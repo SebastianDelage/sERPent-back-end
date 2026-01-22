@@ -1,0 +1,13 @@
+package com.serpent.serpent;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class sERPentApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
+}
