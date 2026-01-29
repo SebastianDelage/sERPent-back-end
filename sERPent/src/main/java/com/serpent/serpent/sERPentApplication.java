@@ -4,10 +4,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class SErPentApplication {
+public class sERPentApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(SErPentApplication.class, args);
+        SpringApplication.run(sERPentApplication.class, args);
     }
 
 }
