@@ -27,7 +27,7 @@ public class expenses {
     private suppliers suppliers;
     @ManyToOne
     @JoinColumn(name = "expense_category_id",nullable = false)
-    private ExpenseCategory expenseCategory;
+    private expenseCategory expenseCategory;
 
     public expenses(){}
 
@@ -71,11 +71,11 @@ public class expenses {
         this.suppliers = suppliers;
     }
 
-    public ExpenseCcategory getExpenseCategory() {
+    public expenseCategory getExpenseCategory() {
         return expenseCategory;
     }
-
-    public void setExpenseCategory(ExpenseCcategory expenseCategory) {
+s
+    public void setExpenseCategory(expenseCategory expenseCategory) {
         this.expenseCategory = expenseCategory;
     }
 }

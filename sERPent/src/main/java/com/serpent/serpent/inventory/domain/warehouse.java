@@ -17,6 +17,9 @@ public class warehouse {
     @NotEmpty
     private Date cratedAt;
 
+    public warehouse() {
+    }
+
     public Long getWarehouserId() {
         return warehouserId;
     }
