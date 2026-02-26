@@ -15,17 +15,19 @@ import java.time.LocalDateTime;
 public class Transaction {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "transaction_id", nullable = false, updatable = false, unique = true)
+    @Column(name = "transaction_id", nullable = false)
     private Long id;
 
     @Column(name = "date", nullable = false)
     private LocalDateTime date;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false, length = 50)
-    private String type;
+    private TransactionType type;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
-    private String status;
+    private TransactionStatus status;
 
     @Column(name = "total", nullable = false, precision = 12, scale = 2)
     private BigDecimal total;
@@ -35,10 +37,10 @@ public class Transaction {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "payment_method_id", nullable = false)
-    private PaymentMethod paymentMethodEntity;
+    private PaymentMethod paymentMethod;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by_user_id", nullable = false)
+    @JoinColumn(name = "created_by_user_id")
     private User createdByUser;
 
     @PrePersist
