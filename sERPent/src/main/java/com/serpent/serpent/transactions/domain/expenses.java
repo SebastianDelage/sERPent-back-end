@@ -21,7 +21,7 @@ public class expenses {
     private Boolean reimubursable;
     @ManyToOne
     @JoinColumn(name ="transaction_id",nullable = false)
-    private Transactions transaction;
+    private Transaction transaction;
     @ManyToOne
     @JoinColumn(name = "supplier_id",nullable = false)
     private suppliers suppliers;
@@ -55,12 +55,8 @@ public class expenses {
         this.reimubursable = reimubursable;
     }
 
-    public Transactions getTranscation() {
+    public Transaction getTranscation() {
         return transaction;
-    }
-
-    public void setTranscation(Transactions transcation) {
-        this.transactions = transaction;
     }
 
     public suppliers getSuppliers() {
@@ -74,7 +70,7 @@ public class expenses {
     public expenseCategory getExpenseCategory() {
         return expenseCategory;
     }
-s
+
     public void setExpenseCategory(expenseCategory expenseCategory) {
         this.expenseCategory = expenseCategory;
     }

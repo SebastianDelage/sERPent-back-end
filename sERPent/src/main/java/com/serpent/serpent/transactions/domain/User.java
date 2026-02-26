@@ -1,5 +1,4 @@
 package com.serpent.serpent.transactions.domain;
-
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -10,11 +9,16 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "users")
+@Table(name = "users",
+        uniqueConstraints = {
+        @UniqueConstraint(name="uk_users_username", columnNames="username"),
+        @UniqueConstraint(name="uk_users_email", columnNames="email")
+    }
+)
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "user_id", nullable = false, updatable = false, unique = true)
+    @Column(name = "user_id", nullable = false)
     private Long id;
 
     @Column(name = "name" ,nullable = false, length = 100)
@@ -33,14 +37,14 @@ public class User {
     private String email;
 
     @Column(name = "active" ,nullable = false)
-    private boolean active;
+    private Boolean active;
 
-    @Column(name = "created_at" ,nullable = false)
+    @Column(name = "created_at" ,nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
-    public void prePersist() {
-        this.createdAt = LocalDateTime.now();
-        if (!this.active) this.active = true;
+    void prePersist() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+        if (active == null) active = true;
     }
 }
