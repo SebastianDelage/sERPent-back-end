@@ -4,7 +4,6 @@ package com.serpent.serpent.catalog.domain;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jdk.jfr.Name;
 
 @Entity
 @Table(name="product_suppliers")

@@ -21,7 +21,7 @@ public class expenses {
     private Boolean reimubursable;
     @ManyToOne
     @JoinColumn(name ="transaction_id",nullable = false)
-    private  transactions transaction;
+    private Transactions transaction;
     @ManyToOne
     @JoinColumn(name = "supplier_id",nullable = false)
     private suppliers suppliers;
@@ -55,11 +55,11 @@ public class expenses {
         this.reimubursable = reimubursable;
     }
 
-    public transactions getTranscation() {
+    public Transactions getTranscation() {
         return transaction;
     }
 
-    public void setTranscation(transactions transcation) {
+    public void setTranscation(Transactions transcation) {
         this.transactions = transaction;
     }
 
