@@ -1,4 +1,4 @@
-package com.serpent.serpent.catalog.domain;
+package com.empresa.serpent.catalog.domain;
 
 
 import jakarta.persistence.*;

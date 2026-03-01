@@ -1,4 +1,4 @@
-package com.serpent.serpent.transactions.domain;
+package com.empresa.serpent.transactions.domain.enums;
 
 public enum TransactionType {
     INCOME,     // Ingreso

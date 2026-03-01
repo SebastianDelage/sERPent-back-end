@@ -1,4 +1,6 @@
-package com.serpent.serpent.transactions.domain;
+package com.empresa.serpent.transactions.domain.entity;
+import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
+import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import jakarta.persistence.*;
 import lombok.*;
 

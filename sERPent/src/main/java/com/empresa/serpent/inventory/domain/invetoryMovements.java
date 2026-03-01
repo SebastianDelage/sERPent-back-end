@@ -1,10 +1,9 @@
-package com.serpent.serpent.inventory.domain;
+package com.empresa.serpent.inventory.domain;
 
-import com.serpent.serpent.inventory.domain.warehouse;
+import com.empresa.serpent.transactions.domain.entity.Transaction;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-
 import java.util.Date;
 
 @Entity
@@ -27,16 +26,14 @@ public class invetoryMovements {
 
 
 
-    @ManyToOne
-    @JoinColumn(name="productId",nullable = false)
-    private Product product;
+
 
     @ManyToOne
-    @JoinColumn(name="productId",nullable = false)
+    @JoinColumn(name="transaction_id",nullable = false)
     private Transaction transaction;
 
     @ManyToOne
-    @JoinColumn(name = "warehouseId")
+    @JoinColumn(name = "warehouse_id")
     private warehouse warehouse;
 
     public invetoryMovements() {
@@ -88,14 +85,6 @@ public class invetoryMovements {
 
     public void setNote(String note) {
         this.note = note;
-    }
-
-    public Product getProduct() {
-        return product;
-    }
-
-    public void setProduct(Product product) {
-        this.product = product;
     }
 
     public Transaction getTransaction() {

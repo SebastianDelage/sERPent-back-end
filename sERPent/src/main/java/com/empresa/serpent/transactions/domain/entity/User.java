@@ -1,4 +1,4 @@
-package com.serpent.serpent.transactions.domain;
+package com.empresa.serpent.transactions.domain.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;

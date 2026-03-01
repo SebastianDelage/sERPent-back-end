@@ -1,17 +1,13 @@
-package com.serpent.serpent.transactions.domain;
-
-
+package com.empresa.serpent.transactions.domain.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
-import com.serpent.serpent.catalog.domain.suppliers;
+import com.empresa.serpent.catalog.domain.suppliers;
 
 
 @Entity
 @Table(name = "expenses")
 public class expenses {
-
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long expenses_id;
