@@ -7,7 +7,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate   # IMPORTANTÍSIMO: Flyway manda, Hibernate valida
+      ddl-auto: validate  # IMPORTANTÍSIMO: Flyway manda, Hibernate valida
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
