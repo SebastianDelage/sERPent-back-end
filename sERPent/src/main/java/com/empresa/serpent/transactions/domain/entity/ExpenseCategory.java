@@ -1,9 +1,7 @@
 package com.empresa.serpent.transactions.domain.entity;
 
-
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import lombok.*;
 
 @Getter

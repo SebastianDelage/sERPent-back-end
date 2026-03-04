@@ -1,30 +1,34 @@
 package com.empresa.serpent.inventory.domain.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotEmpty;
 import lombok.*;
+import jakarta.validation.constraints.NotBlank;
+import org.hibernate.annotations.CreationTimestamp;
+import java.time.LocalDateTime;
 
-import java.util.Date;
-@Entity
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@Table(name = "warehouse")
+@Entity
+@Table(name = "warehouses")
 public class Warehouse {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "warehouse_id",nullable = false,updatable = false)
+    @Column(name = "warehouse_id", nullable = false, updatable = false)
     private Long id;
-    @NotEmpty
-    @Column(name = "name",length = 100,unique = true)
-    private String name;
-    @Column(name = "active")
-    private Boolean active;
-    @Column(name = "crated_at")
-    @NotEmpty
-    private Date cratedAt;
 
+    @NotBlank
+    @Column(name = "name", nullable = false, length = 120, unique = true)
+    private String name;
+
+    @Builder.Default
+    @Column(name = "active", nullable = false)
+    private Boolean active = true;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 }
