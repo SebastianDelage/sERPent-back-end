@@ -1,8 +1,7 @@
 package com.empresa.serpent.transactions.domain.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import com.empresa.serpent.catalog.domain.Suppliers;
+import com.empresa.serpent.catalog.domain.Supplier;
 import lombok.*;
 
 @Getter
@@ -13,24 +12,31 @@ import lombok.*;
 @Entity
 @Table(name = "expenses")
 public class Expense {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "exppenses_id",nullable = false,updatable = false)
+    @Column(name = "expense_id", nullable = false, updatable = false)
     private Long id;
-    @NotNull
-    @Column(name = "recepit_number")
-    private Double recepitNumber; //No recuerdo que es este dato
-    @NotNull
-    @Column(name = "reimubursable")
-    private Boolean reimubursable;
-    @OneToOne
-    @JoinColumn(name ="transaction_id",nullable = false)
-    private Transaction transaction;
-    @ManyToOne
-    @JoinColumn(name = "supplier_id",nullable = false)
-    private Suppliers suppliers;
-    @ManyToOne
-    @JoinColumn(name = "expense_category_id",nullable = false)
-    private ExpenseCategory expenseCategory;
 
+    @Column(name = "receipt_number", length = 80)
+    private String receiptNumber;
+
+    @Builder.Default
+    @Column(name = "reimbursable", nullable = false)
+    private Boolean reimbursable = false;
+
+    @Column(name = "notes")
+    private String notes;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "transaction_id", nullable = false, unique = true)
+    private Transaction transaction;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "supplier_id")
+    private Supplier supplier;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "expense_category_id", nullable = false)
+    private ExpenseCategory expenseCategory;
 }

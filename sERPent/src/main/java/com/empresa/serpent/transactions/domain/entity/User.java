@@ -1,6 +1,8 @@
 package com.empresa.serpent.transactions.domain.entity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.LocalDateTime;
 
 @Getter
@@ -9,42 +11,34 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "users",
-        uniqueConstraints = {
-        @UniqueConstraint(name="uk_users_username", columnNames="username"),
-        @UniqueConstraint(name="uk_users_email", columnNames="email")
-    }
-)
+@Table(name = "users")
 public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = false, updatable = false)
     private Long id;
 
-    @Column(name = "name" ,nullable = false, length = 100)
+    @Column(name = "name", nullable = false, length = 100)
     private String name;
 
-    @Column(name = "last_name" ,nullable = false, length = 100)
+    @Column(name = "last_name", length = 100)
     private String lastName;
 
-    @Column(name = "username" ,nullable = false, length = 100)
+    @Column(name = "username", nullable = false, length = 80)
     private String username;
 
-    @Column(name = "password" ,nullable = false, length = 255)
-    private String password;
+    @Column(name = "password_hash", nullable = false, length = 255)
+    private String passwordHash;
 
-    @Column(name = "email" ,nullable = false, length = 100)
+    @Column(name = "email", length = 150)
     private String email;
 
-    @Column(name = "active" ,nullable = false)
-    private Boolean active;
+    @Builder.Default
+    @Column(name = "active", nullable = false)
+    private Boolean active = true;
 
-    @Column(name = "created_at" ,nullable = false, updatable = false)
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    @PrePersist
-    void prePersist() {
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        if (active == null) active = true;
-    }
 }

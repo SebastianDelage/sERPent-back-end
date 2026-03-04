@@ -13,7 +13,7 @@ import lombok.*;
 @Builder
 @Entity
 @Table(name="product_suppliers")
-public class ProductSuppliers {
+public class ProductSupplier {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
