@@ -1,0 +1,23 @@
+package com.empresa.serpent.transactions.repository;
+
+import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
+import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
+import com.empresa.serpent.transactions.domain.enums.TransactionType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface TransactionRepository extends
+        JpaRepository<TransactionEntity, Long>,
+        JpaSpecificationExecutor<TransactionEntity> {
+
+    List<TransactionEntity> findByType(TransactionType type);
+
+    List<TransactionEntity> findByStatus(TransactionStatus status);
+
+    List<TransactionEntity> findByDateBetween(LocalDateTime start, LocalDateTime end);
+
+    List<TransactionEntity> findByCreatedByUserEntityId(Long userId);
+}

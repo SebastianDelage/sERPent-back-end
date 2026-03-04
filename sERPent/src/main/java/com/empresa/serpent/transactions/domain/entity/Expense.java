@@ -30,7 +30,7 @@ public class Expense {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transaction_id", nullable = false, unique = true)
-    private Transaction transaction;
+    private TransactionEntity transaction;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "supplier_id")

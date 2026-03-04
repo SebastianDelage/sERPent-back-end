@@ -41,5 +41,5 @@ public class Sale {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transaction_id", nullable = false)
-    private Transaction transaction;
+    private TransactionEntity transaction;
 }

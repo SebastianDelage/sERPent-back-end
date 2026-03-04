@@ -1,6 +1,6 @@
 package com.empresa.serpent.transactions.domain.entity;
 
-import com.empresa.serpent.catalog.domain.Product;
+import com.empresa.serpent.catalog.domain.ProductEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -32,11 +32,11 @@ public class TransactionDetail {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id")
-    private Product product;
+    private ProductEntity product;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "transaction_id", nullable = false)
-    private Transaction transaction;
+    private TransactionEntity transaction;
 
     @PrePersist
     @PreUpdate

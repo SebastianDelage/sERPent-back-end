@@ -4,6 +4,8 @@ import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -16,13 +18,14 @@ import java.util.List;
 @Builder
 @Entity
 @Table(name = "transactions")
-public class Transaction {
+public class TransactionEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "transaction_id", nullable = false, updatable = false)
     private Long id;
 
+    @CreationTimestamp
     @Column(name = "date", nullable = false)
     private LocalDateTime date;
 
@@ -46,7 +49,7 @@ public class Transaction {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by_user_id", nullable = false)
-    private User createdByUser;
+    private UserEntity createdByUserEntity;
 
     @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TransactionDetail> details = new ArrayList<>();
@@ -59,7 +62,6 @@ public class Transaction {
 
     @PrePersist
     public void prePersist() {
-        if (this.date == null) this.date = LocalDateTime.now();
         if (this.total == null) this.total = BigDecimal.ZERO;
     }
 }

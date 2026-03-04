@@ -1,8 +1,8 @@
 package com.empresa.serpent.inventory.domain.entity;
 
-import com.empresa.serpent.catalog.domain.Product;
+import com.empresa.serpent.catalog.domain.ProductEntity;
 import com.empresa.serpent.inventory.domain.enums.MovementType;
-import com.empresa.serpent.transactions.domain.entity.Transaction;
+import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetail;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -44,7 +44,7 @@ public class InventoryMovement {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    private ProductEntity product;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "warehouse_id", nullable = false)
@@ -52,7 +52,7 @@ public class InventoryMovement {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transaction_id")
-    private Transaction transaction;
+    private TransactionEntity transaction;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transaction_detail_id")
