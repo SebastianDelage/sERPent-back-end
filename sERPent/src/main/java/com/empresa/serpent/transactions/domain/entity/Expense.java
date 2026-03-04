@@ -5,8 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import com.empresa.serpent.catalog.domain.Suppliers;
 import lombok.*;
 
-import java.math.BigDecimal;
-
 @Getter
 @Setter
 @AllArgsConstructor
@@ -14,7 +12,7 @@ import java.math.BigDecimal;
 @Builder
 @Entity
 @Table(name = "expenses")
-public class Expenses {
+public class Expense {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "exppenses_id",nullable = false,updatable = false)
@@ -25,7 +23,7 @@ public class Expenses {
     @NotNull
     @Column(name = "reimubursable")
     private Boolean reimubursable;
-    @ManyToOne
+    @OneToOne
     @JoinColumn(name ="transaction_id",nullable = false)
     private Transaction transaction;
     @ManyToOne

@@ -17,7 +17,7 @@ import java.util.Date;
 public class InvetoryMovements {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "inventory_movements_id",nullable = false,updatable = false)
+    @Column(name = "movement_id",nullable = false,updatable = false)
     private Long id;
 
     @NotEmpty
@@ -30,7 +30,7 @@ public class InvetoryMovements {
     @Column(name = "unit_cost",length = 100,precision = 12,scale = 2)
     private Double unitCost;
     @NotNull
-    @Column(name = "crated_at")
+    @Column(name = "created_at")
     private Date cratedAt;
     @NotEmpty
     @Column(name = "note")
