@@ -45,7 +45,7 @@ public class TransactionEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "payment_method_id") // en DB es nullable
-    private PaymentMethod paymentMethod;
+    private PaymentMethodEntity paymentMethod;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by_user_id", nullable = false)

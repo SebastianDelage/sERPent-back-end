@@ -25,13 +25,13 @@ public class UserEntity {
     @Column(name = "last_name", length = 100)
     private String lastName;
 
-    @Column(name = "username", nullable = false, length = 80)
+    @Column(name = "username", nullable = false, length = 80, unique = true)
     private String username;
 
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
-    @Column(name = "email", length = 150)
+    @Column(name = "email", length = 150, unique = true)
     private String email;
 
     @Builder.Default

@@ -10,7 +10,7 @@ import lombok.*;
 @Builder
 @Entity
 @Table(name = "payment_methods")
-public class PaymentMethod {
+public class PaymentMethodEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
