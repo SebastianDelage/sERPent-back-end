@@ -53,8 +53,4 @@ public class InventoryMovementEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transaction_id")
     private TransactionEntity transaction;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "transaction_detail_id")
-    private TransactionDetailEntity transactionDetail;
 }
