@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 @Builder
 @Entity
 @Table(name = "product_suppliers")
-public class ProductSupplier {
+public class ProductSupplierEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,7 +25,7 @@ public class ProductSupplier {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "supplier_id", nullable = false)
-    private Supplier supplier;
+    private SupplierEntity supplierEntity;
 
     @NotNull
     @Column(name = "cost_price", nullable = false, precision = 19, scale = 4)

@@ -1,7 +1,7 @@
 package com.empresa.serpent.transactions.domain.entity;
 
 import jakarta.persistence.*;
-import com.empresa.serpent.catalog.domain.Supplier;
+import com.empresa.serpent.catalog.domain.SupplierEntity;
 import lombok.*;
 
 @Getter
@@ -34,7 +34,7 @@ public class Expense {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "supplier_id")
-    private Supplier supplier;
+    private SupplierEntity supplierEntity;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "expense_category_id", nullable = false)

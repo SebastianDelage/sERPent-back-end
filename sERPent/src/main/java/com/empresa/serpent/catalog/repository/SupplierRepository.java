@@ -1,9 +1,21 @@
 package com.empresa.serpent.catalog.repository;
 
-import com.empresa.serpent.catalog.domain.Supplier;
+import com.empresa.serpent.catalog.domain.SupplierEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
-import java.util.List;
+import org.springframework.stereotype.Repository;
 
-public interface SupplierRepository extends JpaRepository<Supplier,Long> {
-    List<Supplier> findByName(String name);
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface SupplierRepository extends JpaRepository<SupplierEntity,Long> {
+
+    Optional<SupplierEntity> findByName(String name);
+
+    List<SupplierEntity> findByNameContainingIgnoreCase(String name);
+
+    List<SupplierEntity> findByActiveTrue();
+
+    boolean existsByName(String name);
+
 }

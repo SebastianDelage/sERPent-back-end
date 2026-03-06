@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @Builder
 @Entity
 @Table(name = "inventory_movements")
-public class InventoryMovement {
+public class InventoryMovementEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "movement_id", nullable = false, updatable = false)
@@ -48,7 +48,7 @@ public class InventoryMovement {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "warehouse_id", nullable = false)
-    private Warehouse warehouse;
+    private WarehouseEntity warehouseEntity;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transaction_id")
