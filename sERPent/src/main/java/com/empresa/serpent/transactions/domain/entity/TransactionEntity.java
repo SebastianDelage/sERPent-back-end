@@ -52,13 +52,13 @@ public class TransactionEntity {
     private UserEntity createdByUserEntity;
 
     @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<TransactionDetail> details = new ArrayList<>();
+    private List<TransactionDetailEntity> details = new ArrayList<>();
 
     @OneToOne(mappedBy = "transaction", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    private Sale sale;
+    private SaleEntity sale;
 
     @OneToOne(mappedBy = "transaction", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    private Expense expense;
+    private ExpenseEntity expense;
 
     @PrePersist
     public void prePersist() {

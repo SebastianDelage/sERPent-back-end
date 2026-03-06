@@ -11,7 +11,7 @@ import lombok.*;
 @Builder
 @Entity
 @Table(name = "expenses")
-public class Expense {
+public class ExpenseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,5 +38,5 @@ public class Expense {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "expense_category_id", nullable = false)
-    private ExpenseCategory expenseCategory;
+    private ExpenseCategoryEntity expenseCategory;
 }

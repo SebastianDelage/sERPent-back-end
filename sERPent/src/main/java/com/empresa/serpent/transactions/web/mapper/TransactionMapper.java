@@ -1,11 +1,15 @@
 package com.empresa.serpent.transactions.web.mapper;
 
+import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.web.dto.response.TransactionDetailResponse;
+import com.empresa.serpent.transactions.web.dto.response.TransactionItemResponse;
 import com.empresa.serpent.transactions.web.dto.response.TransactionListResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
+
+import java.util.List;
 
 @Mapper(
         componentModel = "spring",
@@ -20,4 +24,10 @@ public interface TransactionMapper {
     @Mapping(target = "createdByUserId", source = "createdByUserEntity.id")
     @Mapping(target = "createdByUsername", source = "createdByUserEntity.username")
     TransactionDetailResponse toDetailResponse(TransactionEntity entity);
+
+    @Mapping(target = "productId", source = "product.id")
+    @Mapping(target = "productName", source = "product.name")
+    TransactionItemResponse toItemResponse(TransactionDetailEntity detail);
+
+    List<TransactionItemResponse> toItemResponseList(List<TransactionDetailEntity> details);
 }

@@ -18,5 +18,7 @@ public record TransactionDetailResponse(
         String paymentMethodName,
 
         Long createdByUserId,
-        String createdByUsername
+        String createdByUsername,
+
+        List<TransactionItemResponse> details
 ) {}

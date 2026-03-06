@@ -11,7 +11,7 @@ import lombok.*;
 @Builder
 @Entity
 @Table(name = "expense_categories")
-public class ExpenseCategory {
+public class ExpenseCategoryEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "expense_category_id", nullable = false, updatable = false)
