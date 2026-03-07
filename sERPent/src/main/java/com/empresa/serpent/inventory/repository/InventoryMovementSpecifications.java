@@ -21,7 +21,7 @@ public final class InventoryMovementSpecifications {
     public static Specification<InventoryMovementEntity> hasWarehouseId(Long warehouseId) {
         return (root, query, cb) ->
                 warehouseId == null ? cb.conjunction()
-                        : cb.equal(root.get("warehouseEntity").get("id"), warehouseId);
+                        : cb.equal(root.get("warehouse").get("id"), warehouseId);
     }
 
     public static Specification<InventoryMovementEntity> hasTransactionId(Long transactionId) {
