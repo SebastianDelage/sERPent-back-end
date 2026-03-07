@@ -45,6 +45,13 @@ VALUES
     (1, 'Insumos', 'Compra de insumos del negocio', TRUE);
 
 -- =========================
+-- WAREHOUSES
+-- =========================
+INSERT INTO warehouses (warehouse_id, name, active, created_at)
+VALUES
+    (1, 'Depósito Central', TRUE, CURRENT_TIMESTAMP);
+
+-- =========================
 -- TRANSACTIONS
 -- =========================
 INSERT INTO transactions (transaction_id, date, type, status, total, payment_method_id, created_by_user_id, description)
@@ -73,3 +80,19 @@ VALUES
 INSERT INTO expenses (expense_id, transaction_id, supplier_id, expense_category_id, receipt_number, reimbursable)
 VALUES
     (1, 2, 1, 1, 'REC-001', FALSE);
+
+-- =========================
+-- RESET IDENTITY / AUTOINCREMENT
+-- =========================
+ALTER TABLE users ALTER COLUMN user_id RESTART WITH 2;
+ALTER TABLE payment_methods ALTER COLUMN payment_method_id RESTART WITH 3;
+ALTER TABLE products ALTER COLUMN product_id RESTART WITH 4;
+ALTER TABLE suppliers ALTER COLUMN supplier_id RESTART WITH 2;
+ALTER TABLE product_suppliers ALTER COLUMN product_supplier_id RESTART WITH 3;
+ALTER TABLE expense_categories ALTER COLUMN expense_category_id RESTART WITH 2;
+ALTER TABLE warehouses ALTER COLUMN warehouse_id RESTART WITH 2;
+ALTER TABLE transactions ALTER COLUMN transaction_id RESTART WITH 3;
+ALTER TABLE transaction_details ALTER COLUMN transaction_detail_id RESTART WITH 3;
+ALTER TABLE sales ALTER COLUMN sale_id RESTART WITH 2;
+ALTER TABLE expenses ALTER COLUMN expense_id RESTART WITH 2;
+ALTER TABLE inventory_movements ALTER COLUMN movement_id RESTART WITH 1;
