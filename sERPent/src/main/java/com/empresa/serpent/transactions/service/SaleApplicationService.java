@@ -5,7 +5,7 @@ import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.InventoryMovementEntity;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.domain.enums.MovementType;
-import com.empresa.serpent.inventory.domain.repository.InventoryMovementRepository;
+import com.empresa.serpent.inventory.repository.InventoryMovementRepository;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.transactions.domain.entity.*;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
@@ -158,7 +158,7 @@ public class SaleApplicationService {
                 .map(detail ->
                         InventoryMovementEntity.builder()
                                 .product(detail.getProduct())
-                                .warehouseEntity(warehouse)
+                                .warehouse(warehouse)
                                 .transaction(savedTransaction)
                                 .movementType(MovementType.OUT)
                                 .quantity(detail.getQuantity())

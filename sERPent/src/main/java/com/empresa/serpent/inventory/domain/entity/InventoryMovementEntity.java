@@ -3,7 +3,6 @@ package com.empresa.serpent.inventory.domain.entity;
 import com.empresa.serpent.catalog.domain.ProductEntity;
 import com.empresa.serpent.inventory.domain.enums.MovementType;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
-import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -48,7 +47,7 @@ public class InventoryMovementEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "warehouse_id", nullable = false)
-    private WarehouseEntity warehouseEntity;
+    private WarehouseEntity warehouse;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transaction_id")

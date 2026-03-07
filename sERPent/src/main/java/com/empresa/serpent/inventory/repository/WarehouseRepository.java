@@ -1,4 +1,4 @@
-package com.empresa.serpent.inventory.domain.repository;
+package com.empresa.serpent.inventory.repository;
 
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -1,4 +1,4 @@
-package com.empresa.serpent.inventory.domain.repository;
+package com.empresa.serpent.inventory.repository;
 
 import com.empresa.serpent.inventory.domain.entity.InventoryMovementEntity;
 import com.empresa.serpent.inventory.domain.enums.MovementType;
@@ -16,7 +16,7 @@ public interface InventoryMovementRepository extends
 
     List<InventoryMovementEntity> findByProductId(Long productId);
 
-    List<InventoryMovementEntity> findByWarehouseEntityId(Long warehouseId);
+    List<InventoryMovementEntity> findByWarehouseId(Long warehouseId);
 
     List<InventoryMovementEntity> findByTransactionId(Long transactionId);
 
@@ -24,5 +24,5 @@ public interface InventoryMovementRepository extends
 
     List<InventoryMovementEntity> findByCreatedAtBetween(LocalDateTime from, LocalDateTime to);
 
-    List<InventoryMovementEntity> findByProductIdAndWarehouseEntityId(Long productId, Long warehouseId);
+    List<InventoryMovementEntity> findByProductIdAndWarehouseId(Long productId, Long warehouseId);
 }
