@@ -1,6 +1,5 @@
 package com.empresa.serpent.transactions.web.controller;
 
-
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import com.empresa.serpent.transactions.service.TransactionQueryService;
@@ -42,7 +41,7 @@ public class TransactionController {
             @RequestParam(required = false) Long paymentMethodId,
             @RequestParam(required = false) String text,
 
-            @PageableDefault(sort = "date", direction = DESC) Pageable pageable
+            @PageableDefault(size = 10, sort = "date", direction = DESC) Pageable pageable
     ) {
         TransactionFilter filter = new TransactionFilter(
                 type,

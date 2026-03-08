@@ -48,6 +48,11 @@ public class StockController {
         return stockQueryService.getTotalStockGroupedByProduct(onlyPositive);
     }
 
+    @GetMapping("/warehouse/{warehouseId}")
+    public List<StockResponse> getStockByWarehouse(@PathVariable Long warehouseId) {
+        return stockQueryService.getStock(new StockFilter(null, warehouseId, null));
+    }
+
     @GetMapping("/low")
     public List<LowStockResponse> getLowStock(
             @RequestParam(defaultValue = "0") BigDecimal threshold

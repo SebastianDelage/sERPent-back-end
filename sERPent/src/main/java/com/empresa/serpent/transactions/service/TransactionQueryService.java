@@ -1,6 +1,5 @@
 package com.empresa.serpent.transactions.service;
 
-
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.repository.TransactionRepository;
@@ -10,7 +9,6 @@ import com.empresa.serpent.transactions.web.dto.response.TransactionDetailRespon
 import com.empresa.serpent.transactions.web.dto.response.TransactionListResponse;
 import com.empresa.serpent.transactions.web.mapper.TransactionMapper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -26,6 +24,8 @@ public class TransactionQueryService {
     private final TransactionMapper transactionMapper;
 
     public Page<TransactionListResponse> search(TransactionFilter filter, Pageable pageable) {
+        validateFilter(filter);
+
         Specification<TransactionEntity> spec = TransactionSpecifications.fromFilter(filter);
 
         return transactionRepository
@@ -38,5 +38,17 @@ public class TransactionQueryService {
                 .orElseThrow(() -> new NotFoundException("Transaction not found: " + id));
 
         return transactionMapper.toDetailResponse(entity);
+    }
+
+    private void validateFilter(TransactionFilter filter) {
+        if (filter == null) {
+            return;
+        }
+
+        if (filter.dateFrom() != null
+                && filter.dateTo() != null
+                && filter.dateFrom().isAfter(filter.dateTo())) {
+            throw new IllegalArgumentException("dateFrom cannot be after dateTo");
+        }
     }
 }

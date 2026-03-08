@@ -13,4 +13,5 @@ public record TransactionFilter(
         Long createdByUserId,
         Long paymentMethodId,
         String text
-) {}
+) {
+}

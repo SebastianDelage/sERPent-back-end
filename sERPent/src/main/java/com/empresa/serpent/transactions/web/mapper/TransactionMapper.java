@@ -1,5 +1,6 @@
 package com.empresa.serpent.transactions.web.mapper;
 
+import com.empresa.serpent.shared.mapper.MapStructConfig;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.web.dto.response.TransactionDetailResponse;
@@ -7,14 +8,10 @@ import com.empresa.serpent.transactions.web.dto.response.TransactionItemResponse
 import com.empresa.serpent.transactions.web.dto.response.TransactionListResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.ReportingPolicy;
 
 import java.util.List;
 
-@Mapper(
-        componentModel = "spring",
-        unmappedTargetPolicy = ReportingPolicy.ERROR
-)
+@Mapper(config = MapStructConfig.class)
 public interface TransactionMapper {
 
     TransactionListResponse toListResponse(TransactionEntity entity);
