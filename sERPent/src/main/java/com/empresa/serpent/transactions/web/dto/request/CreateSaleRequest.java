@@ -2,6 +2,7 @@ package com.empresa.serpent.transactions.web.dto.request;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+
 import java.util.List;
 
 public record CreateSaleRequest(
@@ -15,6 +16,9 @@ public record CreateSaleRequest(
 
         @NotNull
         Long createdByUserId,
+
+        @NotNull
+        Long warehouseId,
 
         String description,
 

@@ -3,6 +3,7 @@ package com.empresa.serpent.transactions.service;
 import com.empresa.serpent.catalog.domain.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
+import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import com.empresa.serpent.inventory.service.InventoryMovementService;
 import com.empresa.serpent.inventory.service.StockValidationService;
 import com.empresa.serpent.inventory.web.dto.request.StockCheckItemRequest;
@@ -41,6 +42,7 @@ public class SaleApplicationService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final PaymentMethodRepository paymentMethodRepository;
+    private final WarehouseRepository warehouseRepository;
     private final StockValidationService stockValidationService;
     private final InventoryMovementService inventoryMovementService;
 
@@ -58,23 +60,19 @@ public class SaleApplicationService {
                             new NotFoundException("Payment method not found: " + request.paymentMethodId()));
         }
 
+        WarehouseEntity warehouse = warehouseRepository.findById(request.warehouseId())
+                .orElseThrow(() ->
+                        new NotFoundException("Warehouse not found: " + request.warehouseId()));
+
+        if (!Boolean.TRUE.equals(warehouse.getActive())) {
+            throw new IllegalArgumentException("Warehouse is inactive: " + request.warehouseId());
+        }
+
         if (request.invoiceNumber() != null
                 && !request.invoiceNumber().isBlank()
                 && saleRepository.existsByInvoiceNumber(request.invoiceNumber())) {
             throw new IllegalArgumentException("Invoice number already exists: " + request.invoiceNumber());
         }
-
-        /*
-         TODO FUTURE:
-         Resolve the real warehouse.
-         Possible options:
-         - warehouse from request
-         - warehouse from user's branch
-         - system default warehouse
-         */
-        WarehouseEntity warehouse = WarehouseEntity.builder()
-                .id(1L) // TEMPORARY
-                .build();
 
         stockValidationService.validateSaleItemsStock(
                 request.items().stream()
