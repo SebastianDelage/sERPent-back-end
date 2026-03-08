@@ -6,9 +6,11 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 public record ProductUpdateRequest(
-        @NotBlank String name,
+        @NotBlank(message = "Name cannot be blank")
+        String name,
         String description,
-        @NotNull BigDecimal price,
+        @NotNull(message = "Price cannot be null")
+        BigDecimal price,
         String sku,
         Boolean active
 ) {

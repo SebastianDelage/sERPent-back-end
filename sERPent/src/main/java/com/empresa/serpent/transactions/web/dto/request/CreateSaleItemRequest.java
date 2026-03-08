@@ -6,15 +6,15 @@ import java.math.BigDecimal;
 
 public record CreateSaleItemRequest(
 
-        @NotNull
+        @NotNull(message = "Product id cannot be null")
         Long productId,
 
         String description,
 
-        @NotNull
+        @NotNull(message = "Quantity cannot be null")
         BigDecimal quantity,
 
-        @NotNull
+        @NotNull(message = "Unit price cannot be null")
         BigDecimal unitPrice
 
 ) {}
