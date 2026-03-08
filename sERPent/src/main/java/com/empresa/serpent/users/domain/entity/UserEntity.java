@@ -1,4 +1,4 @@
-package com.empresa.serpent.transactions.domain.entity;
+package com.empresa.serpent.users.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
