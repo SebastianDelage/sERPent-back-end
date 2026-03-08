@@ -10,15 +10,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class InventoryMovementService {
 
     private final InventoryMovementRepository inventoryMovementRepository;
 
+    @Transactional
     public void registerSaleMovements(TransactionEntity transaction, WarehouseEntity warehouse) {
         validateTransactionAndWarehouse(transaction, warehouse);
 
@@ -30,6 +31,7 @@ public class InventoryMovementService {
         inventoryMovementRepository.saveAll(movements);
     }
 
+    @Transactional
     public void registerPurchaseMovements(TransactionEntity transaction, WarehouseEntity warehouse) {
         validateTransactionAndWarehouse(transaction, warehouse);
 
@@ -46,12 +48,42 @@ public class InventoryMovementService {
             throw new IllegalArgumentException("Transaction cannot be null");
         }
 
+        if (transaction.getId() == null) {
+            throw new IllegalArgumentException("Transaction id cannot be null");
+        }
+
         if (warehouse == null) {
             throw new IllegalArgumentException("Warehouse cannot be null");
         }
 
+        if (warehouse.getId() == null) {
+            throw new IllegalArgumentException("Warehouse id cannot be null");
+        }
+
         if (transaction.getDetails() == null || transaction.getDetails().isEmpty()) {
             throw new IllegalArgumentException("Transaction must contain at least one detail");
+        }
+
+        for (TransactionDetailEntity detail : transaction.getDetails()) {
+            validateDetail(detail);
+        }
+    }
+
+    private void validateDetail(TransactionDetailEntity detail) {
+        if (detail == null) {
+            throw new IllegalArgumentException("Transaction detail cannot be null");
+        }
+
+        if (detail.getProduct() == null) {
+            throw new IllegalArgumentException("Transaction detail product cannot be null");
+        }
+
+        if (detail.getQuantity() == null) {
+            throw new IllegalArgumentException("Transaction detail quantity cannot be null");
+        }
+
+        if (detail.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Transaction detail quantity must be greater than zero");
         }
     }
 
