@@ -82,6 +82,25 @@ VALUES
     (1, 2, 1, 1, 'REC-001', FALSE);
 
 -- =========================
+-- INITIAL INVENTORY MOVEMENTS
+-- =========================
+INSERT INTO inventory_movements (
+    movement_id,
+    product_id,
+    warehouse_id,
+    transaction_id,
+    movement_type,
+    quantity,
+    unit_cost,
+    created_at,
+    note
+)
+VALUES
+    (1, 1, 1, NULL, 'IN', 20, 3000, CURRENT_TIMESTAMP, 'Initial stock load'),
+    (2, 2, 1, NULL, 'IN', 20, 3200, CURRENT_TIMESTAMP, 'Initial stock load'),
+    (3, 3, 1, NULL, 'IN', 15, 3500, CURRENT_TIMESTAMP, 'Initial stock load');
+
+-- =========================
 -- RESET IDENTITY / AUTOINCREMENT
 -- =========================
 ALTER TABLE users ALTER COLUMN user_id RESTART WITH 2;
@@ -95,4 +114,4 @@ ALTER TABLE transactions ALTER COLUMN transaction_id RESTART WITH 3;
 ALTER TABLE transaction_details ALTER COLUMN transaction_detail_id RESTART WITH 3;
 ALTER TABLE sales ALTER COLUMN sale_id RESTART WITH 2;
 ALTER TABLE expenses ALTER COLUMN expense_id RESTART WITH 2;
-ALTER TABLE inventory_movements ALTER COLUMN movement_id RESTART WITH 1;
+ALTER TABLE inventory_movements ALTER COLUMN movement_id RESTART WITH 4;

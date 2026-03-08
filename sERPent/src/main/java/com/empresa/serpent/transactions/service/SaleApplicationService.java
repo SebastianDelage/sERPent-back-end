@@ -2,12 +2,16 @@ package com.empresa.serpent.transactions.service;
 
 import com.empresa.serpent.catalog.domain.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
-import com.empresa.serpent.inventory.domain.entity.InventoryMovementEntity;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
-import com.empresa.serpent.inventory.domain.enums.MovementType;
-import com.empresa.serpent.inventory.repository.InventoryMovementRepository;
+import com.empresa.serpent.inventory.service.InventoryMovementService;
+import com.empresa.serpent.inventory.service.StockValidationService;
+import com.empresa.serpent.inventory.web.dto.request.StockCheckItemRequest;
 import com.empresa.serpent.shared.exception.NotFoundException;
-import com.empresa.serpent.transactions.domain.entity.*;
+import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
+import com.empresa.serpent.transactions.domain.entity.SaleEntity;
+import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
+import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
+import com.empresa.serpent.transactions.domain.entity.UserEntity;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import com.empresa.serpent.transactions.repository.PaymentMethodRepository;
@@ -20,6 +24,7 @@ import com.empresa.serpent.transactions.web.dto.response.CreateSaleResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,47 +41,52 @@ public class SaleApplicationService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final PaymentMethodRepository paymentMethodRepository;
-    private final InventoryMovementRepository inventoryMovementRepository;
+    private final StockValidationService stockValidationService;
+    private final InventoryMovementService inventoryMovementService;
 
     @Transactional
     public CreateSaleResponse createSale(CreateSaleRequest request) {
-
-        /*
-         TODO FUTURO:
-         Validar stock disponible antes de permitir la venta.
-         Ejemplo: inventoryService.validateStock(productId, quantity)
-         */
 
         UserEntity createdBy = userRepository.findById(request.createdByUserId())
                 .orElseThrow(() ->
                         new NotFoundException("User not found: " + request.createdByUserId()));
 
         PaymentMethodEntity paymentMethod = null;
-
         if (request.paymentMethodId() != null) {
             paymentMethod = paymentMethodRepository.findById(request.paymentMethodId())
                     .orElseThrow(() ->
                             new NotFoundException("Payment method not found: " + request.paymentMethodId()));
         }
 
-        /*
-         TODO FUTURO:
-         Resolver el warehouse real.
-         Opciones posibles:
-         - warehouse por request
-         - warehouse por sucursal del usuario
-         - warehouse default del sistema
-         */
+        if (request.invoiceNumber() != null
+                && !request.invoiceNumber().isBlank()
+                && saleRepository.existsByInvoiceNumber(request.invoiceNumber())) {
+            throw new IllegalArgumentException("Invoice number already exists: " + request.invoiceNumber());
+        }
 
+        /*
+         TODO FUTURE:
+         Resolve the real warehouse.
+         Possible options:
+         - warehouse from request
+         - warehouse from user's branch
+         - system default warehouse
+         */
         WarehouseEntity warehouse = WarehouseEntity.builder()
-                .id(1L) // TEMPORAL
+                .id(1L) // TEMPORARY
                 .build();
 
+        stockValidationService.validateSaleItemsStock(
+                request.items().stream()
+                        .map(item -> new StockCheckItemRequest(item.productId(), item.quantity()))
+                        .toList(),
+                warehouse.getId()
+        );
+
         /*
-         Cargamos productos en batch para evitar N+1 queries
+         Batch load products to avoid N+1 queries.
          */
-        List<Long> productIds = request.items()
-                .stream()
+        List<Long> productIds = request.items().stream()
                 .map(CreateSaleItemRequest::productId)
                 .toList();
 
@@ -85,12 +95,9 @@ public class SaleApplicationService {
         Map<Long, ProductEntity> productMap = products.stream()
                 .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
 
-        /*
-         Creamos Transaction
-         */
         TransactionEntity transaction = TransactionEntity.builder()
                 .type(TransactionType.SALE)
-                .status(TransactionStatus.CONFIRMED) // Venta real impacta stock
+                .status(TransactionStatus.CONFIRMED)
                 .description(request.description())
                 .paymentMethod(paymentMethod)
                 .createdByUserEntity(createdBy)
@@ -103,19 +110,25 @@ public class SaleApplicationService {
         for (CreateSaleItemRequest item : request.items()) {
 
             ProductEntity product = productMap.get(item.productId());
-
             if (product == null) {
                 throw new NotFoundException("Product not found: " + item.productId());
             }
 
-            BigDecimal subtotal = item.unitPrice()
-                    .multiply(item.quantity());
+            if (item.unitPrice() == null) {
+                throw new IllegalArgumentException("Item unitPrice cannot be null");
+            }
+
+            if (item.unitPrice().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("Item unitPrice cannot be negative");
+            }
+
+            BigDecimal subtotal = item.unitPrice().multiply(item.quantity());
 
             TransactionDetailEntity detail = TransactionDetailEntity.builder()
                     .transaction(transaction)
                     .product(product)
                     .description(
-                            item.description() != null
+                            item.description() != null && !item.description().isBlank()
                                     ? item.description()
                                     : product.getName()
                     )
@@ -125,17 +138,12 @@ public class SaleApplicationService {
                     .build();
 
             transaction.getDetails().add(detail);
-
             total = total.add(subtotal);
         }
 
         transaction.setTotal(total);
 
         TransactionEntity savedTransaction = transactionRepository.save(transaction);
-
-        /*
-         Creamos la entidad Sale
-         */
 
         SaleEntity sale = SaleEntity.builder()
                 .transaction(savedTransaction)
@@ -148,36 +156,14 @@ public class SaleApplicationService {
 
         SaleEntity savedSale = saleRepository.save(sale);
 
-        /*
-         Generamos movimientos de inventario
-         */
-
-        List<InventoryMovementEntity> movements = savedTransaction
-                .getDetails()
-                .stream()
-                .map(detail ->
-                        InventoryMovementEntity.builder()
-                                .product(detail.getProduct())
-                                .warehouse(warehouse)
-                                .transaction(savedTransaction)
-                                .movementType(MovementType.OUT)
-                                .quantity(detail.getQuantity())
-                                .unitCost(null)
-                                .note("Sale #" + savedTransaction.getId())
-                                .build()
-                )
-                .toList();
-
-        inventoryMovementRepository.saveAll(movements);
+        inventoryMovementService.registerSaleMovements(savedTransaction, warehouse);
 
         /*
-         TODO FUTURO:
-         - calcular impuestos
-         - integración AFIP
-         - generar CAE
-         - validar duplicados de invoiceNumber
+         TODO FUTURE:
+         - calculate taxes
+         - integrate with AFIP
+         - generate CAE
          */
-
         return new CreateSaleResponse(
                 savedTransaction.getId(),
                 savedSale.getId(),
