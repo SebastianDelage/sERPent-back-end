@@ -13,31 +13,94 @@ The goal of the project is to provide a **practical ERP backend foundation** tha
 
 ---
 
-# High Level Architecture
+## Project Ecosystem
+
+This repository contains the backend of the sERPent ERP system.
+
+The full platform is planned as a multi-repository application composed of:
+
+- `sERPent-backend` for business logic and API services
+- `sERPent-frontend` for the Angular user interface
+- `sERPent-desktop` for **Electron-based desktop packaging and distribution**
+
+The long-term product vision is a **desktop ERP application built with Angular and Electron**, powered by the backend services provided in this repository.
+
+---
+
+## ERP System Architecture
+
+The following diagram shows the intended high-level architecture of the full sERPent platform.
+
+```mermaid
+flowchart LR
+
+User[End User] --> Desktop[Desktop Application<br/>sERPent-desktop]
+Desktop --> Frontend[Frontend Client<br/>Angular]
+Frontend --> Backend[Backend API<br/>Spring Boot]
+Backend --> Database[(PostgreSQL / H2)]
+
+Postman[Postman / API Testing] --> Backend
+```
+
+This architecture separates responsibilities between desktop distribution, frontend interaction, backend business logic, and persistence.
+
+---
+
+## High Level Backend Architecture
 
 The backend follows a modular layered architecture with clear separation between API, business workflows, and persistence.
 
 ```mermaid
 flowchart TD
 
-Client[Client / Frontend / Postman] --> Controller[REST Controllers]
+Client[Angular Client / Postman] --> Controller[REST Controllers]
 
-Controller --> AppService[Application Services]
-Controller --> QueryService[Query Services]
+Controller --> Service[Application / Query Services]
 
-AppService --> DomainService[Domain Services]
-QueryService --> DomainService
-
-DomainService --> Repository[Repositories]
+Service --> Repository[Repositories]
 
 Repository --> Database[(PostgreSQL / H2)]
 ```
 
-Controllers expose the API surface, services orchestrate business logic, repositories handle persistence, and the database stores transactional state.
+Controllers expose the API surface, services orchestrate business workflows, repositories handle persistence, and the database stores transactional state.
 
 ---
 
-# Project Status
+## Domain Model Overview
+
+The following diagram illustrates the main domain relationships inside the ERP.
+
+```mermaid
+flowchart LR
+
+Products --> TransactionDetails
+Transactions --> TransactionDetails
+
+Transactions --> Sales
+Transactions --> Expenses
+
+Products --> InventoryMovements
+Warehouses --> InventoryMovements
+
+InventoryMovements --> Stock
+
+Suppliers --> ProductSuppliers
+Products --> ProductSuppliers
+
+Suppliers --> Expenses
+ExpenseCategories --> Expenses
+```
+
+This model reflects the core design decisions of the system:
+
+- **transactions as the operational root**
+- **movement-based inventory**
+- **separation between inventory history and stock visibility**
+- **integration of suppliers and expenses into the transaction model**
+
+---
+
+## Project Status
 
 The **core transactional and inventory backend is already implemented and functional**.
 
@@ -52,7 +115,7 @@ This repository represents an **active development project**, and additional ERP
 
 ---
 
-# Tech Stack
+## Tech Stack
 
 - Java
 - Spring Boot
@@ -66,13 +129,13 @@ This repository represents an **active development project**, and additional ERP
 
 ---
 
-# Current Modules
+## Current Modules
 
-The current backend already supports the following core capabilities.
+The backend currently includes the following core modules.
 
 ---
 
-## Product Catalog
+### Product Catalog
 
 Features:
 
@@ -90,7 +153,7 @@ Validations:
 
 ---
 
-## Users
+### Users
 
 Features:
 
@@ -106,7 +169,7 @@ Validations:
 
 ---
 
-## Payment Methods
+### Payment Methods
 
 Features:
 
@@ -121,7 +184,7 @@ Validations:
 
 ---
 
-## Warehouses
+### Warehouses
 
 Features:
 
@@ -136,7 +199,7 @@ Validations:
 
 ---
 
-## Transactions
+### Transactions
 
 The system uses a **generic transaction model**.
 
@@ -153,7 +216,7 @@ Features:
 
 ---
 
-## Sales
+### Sales
 
 Sales are implemented as a **business workflow built on top of transactions**.
 
@@ -176,7 +239,7 @@ Validations:
 
 ---
 
-## Inventory Movements
+### Inventory Movements
 
 Inventory is **movement-based**, not stored directly in products.
 
@@ -197,7 +260,7 @@ Supported movement types:
 
 ---
 
-## Stock Queries
+### Stock Queries
 
 Stock visibility is separated from movement history.
 
@@ -212,7 +275,7 @@ Features:
 
 ---
 
-## Suppliers
+### Suppliers
 
 Supplier management supports product sourcing and cost tracking.
 
@@ -229,7 +292,7 @@ Features:
 
 ---
 
-## Expenses
+### Expenses
 
 Expense management allows recording operational costs.
 
@@ -246,9 +309,9 @@ Features:
 
 ---
 
-# Running the Project
+## Running the Project
 
-## Requirements
+### Requirements
 
 - Java 17+
 - Maven
@@ -256,7 +319,7 @@ Features:
 
 ---
 
-## Development Database
+### Development Database
 
 The project uses **H2 for development**.
 
@@ -273,7 +336,7 @@ Seed data includes:
 
 ---
 
-## Run the application
+### Run the application
 
 ```bash
 mvn spring-boot:run
@@ -281,9 +344,15 @@ mvn spring-boot:run
 
 The API will start using the default Spring Boot configuration.
 
+By default the API will be available at:
+
+```
+http://localhost:8080
+```
+
 ---
 
-# Roadmap
+## Roadmap
 
 The architecture has been designed to support additional ERP capabilities.
 
@@ -298,7 +367,7 @@ Planned modules include:
 
 ---
 
-# Documentation
+## Documentation
 
 Additional technical documentation can be found in:
 
@@ -317,7 +386,7 @@ This document explains:
 
 ---
 
-# Development Principles
+## Development Principles
 
 To keep the project maintainable and scalable:
 
@@ -329,8 +398,8 @@ To keep the project maintainable and scalable:
 
 ---
 
-# Summary
+## Summary
 
 sERPent is a **transaction-driven, inventory-centric ERP backend** designed to support real-world business workflows while remaining modular and extensible.
 
-The current codebase already provides a strong foundation for building additional ERP capabilities while keeping the core system simple, explicit, and maintainable.
+The current codebase provides a strong foundation for building additional ERP capabilities while keeping the core system simple, explicit, and maintainable.

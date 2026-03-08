@@ -15,6 +15,48 @@ The project aims to provide a **solid ERP foundation** that can grow incremental
 
 ---
 
+## System Landscape
+
+Although this repository focuses on the backend, sERPent is designed as part of a broader application ecosystem.
+
+The full platform is planned to include multiple repositories with clearly separated responsibilities.
+
+### Backend
+
+**sERPent-backend** (this repository)
+
+Responsible for:
+
+- domain logic
+- transactional workflows
+- inventory management
+- persistence
+- REST API exposure
+
+### Frontend
+
+**sERPent-frontend**
+
+An Angular client application responsible for:
+
+- user interface
+- dashboard views
+- business interaction workflows
+- communication with backend APIs
+
+### Desktop Distribution
+
+**sERPent-desktop**
+
+An Electron-based desktop shell responsible for:
+
+- packaging the Angular frontend
+- providing desktop application distribution
+- enabling cross-platform desktop deployment
+
+This separation ensures that business logic remains independent from presentation and desktop distribution concerns, allowing the system to evolve as a maintainable multi-repository architecture.
+
+---
 # Current System Status
 
 The **core transactional and inventory backend is already implemented and functional**.
