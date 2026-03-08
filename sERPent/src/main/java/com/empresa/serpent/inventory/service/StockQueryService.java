@@ -6,6 +6,7 @@ import com.empresa.serpent.inventory.repository.InventoryMovementRepository;
 import com.empresa.serpent.inventory.repository.InventoryMovementSpecifications;
 import com.empresa.serpent.inventory.web.dto.filter.InventoryMovementFilter;
 import com.empresa.serpent.inventory.web.dto.filter.StockFilter;
+import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.ProductStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.StockResponse;
 import lombok.RequiredArgsConstructor;
@@ -68,6 +69,13 @@ public class StockQueryService {
                                 || !filter.onlyPositive()
                                 || response.stock().compareTo(BigDecimal.ZERO) > 0
                 )
+                .sorted((a, b) -> {
+                    int productCompare = a.productName().compareToIgnoreCase(b.productName());
+                    if (productCompare != 0) {
+                        return productCompare;
+                    }
+                    return a.warehouseName().compareToIgnoreCase(b.warehouseName());
+                })
                 .toList();
     }
 
@@ -113,6 +121,41 @@ public class StockQueryService {
                                 || !onlyPositive
                                 || response.totalStock().compareTo(BigDecimal.ZERO) > 0
                 )
+                .toList();
+    }
+
+    /*
+ FUTURE IMPROVEMENT
+
+ Currently, this method uses a request threshold to determine low-stock products.
+
+ In a future version of sERPent, the Product entity should include inventory
+ configuration fields such as:
+
+     - minimumStock
+     - reorderPoint
+     - reorderQuantity
+
+ Once implemented, this method should be refactored to compare the current
+ product stock against Product.minimumStock instead of a request threshold.
+
+ This will allow the system to support automatic replenishment alerts and
+ purchasing suggestions, similar to how most ERP systems handle inventory control.
+ */
+    public List<LowStockResponse> getLowStock(BigDecimal threshold) {
+        if (threshold == null || threshold.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Threshold must be zero or greater");
+        }
+
+        return getTotalStockGroupedByProduct(false).stream()
+                .filter(product -> product.totalStock().compareTo(threshold) <= 0)
+                .map(product -> new LowStockResponse(
+                        product.productId(),
+                        product.productName(),
+                        product.totalStock(),
+                        threshold
+                ))
+                .sorted((a, b) -> a.productName().compareToIgnoreCase(b.productName()))
                 .toList();
     }
 

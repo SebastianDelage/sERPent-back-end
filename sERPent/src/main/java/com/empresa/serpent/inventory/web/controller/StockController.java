@@ -2,6 +2,7 @@ package com.empresa.serpent.inventory.web.controller;
 
 import com.empresa.serpent.inventory.service.StockQueryService;
 import com.empresa.serpent.inventory.web.dto.filter.StockFilter;
+import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.ProductStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.StockResponse;
 import lombok.RequiredArgsConstructor;
@@ -45,5 +46,12 @@ public class StockController {
             @RequestParam(required = false) Boolean onlyPositive
     ) {
         return stockQueryService.getTotalStockGroupedByProduct(onlyPositive);
+    }
+
+    @GetMapping("/low")
+    public List<LowStockResponse> getLowStock(
+            @RequestParam(defaultValue = "0") BigDecimal threshold
+    ) {
+        return stockQueryService.getLowStock(threshold);
     }
 }
