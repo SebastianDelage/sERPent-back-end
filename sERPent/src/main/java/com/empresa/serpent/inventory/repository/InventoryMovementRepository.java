@@ -9,7 +9,6 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Repository
 public interface InventoryMovementRepository extends
         JpaRepository<InventoryMovementEntity, Long>,
         JpaSpecificationExecutor<InventoryMovementEntity> {

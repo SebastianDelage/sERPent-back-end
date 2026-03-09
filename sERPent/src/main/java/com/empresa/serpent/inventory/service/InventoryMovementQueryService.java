@@ -27,7 +27,7 @@ public class InventoryMovementQueryService {
 
     public InventoryMovementResponse getById(Long id) {
         InventoryMovementEntity entity = inventoryMovementRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Movimiento de inventario no encontrado con id: " + id));
+                .orElseThrow(() -> new NotFoundException("Inventory movement not found: " + id));
 
         return inventoryMovementMapper.toResponse(entity);
     }

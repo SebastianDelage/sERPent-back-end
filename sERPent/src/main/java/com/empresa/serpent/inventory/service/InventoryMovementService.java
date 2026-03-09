@@ -1,5 +1,6 @@
 package com.empresa.serpent.inventory.service;
 
+import com.empresa.serpent.catalog.domain.ProductEntity;
 import com.empresa.serpent.inventory.domain.entity.InventoryMovementEntity;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.domain.enums.MovementType;
@@ -41,6 +42,68 @@ public class InventoryMovementService {
                 .toList();
 
         inventoryMovementRepository.saveAll(movements);
+    }
+
+    @Transactional
+    public void registerAdjustmentMovement(
+            TransactionEntity transaction,
+            WarehouseEntity warehouse,
+            ProductEntity product,
+            MovementType movementType,
+            BigDecimal quantity,
+            String note
+    ) {
+        if (transaction == null) {
+            throw new IllegalArgumentException("Transaction cannot be null");
+        }
+
+        if (transaction.getId() == null) {
+            throw new IllegalArgumentException("Transaction id cannot be null");
+        }
+
+        if (warehouse == null) {
+            throw new IllegalArgumentException("Warehouse cannot be null");
+        }
+
+        if (warehouse.getId() == null) {
+            throw new IllegalArgumentException("Warehouse id cannot be null");
+        }
+
+        if (product == null) {
+            throw new IllegalArgumentException("Product cannot be null");
+        }
+
+        if (product.getId() == null) {
+            throw new IllegalArgumentException("Product id cannot be null");
+        }
+
+        if (movementType == null) {
+            throw new IllegalArgumentException("Movement type cannot be null");
+        }
+
+        if (movementType != MovementType.ADJUSTMENT_IN && movementType != MovementType.ADJUSTMENT_OUT) {
+            throw new IllegalArgumentException("Movement type must be ADJUSTMENT_IN or ADJUSTMENT_OUT");
+        }
+
+        if (quantity == null) {
+            throw new IllegalArgumentException("Quantity cannot be null");
+        }
+
+        if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Quantity must be greater than zero");
+        }
+
+        InventoryMovementEntity movement = InventoryMovementEntity.builder()
+                .product(product)
+                .warehouse(warehouse)
+                .transaction(transaction)
+                .movementType(movementType)
+                .quantity(quantity)
+                .unitCost(null)
+                .note(note)
+                .build();
+
+        inventoryMovementRepository.save(movement);
     }
 
     private void validateTransactionAndWarehouse(TransactionEntity transaction, WarehouseEntity warehouse) {
