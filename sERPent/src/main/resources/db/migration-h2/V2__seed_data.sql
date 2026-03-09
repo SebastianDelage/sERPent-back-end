@@ -3,7 +3,7 @@
 -- =========================
 INSERT INTO users (user_id, name, last_name, username, password_hash, email, active, created_at)
 VALUES
-    (1, 'Admin', 'System', 'admin', '123', 'admin@serpent.com', TRUE, CURRENT_TIMESTAMP);
+    (1, 'Admin', 'System', 'admin', 'dev-only-password', 'admin@serpent.com', TRUE, CURRENT_TIMESTAMP);
 
 -- =========================
 -- PAYMENT METHODS
@@ -49,7 +49,9 @@ VALUES
 -- =========================
 INSERT INTO warehouses (warehouse_id, name, active, created_at)
 VALUES
-    (1, 'Depósito Central', TRUE, CURRENT_TIMESTAMP);
+    (1, 'Depósito Central', TRUE, CURRENT_TIMESTAMP),
+    (2, 'Sucursal Norte', TRUE, CURRENT_TIMESTAMP),
+    (3, 'Depósito Inactivo', FALSE, CURRENT_TIMESTAMP);
 
 -- =========================
 -- TRANSACTIONS
@@ -96,9 +98,18 @@ INSERT INTO inventory_movements (
     note
 )
 VALUES
+    -- Initial stock in warehouse 1
     (1, 1, 1, NULL, 'IN', 20, 3000, CURRENT_TIMESTAMP, 'Initial stock load'),
     (2, 2, 1, NULL, 'IN', 20, 3200, CURRENT_TIMESTAMP, 'Initial stock load'),
-    (3, 3, 1, NULL, 'IN', 15, 3500, CURRENT_TIMESTAMP, 'Initial stock load');
+    (3, 3, 1, NULL, 'IN', 15, 3500, CURRENT_TIMESTAMP, 'Initial stock load'),
+
+    -- Initial stock in warehouse 2
+    (4, 1, 2, NULL, 'IN', 8, 3000, CURRENT_TIMESTAMP, 'Initial stock load'),
+    (5, 3, 2, NULL, 'IN', 5, 3500, CURRENT_TIMESTAMP, 'Initial stock load'),
+
+    -- Inventory impact of seeded sale #1 in warehouse 1
+    (6, 1, 1, 1, 'OUT', 1, NULL, CURRENT_TIMESTAMP, 'Sale #1'),
+    (7, 2, 1, 1, 'OUT', 1, NULL, CURRENT_TIMESTAMP, 'Sale #1');
 
 -- =========================
 -- RESET IDENTITY / AUTOINCREMENT
@@ -109,9 +120,9 @@ ALTER TABLE products ALTER COLUMN product_id RESTART WITH 4;
 ALTER TABLE suppliers ALTER COLUMN supplier_id RESTART WITH 2;
 ALTER TABLE product_suppliers ALTER COLUMN product_supplier_id RESTART WITH 3;
 ALTER TABLE expense_categories ALTER COLUMN expense_category_id RESTART WITH 2;
-ALTER TABLE warehouses ALTER COLUMN warehouse_id RESTART WITH 2;
+ALTER TABLE warehouses ALTER COLUMN warehouse_id RESTART WITH 4;
 ALTER TABLE transactions ALTER COLUMN transaction_id RESTART WITH 3;
 ALTER TABLE transaction_details ALTER COLUMN transaction_detail_id RESTART WITH 3;
 ALTER TABLE sales ALTER COLUMN sale_id RESTART WITH 2;
 ALTER TABLE expenses ALTER COLUMN expense_id RESTART WITH 2;
-ALTER TABLE inventory_movements ALTER COLUMN movement_id RESTART WITH 4;
+ALTER TABLE inventory_movements ALTER COLUMN movement_id RESTART WITH 8;
