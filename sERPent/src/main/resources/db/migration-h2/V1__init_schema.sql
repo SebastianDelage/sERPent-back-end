@@ -125,7 +125,7 @@ CREATE TABLE transactions (
 
                               CONSTRAINT ck_transactions_total_nonneg CHECK (total >= 0),
 
-                              CONSTRAINT ck_transactions_type CHECK (type IN ('SALE','EXPENSE','PURCHASE','ADJUSTMENT')),
+                              CONSTRAINT ck_transactions_type CHECK (type IN ('SALE','EXPENSE','PURCHASE','ADJUSTMENT','TRANSFER')),
                               CONSTRAINT ck_transactions_status CHECK (status IN ('DRAFT','CONFIRMED','CANCELLED'))
 );
 

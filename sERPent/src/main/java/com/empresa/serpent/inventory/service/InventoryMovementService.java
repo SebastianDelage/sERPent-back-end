@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -106,6 +107,52 @@ public class InventoryMovementService {
         inventoryMovementRepository.save(movement);
     }
 
+    @Transactional
+    public void registerTransferMovements(
+            TransactionEntity transaction,
+            WarehouseEntity sourceWarehouse,
+            WarehouseEntity targetWarehouse
+    ) {
+        if (transaction == null) {
+            throw new IllegalArgumentException("Transaction cannot be null");
+        }
+
+        if (transaction.getId() == null) {
+            throw new IllegalArgumentException("Transaction id cannot be null");
+        }
+
+        if (sourceWarehouse == null) {
+            throw new IllegalArgumentException("Source warehouse cannot be null");
+        }
+
+        if (sourceWarehouse.getId() == null) {
+            throw new IllegalArgumentException("Source warehouse id cannot be null");
+        }
+
+        if (targetWarehouse == null) {
+            throw new IllegalArgumentException("Target warehouse cannot be null");
+        }
+
+        if (targetWarehouse.getId() == null) {
+            throw new IllegalArgumentException("Target warehouse id cannot be null");
+        }
+
+        if (sourceWarehouse.getId().equals(targetWarehouse.getId())) {
+            throw new IllegalArgumentException("Source and target warehouse cannot be the same");
+        }
+
+        if (transaction.getDetails() == null || transaction.getDetails().isEmpty()) {
+            throw new IllegalArgumentException("Transaction must contain at least one detail");
+        }
+
+        List<InventoryMovementEntity> movements = transaction.getDetails()
+                .stream()
+                .flatMap(detail -> toTransferMovements(detail, transaction, sourceWarehouse, targetWarehouse))
+                .toList();
+
+        inventoryMovementRepository.saveAll(movements);
+    }
+
     private void validateTransactionAndWarehouse(TransactionEntity transaction, WarehouseEntity warehouse) {
         if (transaction == null) {
             throw new IllegalArgumentException("Transaction cannot be null");
@@ -180,6 +227,37 @@ public class InventoryMovementService {
                 .unitCost(detail.getUnitPrice())
                 .note("Purchase #" + transaction.getId())
                 .build();
+    }
+
+    private Stream<InventoryMovementEntity> toTransferMovements(
+            TransactionDetailEntity detail,
+            TransactionEntity transaction,
+            WarehouseEntity sourceWarehouse,
+            WarehouseEntity targetWarehouse
+    ) {
+        validateDetail(detail);
+
+        InventoryMovementEntity transferOut = InventoryMovementEntity.builder()
+                .product(detail.getProduct())
+                .warehouse(sourceWarehouse)
+                .transaction(transaction)
+                .movementType(MovementType.TRANSFER_OUT)
+                .quantity(detail.getQuantity())
+                .unitCost(null)
+                .note("Transfer #" + transaction.getId() + " to warehouse " + targetWarehouse.getId())
+                .build();
+
+        InventoryMovementEntity transferIn = InventoryMovementEntity.builder()
+                .product(detail.getProduct())
+                .warehouse(targetWarehouse)
+                .transaction(transaction)
+                .movementType(MovementType.TRANSFER_IN)
+                .quantity(detail.getQuantity())
+                .unitCost(null)
+                .note("Transfer #" + transaction.getId() + " from warehouse " + sourceWarehouse.getId())
+                .build();
+
+        return Stream.of(transferOut, transferIn);
     }
     /*
  FUTURE MOVEMENT TYPES
