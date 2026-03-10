@@ -5,5 +5,6 @@ public enum TransactionType {
     EXPENSE,
     PURCHASE,
     ADJUSTMENT,
-    TRANSFER
+    TRANSFER,
+    RETURN
 }

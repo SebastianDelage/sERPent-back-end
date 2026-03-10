@@ -161,7 +161,7 @@ public class StockQueryService {
 
     private BigDecimal signedQuantity(InventoryMovementEntity movement) {
         return switch (movement.getMovementType()) {
-            case IN, ADJUSTMENT_IN, TRANSFER_IN -> movement.getQuantity();
+            case IN, ADJUSTMENT_IN, TRANSFER_IN, RETURN_IN -> movement.getQuantity();
             case OUT, ADJUSTMENT_OUT, TRANSFER_OUT -> movement.getQuantity().negate();
         };
     }

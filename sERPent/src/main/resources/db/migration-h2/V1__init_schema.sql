@@ -125,7 +125,9 @@ CREATE TABLE transactions (
 
                               CONSTRAINT ck_transactions_total_nonneg CHECK (total >= 0),
 
-                              CONSTRAINT ck_transactions_type CHECK (type IN ('SALE','EXPENSE','PURCHASE','ADJUSTMENT','TRANSFER')),
+                              CONSTRAINT ck_transactions_type CHECK (
+                                  type IN ('SALE','EXPENSE','PURCHASE','ADJUSTMENT','TRANSFER','RETURN')
+                                  ),
                               CONSTRAINT ck_transactions_status CHECK (status IN ('DRAFT','CONFIRMED','CANCELLED'))
 );
 
@@ -176,7 +178,25 @@ CREATE TABLE sales (
 );
 
 -- =========================
--- 10) EXPENSES
+-- 10) SALE RETURNS
+-- =========================
+CREATE TABLE sale_returns (
+                              sale_return_id BIGSERIAL PRIMARY KEY,
+                              transaction_id BIGINT NOT NULL,
+                              original_sale_id BIGINT NOT NULL,
+                              reason TEXT,
+
+                              CONSTRAINT fk_sale_returns_transaction
+                                  FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id),
+
+                              CONSTRAINT fk_sale_returns_original_sale
+                                  FOREIGN KEY (original_sale_id) REFERENCES sales(sale_id),
+
+                              CONSTRAINT ux_sale_returns_transaction UNIQUE (transaction_id)
+);
+
+-- =========================
+-- 11) EXPENSES
 -- =========================
 CREATE TABLE expenses (
                           expense_id BIGSERIAL PRIMARY KEY,
@@ -200,7 +220,7 @@ CREATE TABLE expenses (
 );
 
 -- =========================
--- 11) WAREHOUSES
+-- 12) WAREHOUSES
 -- =========================
 CREATE TABLE warehouses (
                             warehouse_id BIGSERIAL PRIMARY KEY,
@@ -212,7 +232,7 @@ CREATE TABLE warehouses (
 );
 
 -- =========================
--- 12) INVENTORY_MOVEMENTS
+-- 13) INVENTORY_MOVEMENTS
 -- =========================
 CREATE TABLE inventory_movements (
                                      movement_id BIGSERIAL PRIMARY KEY,
@@ -238,7 +258,15 @@ CREATE TABLE inventory_movements (
                                      CONSTRAINT ck_inventory_movements_unit_cost_nonneg CHECK (unit_cost IS NULL OR unit_cost >= 0),
 
                                      CONSTRAINT ck_inventory_movements_type CHECK (
-                                         movement_type IN ('IN','OUT','ADJUSTMENT_IN','ADJUSTMENT_OUT','TRANSFER_IN','TRANSFER_OUT')
+                                         movement_type IN (
+                                                           'IN',
+                                                           'OUT',
+                                                           'ADJUSTMENT_IN',
+                                                           'ADJUSTMENT_OUT',
+                                                           'TRANSFER_IN',
+                                                           'TRANSFER_OUT',
+                                                           'RETURN_IN'
+                                             )
                                          )
 );
 
@@ -253,6 +281,8 @@ CREATE INDEX idx_transactions_payment_method ON transactions(payment_method_id);
 
 CREATE INDEX idx_transaction_details_transaction ON transaction_details(transaction_id);
 CREATE INDEX idx_transaction_details_product ON transaction_details(product_id);
+
+CREATE INDEX idx_sale_returns_original_sale ON sale_returns(original_sale_id);
 
 CREATE INDEX idx_expenses_supplier ON expenses(supplier_id);
 CREATE INDEX idx_expenses_category ON expenses(expense_category_id);

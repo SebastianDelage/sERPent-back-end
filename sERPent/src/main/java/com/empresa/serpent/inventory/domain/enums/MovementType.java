@@ -6,5 +6,6 @@ public enum MovementType {
     ADJUSTMENT_IN,
     ADJUSTMENT_OUT,
     TRANSFER_IN,
-    TRANSFER_OUT
+    TRANSFER_OUT,
+    RETURN_IN
 }

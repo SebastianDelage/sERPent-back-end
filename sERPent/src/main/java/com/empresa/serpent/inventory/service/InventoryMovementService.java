@@ -82,8 +82,12 @@ public class InventoryMovementService {
             throw new IllegalArgumentException("Movement type cannot be null");
         }
 
-        if (movementType != MovementType.ADJUSTMENT_IN && movementType != MovementType.ADJUSTMENT_OUT) {
-            throw new IllegalArgumentException("Movement type must be ADJUSTMENT_IN or ADJUSTMENT_OUT");
+        if (movementType != MovementType.ADJUSTMENT_IN
+                && movementType != MovementType.ADJUSTMENT_OUT
+                && movementType != MovementType.RETURN_IN) {
+            throw new IllegalArgumentException(
+                    "Movement type must be ADJUSTMENT_IN, ADJUSTMENT_OUT or RETURN_IN"
+            );
         }
 
         if (quantity == null) {
