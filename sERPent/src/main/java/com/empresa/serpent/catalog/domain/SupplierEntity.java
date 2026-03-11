@@ -2,8 +2,8 @@ package com.empresa.serpent.catalog.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
-import jakarta.validation.constraints.NotBlank;
 import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.LocalDateTime;
 
 @Getter
@@ -20,7 +20,6 @@ public class SupplierEntity {
     @Column(name = "supplier_id", nullable = false, updatable = false)
     private Long id;
 
-    @NotBlank
     @Column(name = "name", nullable = false, length = 150)
     private String name;
 
