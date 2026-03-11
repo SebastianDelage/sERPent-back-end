@@ -65,6 +65,22 @@ public class WarehouseService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<WarehouseResponse> findAll() {
+        return warehouseRepository.findAll().stream()
+                .map(warehouseMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional
+    public void deactivate(Long id) {
+        WarehouseEntity entity = warehouseRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Warehouse not found: " + id));
+
+        entity.setActive(false);
+        warehouseRepository.save(entity);
+    }
+
     private void validateName(String name, Long currentWarehouseId) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("Name cannot be blank");
