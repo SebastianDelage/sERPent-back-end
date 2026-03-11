@@ -7,5 +7,6 @@
     <file url="file://$PROJECT_DIR$/sERPent/src/main/resources/db/migration/V2__add_transaction_detail_to_inventory_movements.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/sERPent/src/main/resources/db/migration/V3__add_transfer_transaction_type.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/sERPent/src/main/resources/db/migration/V4__add_return_transaction_type_and_return_in_movement_type_and_sale_returns_.sql" dialect="GenericSQL" />
+    <file url="file://$PROJECT_DIR$/sERPent/src/main/resources/db/migration/V5__add_product_inventory_config.sql" dialect="GenericSQL" />
   </component>
 </project>

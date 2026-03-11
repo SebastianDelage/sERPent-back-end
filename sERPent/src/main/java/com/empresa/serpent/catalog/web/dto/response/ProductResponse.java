@@ -10,6 +10,9 @@ public record ProductResponse(
         BigDecimal price,
         String sku,
         Boolean active,
+        BigDecimal minimumStock,
+        BigDecimal reorderPoint,
+        BigDecimal reorderQuantity,
         LocalDateTime createdAt
 ) {
 }

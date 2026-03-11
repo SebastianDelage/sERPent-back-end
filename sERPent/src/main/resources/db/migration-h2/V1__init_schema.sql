@@ -39,6 +39,9 @@ CREATE TABLE products (
                           price NUMERIC(19,4) NOT NULL DEFAULT 0,
                           sku VARCHAR(80),
                           active BOOLEAN NOT NULL DEFAULT TRUE,
+                          minimum_stock NUMERIC(12,3),
+                          reorder_point NUMERIC(12,3),
+                          reorder_quantity NUMERIC(12,3),
                           created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 
                           CONSTRAINT ux_products_sku UNIQUE (sku),

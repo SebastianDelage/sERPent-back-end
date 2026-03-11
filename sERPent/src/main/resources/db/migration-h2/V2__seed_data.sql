@@ -16,11 +16,21 @@ VALUES
 -- =========================
 -- PRODUCTS
 -- =========================
-INSERT INTO products (product_id, name, description, price, sku, active, created_at)
-VALUES
-    (1, 'Pollo entero', 'Pollo fresco entero', 4500, 'POLLO-001', TRUE, CURRENT_TIMESTAMP),
-    (2, 'Pata muslo', 'Combo pata y muslo', 4600, 'POLLO-002', TRUE, CURRENT_TIMESTAMP),
-    (3, 'Milanesa de pollo', 'Milanesa preparada', 5200, 'POLLO-003', TRUE, CURRENT_TIMESTAMP);
+INSERT INTO products (
+    product_id,
+    name,
+    description,
+    price,
+    sku,
+    active,
+    created_at,
+    minimum_stock,
+    reorder_point,
+    reorder_quantity
+) VALUES
+      (1, 'Pollo entero', 'Whole chicken', 2500, 'POLLO001', TRUE, CURRENT_TIMESTAMP, 20, 25, 50),
+      (2, 'Pata muslo', 'Chicken leg quarter', 1800, 'POLLO002', TRUE, CURRENT_TIMESTAMP, 20, 30, 50),
+      (3, 'Milanesa de pollo', 'Chicken milanese', 3000, 'POLLO003', TRUE, CURRENT_TIMESTAMP, NULL, NULL, NULL);
 
 -- =========================
 -- SUPPLIERS

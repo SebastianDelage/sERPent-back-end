@@ -19,5 +19,14 @@ public record ProductUpdateRequest(
 
         String sku,
 
-        Boolean active
+        Boolean active,
+
+        @PositiveOrZero(message = "Minimum stock cannot be negative")
+        BigDecimal minimumStock,
+
+        @PositiveOrZero(message = "Reorder point cannot be negative")
+        BigDecimal reorderPoint,
+
+        @PositiveOrZero(message = "Reorder quantity cannot be negative")
+        BigDecimal reorderQuantity
 ) {}

@@ -25,6 +25,11 @@ public class ProductService {
     public ProductResponse create(ProductCreateRequest request) {
         validatePrice(request.price());
         validateSku(request.sku(), null);
+        validateInventoryConfiguration(
+                request.minimumStock(),
+                request.reorderPoint(),
+                request.reorderQuantity()
+        );
 
         ProductEntity entity = productMapper.toEntity(request);
 
@@ -42,6 +47,11 @@ public class ProductService {
     public ProductResponse update(Long id, ProductUpdateRequest request) {
         validatePrice(request.price());
         validateSku(request.sku(), id);
+        validateInventoryConfiguration(
+                request.minimumStock(),
+                request.reorderPoint(),
+                request.reorderQuantity()
+        );
 
         ProductEntity entity = productRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Product not found: " + id));
@@ -100,6 +110,28 @@ public class ProductService {
                         throw new IllegalArgumentException("SKU already exists: " + sku.trim());
                     }
                 });
+    }
+
+    private void validateInventoryConfiguration(
+            BigDecimal minimumStock,
+            BigDecimal reorderPoint,
+            BigDecimal reorderQuantity
+    ) {
+        validateNonNegative(minimumStock, "Minimum stock cannot be negative");
+        validateNonNegative(reorderPoint, "Reorder point cannot be negative");
+        validateNonNegative(reorderQuantity, "Reorder quantity cannot be negative");
+
+        if (minimumStock != null
+                && reorderPoint != null
+                && reorderPoint.compareTo(minimumStock) < 0) {
+            throw new IllegalArgumentException("Reorder point cannot be less than minimum stock");
+        }
+    }
+
+    private void validateNonNegative(BigDecimal value, String message) {
+        if (value != null && value.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException(message);
+        }
     }
 
     private void normalizeSku(ProductEntity entity) {
