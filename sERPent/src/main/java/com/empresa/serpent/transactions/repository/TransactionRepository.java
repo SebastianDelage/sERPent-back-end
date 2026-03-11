@@ -1,8 +1,9 @@
 package com.empresa.serpent.transactions.repository;
 
 import com.empresa.serpent.reports.repository.projection.SalesDailyProjection;
+import com.empresa.serpent.reports.repository.projection.SalesSummaryProjection;
+import com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesByProductResponse;
-import com.empresa.serpent.reports.web.dto.response.SalesDailyResponse;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
@@ -42,14 +43,39 @@ public interface TransactionRepository extends
     List<SalesByProductResponse> getSalesByProductReport();
 
     @Query(value = """
+           SELECT
+               CAST(t.date AS DATE) AS date,
+               COUNT(DISTINCT t.transaction_id) AS transactions,
+               SUM(t.total) AS totalRevenue
+           FROM transactions t
+           WHERE t.type = 'SALE'
+           GROUP BY CAST(t.date AS DATE)
+           ORDER BY CAST(t.date AS DATE) DESC
+           """, nativeQuery = true)
+    List<SalesDailyProjection> getSalesDailyReportRaw();
+
+    @Query("""
+           SELECT new com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodResponse(
+               pm.id,
+               pm.name,
+               COUNT(t.id),
+               SUM(t.total)
+           )
+           FROM TransactionEntity t
+           JOIN t.paymentMethod pm
+           WHERE t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.SALE
+           GROUP BY pm.id, pm.name
+           ORDER BY SUM(t.total) DESC
+           """)
+    List<SalesByPaymentMethodResponse> getSalesByPaymentMethodReport();
+
+    @Query(value = """
        SELECT
-           CAST(t.date AS DATE) AS date,
-           COUNT(DISTINCT t.transaction_id) AS transactions,
-           SUM(t.total) AS totalRevenue
+           COUNT(t.transaction_id) AS transactions,
+           COALESCE(SUM(t.total), 0) AS totalRevenue,
+           COALESCE(AVG(t.total), 0) AS averageTicket
        FROM transactions t
        WHERE t.type = 'SALE'
-       GROUP BY CAST(t.date AS DATE)
-       ORDER BY CAST(t.date AS DATE) DESC
        """, nativeQuery = true)
-    List<SalesDailyProjection> getSalesDailyReportRaw();
+    SalesSummaryProjection getSalesSummaryReportRaw();
 }
