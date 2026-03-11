@@ -1,6 +1,8 @@
 package com.empresa.serpent.transactions.repository;
 
+import com.empresa.serpent.reports.repository.projection.SalesDailyProjection;
 import com.empresa.serpent.reports.web.dto.response.SalesByProductResponse;
+import com.empresa.serpent.reports.web.dto.response.SalesDailyResponse;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
@@ -38,4 +40,16 @@ public interface TransactionRepository extends
            ORDER BY SUM(d.quantity) DESC
            """)
     List<SalesByProductResponse> getSalesByProductReport();
+
+    @Query(value = """
+       SELECT
+           CAST(t.date AS DATE) AS date,
+           COUNT(DISTINCT t.transaction_id) AS transactions,
+           SUM(t.total) AS totalRevenue
+       FROM transactions t
+       WHERE t.type = 'SALE'
+       GROUP BY CAST(t.date AS DATE)
+       ORDER BY CAST(t.date AS DATE) DESC
+       """, nativeQuery = true)
+    List<SalesDailyProjection> getSalesDailyReportRaw();
 }

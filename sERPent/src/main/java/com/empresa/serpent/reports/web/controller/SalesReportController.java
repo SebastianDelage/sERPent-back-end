@@ -2,6 +2,7 @@ package com.empresa.serpent.reports.web.controller;
 
 import com.empresa.serpent.reports.service.SalesReportService;
 import com.empresa.serpent.reports.web.dto.response.SalesByProductResponse;
+import com.empresa.serpent.reports.web.dto.response.SalesDailyResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,5 +18,10 @@ public class SalesReportController {
     @GetMapping("/by-product")
     public List<SalesByProductResponse> getSalesByProduct() {
         return salesReportService.getSalesByProduct();
+    }
+
+    @GetMapping("/daily")
+    public List<SalesDailyResponse> getSalesDaily() {
+        return salesReportService.getSalesDaily();
     }
 }
