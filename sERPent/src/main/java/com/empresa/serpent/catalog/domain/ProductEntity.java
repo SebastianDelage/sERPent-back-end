@@ -44,28 +44,16 @@ public class ProductEntity {
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
+    @Column(name = "minimum_stock", precision = 12, scale = 3)
+    private BigDecimal minimumStock;
+
+    @Column(name = "reorder_point", precision = 12, scale = 3)
+    private BigDecimal reorderPoint;
+
+    @Column(name = "reorder_quantity", precision = 12, scale = 3)
+    private BigDecimal reorderQuantity;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    /*
-     FUTURE INVENTORY CONFIGURATION
-
-     In a future version of sERPent the Product entity should include
-     inventory control fields such as:
-
-         minimumStock
-         reorderPoint
-         reorderQuantity
-
-     These fields will allow the system to:
-
-         - detect low stock automatically
-         - suggest replenishment orders
-         - support warehouse planning
-
-     Once implemented, StockQueryService.lowStock() should compare the
-     current product stock against Product.minimumStock instead of using
-     a dynamic threshold parameter.
-     */
 }

@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 public record LowStockResponse(
         Long productId,
         String productName,
-        BigDecimal totalStock,
-        BigDecimal threshold
+        BigDecimal currentStock,
+        BigDecimal minimumStock
 ) {
 }

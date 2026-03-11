@@ -54,9 +54,7 @@ public class StockController {
     }
 
     @GetMapping("/low")
-    public List<LowStockResponse> getLowStock(
-            @RequestParam(defaultValue = "0") BigDecimal threshold
-    ) {
-        return stockQueryService.getLowStock(threshold);
+    public List<LowStockResponse> getLowStock() {
+        return stockQueryService.getLowStock();
     }
 }

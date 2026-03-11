@@ -1,5 +1,7 @@
 package com.empresa.serpent.inventory.service;
 
+import com.empresa.serpent.catalog.domain.ProductEntity;
+import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.InventoryMovementEntity;
 import com.empresa.serpent.inventory.repository.InventoryMovementRepository;
 import com.empresa.serpent.inventory.repository.InventoryMovementSpecifications;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,6 +26,7 @@ import java.util.stream.Collectors;
 public class StockQueryService {
 
     private final InventoryMovementRepository inventoryMovementRepository;
+    private final ProductRepository productRepository;
 
     public List<StockResponse> getStock(StockFilter filter) {
 
@@ -93,6 +97,7 @@ public class StockQueryService {
     }
 
     public List<ProductStockResponse> getTotalStockGroupedByProduct(Boolean onlyPositive) {
+
         List<StockResponse> stockRows = getStock(new StockFilter(null, null, null));
 
         Map<ProductKey, BigDecimal> grouped = stockRows.stream()
@@ -125,36 +130,56 @@ public class StockQueryService {
     }
 
     /*
-     FUTURE IMPROVEMENT
+     LOW STOCK DETECTION
 
-     Currently, this method uses a request threshold to determine low-stock products.
+     This method detects products whose stock is at or below the
+     configured minimum stock level.
 
-     In a future version of sERPent, the Product entity should include inventory
-     configuration fields such as:
+     IMPORTANT BUSINESS RULE
 
-         - minimumStock
-         - reorderPoint
-         - reorderQuantity
+     A product will ONLY be considered for low-stock detection if it
+     has a minimumStock configured.
 
-     Once implemented, this method should be refactored to compare the current
-     product stock against Product.minimumStock instead of a request threshold.
+     If minimumStock is NULL, the system assumes that this product does
+     not require strict stock monitoring and it will be ignored by this
+     check.
 
-     This will allow the system to support automatic replenishment alerts and
-     purchasing suggestions, similar to how most ERP systems handle inventory control.
+     This allows sERPent to support businesses where some items are
+     produced or handled dynamically (for example fresh food,
+     handmade products or items produced on demand).
+
+     In those cases, the system will not recommend increasing stock
+     unless a minimumStock level is explicitly defined.
      */
-    public List<LowStockResponse> getLowStock(BigDecimal threshold) {
-        if (threshold == null || threshold.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Threshold must be zero or greater");
-        }
+    public List<LowStockResponse> getLowStock() {
 
-        return getTotalStockGroupedByProduct(false).stream()
-                .filter(product -> product.totalStock().compareTo(threshold) <= 0)
-                .map(product -> new LowStockResponse(
-                        product.productId(),
-                        product.productName(),
-                        product.totalStock(),
-                        threshold
-                ))
+        List<ProductStockResponse> stockRows = getTotalStockGroupedByProduct(false);
+
+        Map<Long, ProductEntity> productMap = productRepository.findAll().stream()
+                .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
+
+        return stockRows.stream()
+                .filter(stockRow -> {
+                    ProductEntity product = productMap.get(stockRow.productId());
+
+                    // Ignore products without inventory configuration
+                    if (product == null || product.getMinimumStock() == null) {
+                        return false;
+                    }
+
+                    return stockRow.totalStock()
+                            .compareTo(product.getMinimumStock()) <= 0;
+                })
+                .map(stockRow -> {
+                    ProductEntity product = productMap.get(stockRow.productId());
+
+                    return new LowStockResponse(
+                            stockRow.productId(),
+                            stockRow.productName(),
+                            stockRow.totalStock(),
+                            product.getMinimumStock()
+                    );
+                })
                 .sorted((a, b) -> a.productName().compareToIgnoreCase(b.productName()))
                 .toList();
     }
