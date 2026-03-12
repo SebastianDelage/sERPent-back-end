@@ -13,5 +13,7 @@ public record SupplierCreateRequest(
         String taxCondition,
         String phone,
         String email,
+        String notes,
+        String address,
         Boolean active
 ) {}

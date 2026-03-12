@@ -12,5 +12,7 @@ public record SupplierUpdateRequest(
         String taxCondition,
         String phone,
         String email,
+        String notes,
+        String address,
         Boolean active
 ) {}

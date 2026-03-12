@@ -28,13 +28,13 @@ public class ExpenseEntity {
     @Column(name = "notes")
     private String notes;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "transaction_id", nullable = false, unique = true)
     private TransactionEntity transaction;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "supplier_id")
-    private SupplierEntity supplierEntity;
+    private SupplierEntity supplier;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "expense_category_id", nullable = false)
