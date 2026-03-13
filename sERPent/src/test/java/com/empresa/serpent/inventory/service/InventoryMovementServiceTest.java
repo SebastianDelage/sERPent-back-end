@@ -19,7 +19,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.*;
+import static com.empresa.serpent.support.TestEntityFactory.detail;
+import static com.empresa.serpent.support.TestEntityFactory.product;
+import static com.empresa.serpent.support.TestEntityFactory.transaction;
+import static com.empresa.serpent.support.TestEntityFactory.transactionWithoutDetails;
+import static com.empresa.serpent.support.TestEntityFactory.warehouse;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,7 +42,7 @@ class InventoryMovementServiceTest {
     void shouldRegisterSaleMovementsAsOut() {
 
         ProductEntity product = product(10L, "Pollo entero");
-        WarehouseEntity warehouse = warehouse(1L, "Central");
+        WarehouseEntity warehouse = warehouse(1L, "Central", true);
         TransactionEntity transaction = transaction(100L, detail(product, "2.000", "4500.0000"));
 
         inventoryMovementService.registerSaleMovements(transaction, warehouse);
@@ -62,7 +68,7 @@ class InventoryMovementServiceTest {
     void shouldRegisterPurchaseMovementsAsInWithUnitCost() {
 
         ProductEntity product = product(10L, "Pollo entero");
-        WarehouseEntity warehouse = warehouse(1L, "Central");
+        WarehouseEntity warehouse = warehouse(1L, "Central", true);
         TransactionEntity transaction = transaction(200L, detail(product, "3.000", "3200.0000"));
 
         inventoryMovementService.registerPurchaseMovements(transaction, warehouse);
@@ -85,7 +91,7 @@ class InventoryMovementServiceTest {
     void shouldRegisterAdjustmentMovementSuccessfully() {
 
         TransactionEntity transaction = transactionWithoutDetails(300L);
-        WarehouseEntity warehouse = warehouse(1L, "Central");
+        WarehouseEntity warehouse = warehouse(1L, "Central", true);
         ProductEntity product = product(10L, "Pollo entero");
 
         inventoryMovementService.registerAdjustmentMovement(
@@ -115,8 +121,8 @@ class InventoryMovementServiceTest {
     void shouldRegisterTransferMovementsWithTransferOutAndTransferIn() {
 
         ProductEntity product = product(10L, "Pollo entero");
-        WarehouseEntity sourceWarehouse = warehouse(1L, "Central");
-        WarehouseEntity targetWarehouse = warehouse(2L, "North");
+        WarehouseEntity sourceWarehouse = warehouse(1L, "Central", true);
+        WarehouseEntity targetWarehouse = warehouse(2L, "North", true);
         TransactionEntity transaction = transaction(400L, detail(product, "5.000", "4500.0000"));
 
         inventoryMovementService.registerTransferMovements(transaction, sourceWarehouse, targetWarehouse);
@@ -148,7 +154,7 @@ class InventoryMovementServiceTest {
         @DisplayName("Should throw when transaction is null in sale movements")
         void shouldThrowWhenTransactionIsNullInSaleMovements() {
 
-            WarehouseEntity warehouse = warehouse(1L, "Central");
+            WarehouseEntity warehouse = warehouse(1L, "Central", true);
 
             assertThatThrownBy(() -> inventoryMovementService.registerSaleMovements(null, warehouse))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -162,7 +168,7 @@ class InventoryMovementServiceTest {
         void shouldThrowWhenTransactionIdIsNullInSaleMovements() {
 
             ProductEntity product = product(10L, "Pollo entero");
-            WarehouseEntity warehouse = warehouse(1L, "Central");
+            WarehouseEntity warehouse = warehouse(1L, "Central", true);
             TransactionEntity transaction = transaction(null, detail(product, "1.000", "4500.0000"));
 
             assertThatThrownBy(() -> inventoryMovementService.registerSaleMovements(transaction, warehouse))
@@ -192,7 +198,7 @@ class InventoryMovementServiceTest {
 
             ProductEntity product = product(10L, "Pollo entero");
             TransactionEntity transaction = transaction(100L, detail(product, "1.000", "4500.0000"));
-            WarehouseEntity warehouse = warehouse(null, "Central");
+            WarehouseEntity warehouse = warehouse(null, "Central", true);
 
             assertThatThrownBy(() -> inventoryMovementService.registerSaleMovements(transaction, warehouse))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -206,7 +212,7 @@ class InventoryMovementServiceTest {
         void shouldThrowWhenTransactionDetailsAreEmptyInSaleMovements() {
 
             TransactionEntity transaction = transactionWithoutDetails(100L);
-            WarehouseEntity warehouse = warehouse(1L, "Central");
+            WarehouseEntity warehouse = warehouse(1L, "Central", true);
 
             assertThatThrownBy(() -> inventoryMovementService.registerSaleMovements(transaction, warehouse))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -219,14 +225,13 @@ class InventoryMovementServiceTest {
         @DisplayName("Should throw when detail product is null")
         void shouldThrowWhenDetailProductIsNull() {
 
-            TransactionDetailEntity detail = TransactionDetailEntity.builder()
-                    .product(null)
-                    .quantity(new BigDecimal("1.000"))
-                    .unitPrice(new BigDecimal("4500.0000"))
-                    .build();
+            TransactionDetailEntity detail = new TransactionDetailEntity();
+            detail.setProduct(null);
+            detail.setQuantity(new BigDecimal("1.000"));
+            detail.setUnitPrice(new BigDecimal("4500.0000"));
 
             TransactionEntity transaction = transaction(100L, detail);
-            WarehouseEntity warehouse = warehouse(1L, "Central");
+            WarehouseEntity warehouse = warehouse(1L, "Central", true);
 
             assertThatThrownBy(() -> inventoryMovementService.registerSaleMovements(transaction, warehouse))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -241,14 +246,13 @@ class InventoryMovementServiceTest {
 
             ProductEntity product = product(10L, "Pollo entero");
 
-            TransactionDetailEntity detail = TransactionDetailEntity.builder()
-                    .product(product)
-                    .quantity(null)
-                    .unitPrice(new BigDecimal("4500.0000"))
-                    .build();
+            TransactionDetailEntity detail = new TransactionDetailEntity();
+            detail.setProduct(product);
+            detail.setQuantity(null);
+            detail.setUnitPrice(new BigDecimal("4500.0000"));
 
             TransactionEntity transaction = transaction(100L, detail);
-            WarehouseEntity warehouse = warehouse(1L, "Central");
+            WarehouseEntity warehouse = warehouse(1L, "Central", true);
 
             assertThatThrownBy(() -> inventoryMovementService.registerSaleMovements(transaction, warehouse))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -263,7 +267,7 @@ class InventoryMovementServiceTest {
 
             ProductEntity product = product(10L, "Pollo entero");
             TransactionEntity transaction = transaction(100L, detail(product, "0.000", "4500.0000"));
-            WarehouseEntity warehouse = warehouse(1L, "Central");
+            WarehouseEntity warehouse = warehouse(1L, "Central", true);
 
             assertThatThrownBy(() -> inventoryMovementService.registerSaleMovements(transaction, warehouse))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -277,7 +281,7 @@ class InventoryMovementServiceTest {
         void shouldThrowWhenAdjustmentMovementTypeIsInvalid() {
 
             TransactionEntity transaction = transactionWithoutDetails(300L);
-            WarehouseEntity warehouse = warehouse(1L, "Central");
+            WarehouseEntity warehouse = warehouse(1L, "Central", true);
             ProductEntity product = product(10L, "Pollo entero");
 
             assertThatThrownBy(() -> inventoryMovementService.registerAdjustmentMovement(
@@ -299,7 +303,7 @@ class InventoryMovementServiceTest {
         void shouldThrowWhenAdjustmentQuantityIsNotPositive() {
 
             TransactionEntity transaction = transactionWithoutDetails(300L);
-            WarehouseEntity warehouse = warehouse(1L, "Central");
+            WarehouseEntity warehouse = warehouse(1L, "Central", true);
             ProductEntity product = product(10L, "Pollo entero");
 
             assertThatThrownBy(() -> inventoryMovementService.registerAdjustmentMovement(
@@ -321,7 +325,7 @@ class InventoryMovementServiceTest {
         void shouldThrowWhenTransferWarehousesAreTheSame() {
 
             ProductEntity product = product(10L, "Pollo entero");
-            WarehouseEntity warehouse = warehouse(1L, "Central");
+            WarehouseEntity warehouse = warehouse(1L, "Central", true);
             TransactionEntity transaction = transaction(400L, detail(product, "5.000", "4500.0000"));
 
             assertThatThrownBy(() -> inventoryMovementService.registerTransferMovements(transaction, warehouse, warehouse))
@@ -335,8 +339,8 @@ class InventoryMovementServiceTest {
         @DisplayName("Should throw when transfer transaction has no details")
         void shouldThrowWhenTransferTransactionHasNoDetails() {
 
-            WarehouseEntity sourceWarehouse = warehouse(1L, "Central");
-            WarehouseEntity targetWarehouse = warehouse(2L, "North");
+            WarehouseEntity sourceWarehouse = warehouse(1L, "Central", true);
+            WarehouseEntity targetWarehouse = warehouse(2L, "North", true);
             TransactionEntity transaction = transactionWithoutDetails(400L);
 
             assertThatThrownBy(() -> inventoryMovementService.registerTransferMovements(transaction, sourceWarehouse, targetWarehouse))
@@ -345,44 +349,5 @@ class InventoryMovementServiceTest {
 
             verify(inventoryMovementRepository, never()).saveAll(anyList());
         }
-    }
-
-    private ProductEntity product(Long id, String name) {
-        ProductEntity product = new ProductEntity();
-        product.setId(id);
-        product.setName(name);
-        product.setPrice(new BigDecimal("1000.0000"));
-        product.setActive(true);
-        return product;
-    }
-
-    private WarehouseEntity warehouse(Long id, String name) {
-        WarehouseEntity warehouse = new WarehouseEntity();
-        warehouse.setId(id);
-        warehouse.setName(name);
-        warehouse.setActive(true);
-        return warehouse;
-    }
-
-    private TransactionDetailEntity detail(ProductEntity product, String quantity, String unitPrice) {
-        TransactionDetailEntity detail = new TransactionDetailEntity();
-        detail.setProduct(product);
-        detail.setQuantity(new BigDecimal(quantity));
-        detail.setUnitPrice(new BigDecimal(unitPrice));
-        return detail;
-    }
-
-    private TransactionEntity transaction(Long id, TransactionDetailEntity... details) {
-        TransactionEntity transaction = new TransactionEntity();
-        transaction.setId(id);
-        transaction.setDetails(List.of(details));
-        return transaction;
-    }
-
-    private TransactionEntity transactionWithoutDetails(Long id) {
-        TransactionEntity transaction = new TransactionEntity();
-        transaction.setId(id);
-        transaction.setDetails(List.of());
-        return transaction;
     }
 }

@@ -33,8 +33,14 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static com.empresa.serpent.support.TestEntityFactory.paymentMethod;
+import static com.empresa.serpent.support.TestEntityFactory.product;
+import static com.empresa.serpent.support.TestEntityFactory.user;
+import static com.empresa.serpent.support.TestEntityFactory.warehouse;
+import static com.empresa.serpent.support.TestRequestFactory.createSaleRequestOneItem;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
@@ -217,7 +223,7 @@ class SaleApplicationServiceTest {
         @DisplayName("Should throw when user is not found")
         void shouldThrowWhenUserIsNotFound() {
 
-            CreateSaleRequest request = requestWithOneItem();
+            CreateSaleRequest request = createSaleRequestOneItem();
 
             given(userRepository.findById(1L)).willReturn(Optional.empty());
 
@@ -234,7 +240,7 @@ class SaleApplicationServiceTest {
         @DisplayName("Should throw when payment method is not found")
         void shouldThrowWhenPaymentMethodIsNotFound() {
 
-            CreateSaleRequest request = requestWithOneItem();
+            CreateSaleRequest request = createSaleRequestOneItem();
 
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
             given(paymentMethodRepository.findById(1L)).willReturn(Optional.empty());
@@ -251,7 +257,7 @@ class SaleApplicationServiceTest {
         @DisplayName("Should throw when warehouse is not found")
         void shouldThrowWhenWarehouseIsNotFound() {
 
-            CreateSaleRequest request = requestWithOneItem();
+            CreateSaleRequest request = createSaleRequestOneItem();
 
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
             given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
@@ -269,7 +275,7 @@ class SaleApplicationServiceTest {
         @DisplayName("Should throw when warehouse is inactive")
         void shouldThrowWhenWarehouseIsInactive() {
 
-            CreateSaleRequest request = requestWithOneItem();
+            CreateSaleRequest request = createSaleRequestOneItem();
 
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
             given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
@@ -287,7 +293,7 @@ class SaleApplicationServiceTest {
         @DisplayName("Should throw when invoice number already exists")
         void shouldThrowWhenInvoiceNumberAlreadyExists() {
 
-            CreateSaleRequest request = requestWithOneItem();
+            CreateSaleRequest request = createSaleRequestOneItem();
 
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
             given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
@@ -306,7 +312,7 @@ class SaleApplicationServiceTest {
         @DisplayName("Should throw when product is not found")
         void shouldThrowWhenProductIsNotFound() {
 
-            CreateSaleRequest request = requestWithOneItem();
+            CreateSaleRequest request = createSaleRequestOneItem();
 
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
             given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
@@ -399,61 +405,5 @@ class SaleApplicationServiceTest {
             verify(transactionRepository, never()).save(any());
             verify(saleRepository, never()).save(any());
         }
-    }
-
-    private CreateSaleRequest requestWithOneItem() {
-        return new CreateSaleRequest(
-                100L,
-                "Consumidor Final",
-                "12345678",
-                "A-0001-00000001",
-                1L,
-                1L,
-                1L,
-                "Venta mostrador",
-                List.of(
-                        new CreateSaleItemRequest(
-                                10L,
-                                null,
-                                new BigDecimal("1.000"),
-                                new BigDecimal("4500.0000")
-                        )
-                )
-        );
-    }
-
-    private UserEntity user(Long id) {
-        UserEntity user = new UserEntity();
-        user.setId(id);
-        user.setName("Admin");
-        user.setUsername("admin");
-        user.setPasswordHash("hash");
-        user.setActive(true);
-        return user;
-    }
-
-    private PaymentMethodEntity paymentMethod(Long id, String name) {
-        PaymentMethodEntity pm = new PaymentMethodEntity();
-        pm.setId(id);
-        pm.setName(name);
-        pm.setActive(true);
-        return pm;
-    }
-
-    private WarehouseEntity warehouse(Long id, String name, boolean active) {
-        WarehouseEntity warehouse = new WarehouseEntity();
-        warehouse.setId(id);
-        warehouse.setName(name);
-        warehouse.setActive(active);
-        return warehouse;
-    }
-
-    private ProductEntity product(Long id, String name) {
-        ProductEntity product = new ProductEntity();
-        product.setId(id);
-        product.setName(name);
-        product.setPrice(new BigDecimal("1000.0000"));
-        product.setActive(true);
-        return product;
     }
 }
