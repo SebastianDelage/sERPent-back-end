@@ -3,12 +3,13 @@ package com.empresa.serpent.transactions.service;
 import com.empresa.serpent.catalog.domain.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
-import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import com.empresa.serpent.inventory.service.InventoryMovementService;
 import com.empresa.serpent.inventory.service.StockValidationService;
+import com.empresa.serpent.inventory.web.dto.request.StockCheckItemRequest;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleEntity;
+import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
@@ -20,6 +21,7 @@ import com.empresa.serpent.transactions.web.dto.request.CreateSaleRequest;
 import com.empresa.serpent.transactions.web.dto.response.CreateSaleResponse;
 import com.empresa.serpent.users.domain.entity.UserEntity;
 import com.empresa.serpent.users.repository.UserRepository;
+import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -40,7 +42,9 @@ import static com.empresa.serpent.support.TestEntityFactory.warehouse;
 import static com.empresa.serpent.support.TestRequestFactory.createSaleRequestOneItem;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
@@ -77,57 +81,37 @@ class SaleApplicationServiceTest {
     @Test
     @DisplayName("Should create sale successfully")
     void shouldCreateSaleSuccessfully() {
-
-        UserEntity user = user(1L);
+        UserEntity createdBy = user(1L);
         PaymentMethodEntity paymentMethod = paymentMethod(1L, "Cash");
-        WarehouseEntity warehouse = warehouse(1L, "Central", true);
+        WarehouseEntity warehouse = warehouse(1L, "Main Warehouse", true);
         ProductEntity product = product(10L, "Pollo entero");
 
-        CreateSaleRequest request = new CreateSaleRequest(
-                100L,
-                "Consumidor Final",
-                "12345678",
-                "A-0001-00000001",
-                1L,
-                1L,
-                1L,
-                "Venta mostrador",
-                List.of(
-                        new CreateSaleItemRequest(
-                                10L,
-                                null,
-                                new BigDecimal("2.000"),
-                                new BigDecimal("4500.0000")
-                        )
-                )
-        );
+        CreateSaleRequest request = createSaleRequestOneItem();
 
-        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
         given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod));
         given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
         given(saleRepository.existsByInvoiceNumber("A-0001-00000001")).willReturn(false);
         given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
 
-        given(transactionRepository.save(any(TransactionEntity.class)))
-                .willAnswer(invocation -> {
-                    TransactionEntity tx = invocation.getArgument(0);
-                    tx.setId(200L);
-                    return tx;
-                });
+        given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
+            TransactionEntity tx = invocation.getArgument(0);
+            tx.setId(100L);
+            return tx;
+        });
 
-        given(saleRepository.save(any(SaleEntity.class)))
-                .willAnswer(invocation -> {
-                    SaleEntity sale = invocation.getArgument(0);
-                    sale.setId(300L);
-                    return sale;
-                });
+        given(saleRepository.save(any(SaleEntity.class))).willAnswer(invocation -> {
+            SaleEntity sale = invocation.getArgument(0);
+            sale.setId(200L);
+            return sale;
+        });
 
-        CreateSaleResponse result = saleApplicationService.createSale(request);
+        CreateSaleResponse response = saleApplicationService.createSale(request);
 
-        assertThat(result.transactionId()).isEqualTo(200L);
-        assertThat(result.saleId()).isEqualTo(300L);
-        assertThat(result.status()).isEqualTo("CONFIRMED");
-        assertThat(result.message()).isEqualTo("Sale created successfully");
+        assertThat(response.transactionId()).isEqualTo(100L);
+        assertThat(response.saleId()).isEqualTo(200L);
+        assertThat(response.status()).isEqualTo("CONFIRMED");
+        assertThat(response.message()).isEqualTo("Sale created successfully");
 
         ArgumentCaptor<TransactionEntity> transactionCaptor = ArgumentCaptor.forClass(TransactionEntity.class);
         verify(transactionRepository).save(transactionCaptor.capture());
@@ -136,43 +120,158 @@ class SaleApplicationServiceTest {
         assertThat(savedTransaction.getType()).isEqualTo(TransactionType.SALE);
         assertThat(savedTransaction.getStatus()).isEqualTo(TransactionStatus.CONFIRMED);
         assertThat(savedTransaction.getPaymentMethod()).isEqualTo(paymentMethod);
-        assertThat(savedTransaction.getCreatedByUserEntity()).isEqualTo(user);
+        assertThat(savedTransaction.getCreatedByUserEntity()).isEqualTo(createdBy);
         assertThat(savedTransaction.getDescription()).isEqualTo("Venta mostrador");
-        assertThat(savedTransaction.getTotal()).isEqualByComparingTo("9000.0000");
+        assertThat(savedTransaction.getTotal()).isEqualByComparingTo("4500.0000");
         assertThat(savedTransaction.getDetails()).hasSize(1);
 
-        assertThat(savedTransaction.getDetails().get(0).getProduct()).isEqualTo(product);
-        assertThat(savedTransaction.getDetails().get(0).getDescription()).isEqualTo("Pollo entero");
-        assertThat(savedTransaction.getDetails().get(0).getQuantity()).isEqualByComparingTo("2.000");
-        assertThat(savedTransaction.getDetails().get(0).getUnitPrice()).isEqualByComparingTo("4500.0000");
-        assertThat(savedTransaction.getDetails().get(0).getSubtotal()).isEqualByComparingTo("9000.0000");
-
-        ArgumentCaptor<SaleEntity> saleCaptor = ArgumentCaptor.forClass(SaleEntity.class);
-        verify(saleRepository).save(saleCaptor.capture());
-
-        SaleEntity savedSale = saleCaptor.getValue();
-        assertThat(savedSale.getCustomerId()).isEqualTo(100L);
-        assertThat(savedSale.getCustomerName()).isEqualTo("Consumidor Final");
-        assertThat(savedSale.getCustomerDocument()).isEqualTo("12345678");
-        assertThat(savedSale.getInvoiceNumber()).isEqualTo("A-0001-00000001");
-        assertThat(savedSale.getTaxTotal()).isEqualByComparingTo("0");
+        TransactionDetailEntity detail = savedTransaction.getDetails().get(0);
+        assertThat(detail.getProduct()).isEqualTo(product);
+        assertThat(detail.getDescription()).isEqualTo("Pollo entero");
+        assertThat(detail.getQuantity()).isEqualByComparingTo("1.000");
+        assertThat(detail.getUnitPrice()).isEqualByComparingTo("4500.0000");
+        assertThat(detail.getSubtotal()).isEqualByComparingTo("4500.0000");
 
         verify(stockValidationService).validateSaleItemsStock(anyList(), eq(1L));
         verify(inventoryMovementService).registerSaleMovements(any(TransactionEntity.class), eq(warehouse));
     }
 
     @Test
-    @DisplayName("Should use product name when item description is blank")
-    void shouldUseProductNameWhenItemDescriptionIsBlank() {
-
-        UserEntity user = user(1L);
-        WarehouseEntity warehouse = warehouse(1L, "Central", true);
+    @DisplayName("Should create sale successfully without payment method")
+    void shouldCreateSaleSuccessfullyWithoutPaymentMethod() {
+        UserEntity createdBy = user(1L);
+        WarehouseEntity warehouse = warehouse(1L, "Main Warehouse", true);
         ProductEntity product = product(10L, "Pollo entero");
 
         CreateSaleRequest request = new CreateSaleRequest(
-                null,
+                100L,
                 "Consumidor Final",
+                "12345678",
+                "A-0001-00000001",
                 null,
+                1L,
+                1L,
+                "Venta sin payment method",
+                List.of(
+                        new CreateSaleItemRequest(
+                                10L,
+                                null,
+                                new BigDecimal("1.000"),
+                                new BigDecimal("4500.0000")
+                        )
+                )
+        );
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(saleRepository.existsByInvoiceNumber("A-0001-00000001")).willReturn(false);
+        given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
+
+        given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
+            TransactionEntity tx = invocation.getArgument(0);
+            tx.setId(101L);
+            return tx;
+        });
+
+        given(saleRepository.save(any(SaleEntity.class))).willAnswer(invocation -> {
+            SaleEntity sale = invocation.getArgument(0);
+            sale.setId(201L);
+            return sale;
+        });
+
+        CreateSaleResponse response = saleApplicationService.createSale(request);
+
+        assertThat(response.transactionId()).isEqualTo(101L);
+        assertThat(response.saleId()).isEqualTo(201L);
+
+        ArgumentCaptor<TransactionEntity> transactionCaptor = ArgumentCaptor.forClass(TransactionEntity.class);
+        verify(transactionRepository).save(transactionCaptor.capture());
+
+        TransactionEntity savedTransaction = transactionCaptor.getValue();
+        assertThat(savedTransaction.getPaymentMethod()).isNull();
+
+        verify(paymentMethodRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("Should create sale successfully with multiple items")
+    void shouldCreateSaleSuccessfullyWithMultipleItems() {
+        UserEntity createdBy = user(1L);
+        PaymentMethodEntity paymentMethod = paymentMethod(1L, "Cash");
+        WarehouseEntity warehouse = warehouse(1L, "Main Warehouse", true);
+        ProductEntity product1 = product(10L, "Pollo entero");
+        ProductEntity product2 = product(20L, "Pata muslo");
+
+        CreateSaleRequest request = new CreateSaleRequest(
+                100L,
+                "Consumidor Final",
+                "12345678",
+                "A-0001-00000002",
+                1L,
+                1L,
+                1L,
+                "Venta múltiple",
+                List.of(
+                        new CreateSaleItemRequest(
+                                10L,
+                                null,
+                                new BigDecimal("2.000"),
+                                new BigDecimal("4500.0000")
+                        ),
+                        new CreateSaleItemRequest(
+                                20L,
+                                null,
+                                new BigDecimal("1.000"),
+                                new BigDecimal("3200.0000")
+                        )
+                )
+        );
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod));
+        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(saleRepository.existsByInvoiceNumber("A-0001-00000002")).willReturn(false);
+        given(productRepository.findByIdIn(List.of(10L, 20L))).willReturn(List.of(product1, product2));
+
+        given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
+            TransactionEntity tx = invocation.getArgument(0);
+            tx.setId(102L);
+            return tx;
+        });
+
+        given(saleRepository.save(any(SaleEntity.class))).willAnswer(invocation -> {
+            SaleEntity sale = invocation.getArgument(0);
+            sale.setId(202L);
+            return sale;
+        });
+
+        CreateSaleResponse response = saleApplicationService.createSale(request);
+
+        assertThat(response.transactionId()).isEqualTo(102L);
+        assertThat(response.saleId()).isEqualTo(202L);
+
+        ArgumentCaptor<TransactionEntity> transactionCaptor = ArgumentCaptor.forClass(TransactionEntity.class);
+        verify(transactionRepository).save(transactionCaptor.capture());
+
+        TransactionEntity savedTransaction = transactionCaptor.getValue();
+        assertThat(savedTransaction.getDetails()).hasSize(2);
+        assertThat(savedTransaction.getTotal()).isEqualByComparingTo("12200.0000");
+
+        assertThat(savedTransaction.getDetails().get(0).getSubtotal()).isEqualByComparingTo("9000.0000");
+        assertThat(savedTransaction.getDetails().get(1).getSubtotal()).isEqualByComparingTo("3200.0000");
+    }
+
+    @Test
+    @DisplayName("Should use product name when item description is blank")
+    void shouldUseProductNameWhenItemDescriptionIsBlank() {
+        UserEntity createdBy = user(1L);
+        WarehouseEntity warehouse = warehouse(1L, "Main Warehouse", true);
+        ProductEntity product = product(10L, "Pollo entero");
+
+        CreateSaleRequest request = new CreateSaleRequest(
+                100L,
+                "Consumidor Final",
+                "12345678",
                 null,
                 null,
                 1L,
@@ -188,23 +287,21 @@ class SaleApplicationServiceTest {
                 )
         );
 
-        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
         given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
         given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
 
-        given(transactionRepository.save(any(TransactionEntity.class)))
-                .willAnswer(invocation -> {
-                    TransactionEntity tx = invocation.getArgument(0);
-                    tx.setId(200L);
-                    return tx;
-                });
+        given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
+            TransactionEntity tx = invocation.getArgument(0);
+            tx.setId(103L);
+            return tx;
+        });
 
-        given(saleRepository.save(any(SaleEntity.class)))
-                .willAnswer(invocation -> {
-                    SaleEntity sale = invocation.getArgument(0);
-                    sale.setId(300L);
-                    return sale;
-                });
+        given(saleRepository.save(any(SaleEntity.class))).willAnswer(invocation -> {
+            SaleEntity sale = invocation.getArgument(0);
+            sale.setId(203L);
+            return sale;
+        });
 
         saleApplicationService.createSale(request);
 
@@ -216,13 +313,260 @@ class SaleApplicationServiceTest {
         assertThat(savedTransaction.getDetails().get(0).getDescription()).isEqualTo("Pollo entero");
     }
 
+    @Test
+    @DisplayName("Should use item description when provided")
+    void shouldUseItemDescriptionWhenProvided() {
+        UserEntity createdBy = user(1L);
+        WarehouseEntity warehouse = warehouse(1L, "Main Warehouse", true);
+        ProductEntity product = product(10L, "Pollo entero");
+
+        CreateSaleRequest request = new CreateSaleRequest(
+                100L,
+                "Consumidor Final",
+                "12345678",
+                null,
+                null,
+                1L,
+                1L,
+                "Venta con descripción custom",
+                List.of(
+                        new CreateSaleItemRequest(
+                                10L,
+                                "Pollo entero premium",
+                                new BigDecimal("1.000"),
+                                new BigDecimal("4500.0000")
+                        )
+                )
+        );
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
+
+        given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
+            TransactionEntity tx = invocation.getArgument(0);
+            tx.setId(104L);
+            return tx;
+        });
+
+        given(saleRepository.save(any(SaleEntity.class))).willAnswer(invocation -> {
+            SaleEntity sale = invocation.getArgument(0);
+            sale.setId(204L);
+            return sale;
+        });
+
+        saleApplicationService.createSale(request);
+
+        ArgumentCaptor<TransactionEntity> transactionCaptor = ArgumentCaptor.forClass(TransactionEntity.class);
+        verify(transactionRepository).save(transactionCaptor.capture());
+
+        TransactionEntity savedTransaction = transactionCaptor.getValue();
+        assertThat(savedTransaction.getDetails()).hasSize(1);
+        assertThat(savedTransaction.getDetails().get(0).getDescription()).isEqualTo("Pollo entero premium");
+    }
+
+    @Test
+    @DisplayName("Should create sale without invoice number and skip duplicate check")
+    void shouldCreateSaleWithoutInvoiceNumberAndSkipDuplicateCheck() {
+        UserEntity createdBy = user(1L);
+        WarehouseEntity warehouse = warehouse(1L, "Main Warehouse", true);
+        ProductEntity product = product(10L, "Pollo entero");
+
+        CreateSaleRequest request = new CreateSaleRequest(
+                100L,
+                "Consumidor Final",
+                "12345678",
+                null,
+                null,
+                1L,
+                1L,
+                "Venta sin factura",
+                List.of(
+                        new CreateSaleItemRequest(
+                                10L,
+                                null,
+                                new BigDecimal("1.000"),
+                                new BigDecimal("4500.0000")
+                        )
+                )
+        );
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
+
+        given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
+            TransactionEntity tx = invocation.getArgument(0);
+            tx.setId(105L);
+            return tx;
+        });
+
+        given(saleRepository.save(any(SaleEntity.class))).willAnswer(invocation -> {
+            SaleEntity sale = invocation.getArgument(0);
+            sale.setId(205L);
+            return sale;
+        });
+
+        saleApplicationService.createSale(request);
+
+        verify(saleRepository, never()).existsByInvoiceNumber(any());
+    }
+
+    @Test
+    @DisplayName("Should calculate total correctly with decimal quantities")
+    void shouldCalculateTotalCorrectlyWithDecimalQuantities() {
+        UserEntity createdBy = user(1L);
+        WarehouseEntity warehouse = warehouse(1L, "Main Warehouse", true);
+        ProductEntity product1 = product(10L, "Pollo entero");
+        ProductEntity product2 = product(20L, "Pata muslo");
+
+        CreateSaleRequest request = new CreateSaleRequest(
+                100L,
+                "Consumidor Final",
+                "12345678",
+                null,
+                null,
+                1L,
+                1L,
+                "Venta decimal",
+                List.of(
+                        new CreateSaleItemRequest(
+                                10L,
+                                null,
+                                new BigDecimal("2.500"),
+                                new BigDecimal("1000.0000")
+                        ),
+                        new CreateSaleItemRequest(
+                                20L,
+                                null,
+                                new BigDecimal("1.250"),
+                                new BigDecimal("500.0000")
+                        )
+                )
+        );
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(productRepository.findByIdIn(List.of(10L, 20L))).willReturn(List.of(product1, product2));
+
+        given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
+            TransactionEntity tx = invocation.getArgument(0);
+            tx.setId(106L);
+            return tx;
+        });
+
+        given(saleRepository.save(any(SaleEntity.class))).willAnswer(invocation -> {
+            SaleEntity sale = invocation.getArgument(0);
+            sale.setId(206L);
+            return sale;
+        });
+
+        saleApplicationService.createSale(request);
+
+        ArgumentCaptor<TransactionEntity> transactionCaptor = ArgumentCaptor.forClass(TransactionEntity.class);
+        verify(transactionRepository).save(transactionCaptor.capture());
+
+        TransactionEntity savedTransaction = transactionCaptor.getValue();
+        assertThat(savedTransaction.getDetails()).hasSize(2);
+        assertThat(savedTransaction.getDetails().get(0).getSubtotal()).isEqualByComparingTo("2500.0000");
+        assertThat(savedTransaction.getDetails().get(1).getSubtotal()).isEqualByComparingTo("625.0000");
+        assertThat(savedTransaction.getTotal()).isEqualByComparingTo("3125.0000");
+    }
+
+    @Test
+    @DisplayName("Should validate stock with expected items and warehouse")
+    void shouldValidateStockWithExpectedItemsAndWarehouse() {
+
+        UserEntity createdBy = user(1L);
+        PaymentMethodEntity paymentMethod = paymentMethod(1L, "Cash");
+        WarehouseEntity warehouse = warehouse(1L, "Main Warehouse", true);
+        ProductEntity product = product(10L, "Pollo entero");
+
+        CreateSaleRequest request = createSaleRequestOneItem();
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod));
+        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
+        given(saleRepository.existsByInvoiceNumber("A-0001-00000001")).willReturn(false);
+
+        given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
+            TransactionEntity tx = invocation.getArgument(0);
+            tx.setId(107L);
+            return tx;
+        });
+
+        given(saleRepository.save(any(SaleEntity.class))).willAnswer(invocation -> {
+            SaleEntity sale = invocation.getArgument(0);
+            sale.setId(207L);
+            return sale;
+        });
+
+        saleApplicationService.createSale(request);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<StockCheckItemRequest>> itemsCaptor =
+                ArgumentCaptor.forClass(List.class);
+
+        verify(stockValidationService).validateSaleItemsStock(itemsCaptor.capture(), eq(1L));
+
+        List<StockCheckItemRequest> capturedItems = itemsCaptor.getValue();
+
+        assertThat(capturedItems).hasSize(1);
+        assertThat(capturedItems.get(0).productId()).isEqualTo(10L);
+        assertThat(capturedItems.get(0).quantity()).isEqualByComparingTo("1.000");
+    }
+
+    @Test
+    @DisplayName("Should register inventory movements with saved transaction and warehouse")
+    void shouldRegisterInventoryMovementsWithSavedTransactionAndWarehouse() {
+
+        UserEntity createdBy = user(1L);
+        PaymentMethodEntity paymentMethod = paymentMethod(1L, "Cash");
+        WarehouseEntity warehouse = warehouse(1L, "Main Warehouse", true);
+        ProductEntity product = product(10L, "Pollo entero");
+
+        CreateSaleRequest request = createSaleRequestOneItem();
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod));
+        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
+        given(saleRepository.existsByInvoiceNumber("A-0001-00000001")).willReturn(false);
+
+        given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
+            TransactionEntity tx = invocation.getArgument(0);
+            tx.setId(108L);
+            return tx;
+        });
+
+        given(saleRepository.save(any(SaleEntity.class))).willAnswer(invocation -> {
+            SaleEntity sale = invocation.getArgument(0);
+            sale.setId(208L);
+            return sale;
+        });
+
+        saleApplicationService.createSale(request);
+
+        ArgumentCaptor<TransactionEntity> transactionCaptor =
+                ArgumentCaptor.forClass(TransactionEntity.class);
+
+        verify(inventoryMovementService)
+                .registerSaleMovements(transactionCaptor.capture(), eq(warehouse));
+
+        TransactionEntity capturedTransaction = transactionCaptor.getValue();
+
+        assertThat(capturedTransaction.getId()).isEqualTo(108L);
+        assertThat(capturedTransaction.getDetails()).hasSize(1);
+        assertThat(capturedTransaction.getDetails().get(0).getProduct().getId()).isEqualTo(10L);
+    }
+
     @Nested
     class ErrorCases {
 
         @Test
         @DisplayName("Should throw when user is not found")
         void shouldThrowWhenUserIsNotFound() {
-
             CreateSaleRequest request = createSaleRequestOneItem();
 
             given(userRepository.findById(1L)).willReturn(Optional.empty());
@@ -239,7 +583,6 @@ class SaleApplicationServiceTest {
         @Test
         @DisplayName("Should throw when payment method is not found")
         void shouldThrowWhenPaymentMethodIsNotFound() {
-
             CreateSaleRequest request = createSaleRequestOneItem();
 
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
@@ -256,7 +599,6 @@ class SaleApplicationServiceTest {
         @Test
         @DisplayName("Should throw when warehouse is not found")
         void shouldThrowWhenWarehouseIsNotFound() {
-
             CreateSaleRequest request = createSaleRequestOneItem();
 
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
@@ -274,7 +616,6 @@ class SaleApplicationServiceTest {
         @Test
         @DisplayName("Should throw when warehouse is inactive")
         void shouldThrowWhenWarehouseIsInactive() {
-
             CreateSaleRequest request = createSaleRequestOneItem();
 
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
@@ -292,7 +633,6 @@ class SaleApplicationServiceTest {
         @Test
         @DisplayName("Should throw when invoice number already exists")
         void shouldThrowWhenInvoiceNumberAlreadyExists() {
-
             CreateSaleRequest request = createSaleRequestOneItem();
 
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
@@ -311,7 +651,6 @@ class SaleApplicationServiceTest {
         @Test
         @DisplayName("Should throw when product is not found")
         void shouldThrowWhenProductIsNotFound() {
-
             CreateSaleRequest request = createSaleRequestOneItem();
 
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
@@ -331,7 +670,6 @@ class SaleApplicationServiceTest {
         @Test
         @DisplayName("Should throw when item unit price is null")
         void shouldThrowWhenItemUnitPriceIsNull() {
-
             CreateSaleRequest request = new CreateSaleRequest(
                     100L,
                     "Consumidor Final",
@@ -370,7 +708,6 @@ class SaleApplicationServiceTest {
         @Test
         @DisplayName("Should throw when item unit price is negative")
         void shouldThrowWhenItemUnitPriceIsNegative() {
-
             CreateSaleRequest request = new CreateSaleRequest(
                     100L,
                     "Consumidor Final",

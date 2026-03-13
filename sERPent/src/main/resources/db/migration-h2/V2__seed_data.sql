@@ -122,6 +122,24 @@ VALUES
     (7, 2, 1, 1, 'OUT', 1, NULL, CURRENT_TIMESTAMP, 'Sale #1');
 
 -- =========================
+-- INITIAL INVENTORY SNAPSHOT
+-- =========================
+INSERT INTO inventory_stock_snapshot (
+    snapshot_id,
+    product_id,
+    warehouse_id,
+    current_stock,
+    updated_at,
+    last_movement_id
+)
+VALUES
+    (1, 1, 1, 19, CURRENT_TIMESTAMP, 6),
+    (2, 2, 1, 19, CURRENT_TIMESTAMP, 7),
+    (3, 3, 1, 15, CURRENT_TIMESTAMP, 3),
+    (4, 1, 2, 8, CURRENT_TIMESTAMP, 4),
+    (5, 3, 2, 5, CURRENT_TIMESTAMP, 5);
+
+-- =========================
 -- RESET IDENTITY / AUTOINCREMENT
 -- =========================
 ALTER TABLE users ALTER COLUMN user_id RESTART WITH 2;
@@ -136,3 +154,4 @@ ALTER TABLE transaction_details ALTER COLUMN transaction_detail_id RESTART WITH 
 ALTER TABLE sales ALTER COLUMN sale_id RESTART WITH 2;
 ALTER TABLE expenses ALTER COLUMN expense_id RESTART WITH 2;
 ALTER TABLE inventory_movements ALTER COLUMN movement_id RESTART WITH 8;
+ALTER TABLE inventory_stock_snapshot ALTER COLUMN snapshot_id RESTART WITH 6;

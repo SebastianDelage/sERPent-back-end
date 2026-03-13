@@ -2,14 +2,12 @@ package com.empresa.serpent.inventory.service;
 
 import com.empresa.serpent.catalog.domain.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
-import com.empresa.serpent.inventory.domain.entity.InventoryMovementEntity;
-import com.empresa.serpent.inventory.repository.InventoryMovementRepository;
-import com.empresa.serpent.inventory.repository.InventoryMovementSpecifications;
-import com.empresa.serpent.inventory.web.dto.filter.InventoryMovementFilter;
+import com.empresa.serpent.inventory.domain.entity.InventoryStockSnapshotEntity;
 import com.empresa.serpent.inventory.web.dto.filter.StockFilter;
 import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.ProductStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.StockResponse;
+import com.empresa.serpent.inventory.repository.InventoryStockSnapshotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,47 +23,19 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class StockQueryService {
 
-    private final InventoryMovementRepository inventoryMovementRepository;
+    private final InventoryStockSnapshotRepository inventoryStockSnapshotRepository;
     private final ProductRepository productRepository;
 
     public List<StockResponse> getStock(StockFilter filter) {
+        List<InventoryStockSnapshotEntity> snapshots = loadSnapshots(filter);
 
-        InventoryMovementFilter movementFilter = new InventoryMovementFilter(
-                filter.productId(),
-                filter.warehouseId(),
-                null,
-                null,
-                null,
-                null
-        );
-
-        List<InventoryMovementEntity> movements = inventoryMovementRepository.findAll(
-                InventoryMovementSpecifications.fromFilter(movementFilter)
-        );
-
-        Map<StockKey, BigDecimal> grouped = movements.stream()
-                .collect(Collectors.groupingBy(
-                        movement -> new StockKey(
-                                movement.getProduct().getId(),
-                                movement.getProduct().getName(),
-                                movement.getWarehouse().getId(),
-                                movement.getWarehouse().getName()
-                        ),
-                        Collectors.reducing(
-                                BigDecimal.ZERO,
-                                this::signedQuantity,
-                                BigDecimal::add
-                        )
-                ));
-
-        return grouped.entrySet()
-                .stream()
-                .map(entry -> new StockResponse(
-                        entry.getKey().productId(),
-                        entry.getKey().productName(),
-                        entry.getKey().warehouseId(),
-                        entry.getKey().warehouseName(),
-                        entry.getValue()
+        return snapshots.stream()
+                .map(snapshot -> new StockResponse(
+                        snapshot.getProduct().getId(),
+                        snapshot.getProduct().getName(),
+                        snapshot.getWarehouse().getId(),
+                        snapshot.getWarehouse().getName(),
+                        snapshot.getCurrentStock()
                 ))
                 .filter(response ->
                         filter.onlyPositive() == null
@@ -83,32 +53,31 @@ public class StockQueryService {
     }
 
     public BigDecimal getStockByProductAndWarehouse(Long productId, Long warehouseId) {
-        return getStock(new StockFilter(productId, warehouseId, null))
-                .stream()
-                .map(StockResponse::stock)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return inventoryStockSnapshotRepository
+                .findByProductIdAndWarehouseId(productId, warehouseId)
+                .map(InventoryStockSnapshotEntity::getCurrentStock)
+                .orElse(BigDecimal.ZERO);
     }
 
     public BigDecimal getTotalStockByProduct(Long productId) {
-        return getStock(new StockFilter(productId, null, null))
+        return inventoryStockSnapshotRepository.findByProductId(productId)
                 .stream()
-                .map(StockResponse::stock)
+                .map(InventoryStockSnapshotEntity::getCurrentStock)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     public List<ProductStockResponse> getTotalStockGroupedByProduct(Boolean onlyPositive) {
+        List<InventoryStockSnapshotEntity> snapshots = inventoryStockSnapshotRepository.findAll();
 
-        List<StockResponse> stockRows = getStock(new StockFilter(null, null, null));
-
-        Map<ProductKey, BigDecimal> grouped = stockRows.stream()
+        Map<ProductKey, BigDecimal> grouped = snapshots.stream()
                 .collect(Collectors.groupingBy(
-                        row -> new ProductKey(
-                                row.productId(),
-                                row.productName()
+                        snapshot -> new ProductKey(
+                                snapshot.getProduct().getId(),
+                                snapshot.getProduct().getName()
                         ),
                         Collectors.reducing(
                                 BigDecimal.ZERO,
-                                StockResponse::stock,
+                                InventoryStockSnapshotEntity::getCurrentStock,
                                 BigDecimal::add
                         )
                 ));
@@ -129,30 +98,7 @@ public class StockQueryService {
                 .toList();
     }
 
-    /*
-     LOW STOCK DETECTION
-
-     This method detects products whose stock is at or below the
-     configured minimum stock level.
-
-     IMPORTANT BUSINESS RULE
-
-     A product will ONLY be considered for low-stock detection if it
-     has a minimumStock configured.
-
-     If minimumStock is NULL, the system assumes that this product does
-     not require strict stock monitoring and it will be ignored by this
-     check.
-
-     This allows sERPent to support businesses where some items are
-     produced or handled dynamically (for example fresh food,
-     handmade products or items produced on demand).
-
-     In those cases, the system will not recommend increasing stock
-     unless a minimumStock level is explicitly defined.
-     */
     public List<LowStockResponse> getLowStock() {
-
         List<ProductStockResponse> stockRows = getTotalStockGroupedByProduct(false);
 
         Map<Long, ProductEntity> productMap = productRepository.findAll().stream()
@@ -162,7 +108,6 @@ public class StockQueryService {
                 .filter(stockRow -> {
                     ProductEntity product = productMap.get(stockRow.productId());
 
-                    // Ignore products without inventory configuration
                     if (product == null || product.getMinimumStock() == null) {
                         return false;
                     }
@@ -184,19 +129,23 @@ public class StockQueryService {
                 .toList();
     }
 
-    private BigDecimal signedQuantity(InventoryMovementEntity movement) {
-        return switch (movement.getMovementType()) {
-            case IN, ADJUSTMENT_IN, TRANSFER_IN, RETURN_IN -> movement.getQuantity();
-            case OUT, ADJUSTMENT_OUT, TRANSFER_OUT -> movement.getQuantity().negate();
-        };
-    }
+    private List<InventoryStockSnapshotEntity> loadSnapshots(StockFilter filter) {
+        if (filter.productId() != null && filter.warehouseId() != null) {
+            return inventoryStockSnapshotRepository
+                    .findByProductIdAndWarehouseId(filter.productId(), filter.warehouseId())
+                    .stream()
+                    .toList();
+        }
 
-    private record StockKey(
-            Long productId,
-            String productName,
-            Long warehouseId,
-            String warehouseName
-    ) {
+        if (filter.productId() != null) {
+            return inventoryStockSnapshotRepository.findByProductId(filter.productId());
+        }
+
+        if (filter.warehouseId() != null) {
+            return inventoryStockSnapshotRepository.findByWarehouseId(filter.warehouseId());
+        }
+
+        return inventoryStockSnapshotRepository.findAll();
     }
 
     private record ProductKey(

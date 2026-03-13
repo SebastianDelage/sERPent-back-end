@@ -20,6 +20,7 @@ import java.util.stream.Stream;
 public class InventoryMovementService {
 
     private final InventoryMovementRepository inventoryMovementRepository;
+    private final InventoryStockSnapshotService inventoryStockSnapshotService;
 
     @Transactional
     public void registerSaleMovements(TransactionEntity transaction, WarehouseEntity warehouse) {
@@ -30,7 +31,8 @@ public class InventoryMovementService {
                 .map(detail -> toSaleMovement(detail, transaction, warehouse))
                 .toList();
 
-        inventoryMovementRepository.saveAll(movements);
+        List<InventoryMovementEntity> savedMovements = inventoryMovementRepository.saveAll(movements);
+        inventoryStockSnapshotService.applyMovements(savedMovements);
     }
 
     @Transactional
@@ -42,7 +44,8 @@ public class InventoryMovementService {
                 .map(detail -> toPurchaseMovement(detail, transaction, warehouse))
                 .toList();
 
-        inventoryMovementRepository.saveAll(movements);
+        List<InventoryMovementEntity> savedMovements = inventoryMovementRepository.saveAll(movements);
+        inventoryStockSnapshotService.applyMovements(savedMovements);
     }
 
     @Transactional
@@ -108,7 +111,8 @@ public class InventoryMovementService {
                 .note(note)
                 .build();
 
-        inventoryMovementRepository.save(movement);
+        InventoryMovementEntity savedMovement = inventoryMovementRepository.save(movement);
+        inventoryStockSnapshotService.applyMovement(savedMovement);
     }
 
     @Transactional
@@ -154,7 +158,8 @@ public class InventoryMovementService {
                 .flatMap(detail -> toTransferMovements(detail, transaction, sourceWarehouse, targetWarehouse))
                 .toList();
 
-        inventoryMovementRepository.saveAll(movements);
+        List<InventoryMovementEntity> savedMovements = inventoryMovementRepository.saveAll(movements);
+        inventoryStockSnapshotService.applyMovements(savedMovements);
     }
 
     private void validateTransactionAndWarehouse(TransactionEntity transaction, WarehouseEntity warehouse) {
@@ -263,85 +268,4 @@ public class InventoryMovementService {
 
         return Stream.of(transferOut, transferIn);
     }
-    /*
- FUTURE MOVEMENT TYPES
-
- This service will eventually support additional inventory operations
- beyond sales and purchases.
-
- 1. INVENTORY ADJUSTMENTS
-
- Used when the physical stock does not match the system stock.
- This may happen due to:
-
-     - damaged products
-     - expired items
-     - counting corrections during stock audits
-     - shrinkage or losses
-
- Example:
-     System stock = 20
-     Physical stock = 18
-
-     Adjustment movement:
-     movementType = OUT
-     quantity = 2
-     note = "Inventory adjustment"
-
- This operation should be triggered by an InventoryAdjustmentService
- or a stock counting process.
-
- ------------------------------------------------------------
-
- 2. WAREHOUSE TRANSFERS
-
- Used when products are moved from one warehouse to another.
-
- Example:
-     Transfer 10 units from Warehouse A to Warehouse B
-
-     Movement 1:
-         warehouse = A
-         movementType = OUT
-         quantity = 10
-         note = "Transfer to warehouse B"
-
-     Movement 2:
-         warehouse = B
-         movementType = IN
-         quantity = 10
-         note = "Transfer from warehouse A"
-
- Transfers should always generate TWO movements to keep the
- inventory ledger balanced.
-
- ------------------------------------------------------------
-
- 3. RETURNS
-
- Used when products return to inventory after a sale.
-
- Example:
-     Customer returns 1 unit from a previous sale.
-
-     Movement:
-         movementType = IN
-         quantity = 1
-         note = "Return from sale #123"
-
- Returns may optionally reference the original transaction.
-
- ------------------------------------------------------------
-
- These operations will likely be implemented through dedicated
- application services such as:
-
-     - InventoryAdjustmentService
-     - WarehouseTransferService
-     - ReturnService
-
- InventoryMovementService will remain responsible only for
- registering the resulting inventory movements.
-    */
-
 }
