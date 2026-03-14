@@ -1,11 +1,13 @@
 package com.empresa.serpent.reports.service;
 
+import com.empresa.serpent.inventory.repository.InventoryMovementRepository;
 import com.empresa.serpent.inventory.service.StockQueryService;
 import com.empresa.serpent.inventory.web.dto.filter.StockFilter;
 import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.ProductStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.StockResponse;
 import com.empresa.serpent.reports.web.dto.response.InventoryByWarehouseResponse;
+import com.empresa.serpent.reports.web.dto.response.InventoryMovementsByTypeResponse;
 import com.empresa.serpent.reports.web.dto.response.InventorySummaryResponse;
 import com.empresa.serpent.reports.web.dto.response.WarehouseSummaryResponse;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 public class InventoryReportService {
 
     private final StockQueryService stockQueryService;
+    private final InventoryMovementRepository inventoryMovementRepository;
 
     public List<InventorySummaryResponse> getInventorySummary() {
         return stockQueryService.getTotalStockGroupedByProduct(false)
@@ -94,6 +97,17 @@ public class InventoryReportService {
                 row.warehouseName(),
                 row.stock()
         );
+    }
+
+    public List<InventoryMovementsByTypeResponse> getInventoryMovementsByType() {
+        return inventoryMovementRepository.getInventoryMovementsByTypeReportRaw()
+                .stream()
+                .map(row -> new InventoryMovementsByTypeResponse(
+                        row.getMovementType(),
+                        row.getMovements(),
+                        row.getTotalQuantity()
+                ))
+                .toList();
     }
 
     private record WarehouseKey(

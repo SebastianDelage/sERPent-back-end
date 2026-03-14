@@ -4,6 +4,7 @@ import com.empresa.serpent.inventory.domain.entity.InventoryMovementEntity;
 import com.empresa.serpent.inventory.domain.enums.MovementType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -24,4 +25,15 @@ public interface InventoryMovementRepository extends
     List<InventoryMovementEntity> findByCreatedAtBetween(LocalDateTime from, LocalDateTime to);
 
     List<InventoryMovementEntity> findByProductIdAndWarehouseId(Long productId, Long warehouseId);
+
+    @Query("""
+       SELECT
+           m.movementType AS movementType,
+           COUNT(m.id) AS movements,
+           COALESCE(SUM(m.quantity), 0) AS totalQuantity
+       FROM InventoryMovementEntity m
+       GROUP BY m.movementType
+       ORDER BY m.movementType
+       """)
+    List<com.empresa.serpent.reports.repository.projection.InventoryMovementsByTypeProjection> getInventoryMovementsByTypeReportRaw();
 }
