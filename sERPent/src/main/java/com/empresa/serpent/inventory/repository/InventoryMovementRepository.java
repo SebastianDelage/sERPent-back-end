@@ -2,10 +2,12 @@ package com.empresa.serpent.inventory.repository;
 
 import com.empresa.serpent.inventory.domain.entity.InventoryMovementEntity;
 import com.empresa.serpent.inventory.domain.enums.MovementType;
+import com.empresa.serpent.reports.repository.projection.InventoryMovementsByProductProjection;
+import com.empresa.serpent.reports.repository.projection.InventoryMovementsByTypeProjection;
+import com.empresa.serpent.reports.repository.projection.InventoryMovementsByWarehouseProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,5 +37,97 @@ public interface InventoryMovementRepository extends
        GROUP BY m.movementType
        ORDER BY m.movementType
        """)
-    List<com.empresa.serpent.reports.repository.projection.InventoryMovementsByTypeProjection> getInventoryMovementsByTypeReportRaw();
+    List<InventoryMovementsByTypeProjection> getInventoryMovementsByTypeReportRaw();
+
+    @Query("""
+       SELECT
+           m.warehouse.id AS warehouseId,
+           m.warehouse.name AS warehouseName,
+           COUNT(m.id) AS movements,
+           COALESCE(SUM(
+               CASE
+                   WHEN m.movementType IN (
+                       com.empresa.serpent.inventory.domain.enums.MovementType.IN,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.ADJUSTMENT_IN,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.TRANSFER_IN,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.RETURN_IN
+                   )
+                   THEN m.quantity
+                   ELSE 0
+               END
+           ), 0) AS totalIn,
+           COALESCE(SUM(
+               CASE
+                   WHEN m.movementType IN (
+                       com.empresa.serpent.inventory.domain.enums.MovementType.OUT,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.ADJUSTMENT_OUT,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.TRANSFER_OUT
+                   )
+                   THEN m.quantity
+                   ELSE 0
+               END
+           ), 0) AS totalOut,
+           COALESCE(SUM(
+               CASE
+                   WHEN m.movementType IN (
+                       com.empresa.serpent.inventory.domain.enums.MovementType.IN,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.ADJUSTMENT_IN,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.TRANSFER_IN,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.RETURN_IN
+                   )
+                   THEN m.quantity
+                   ELSE -m.quantity
+               END
+           ), 0) AS netQuantity
+       FROM InventoryMovementEntity m
+       GROUP BY m.warehouse.id, m.warehouse.name
+       ORDER BY m.warehouse.name
+       """)
+    List<InventoryMovementsByWarehouseProjection> getInventoryMovementsByWarehouseReportRaw();
+
+    @Query("""
+       SELECT
+           m.product.id AS productId,
+           m.product.name AS productName,
+           COUNT(m.id) AS movements,
+           COALESCE(SUM(
+               CASE
+                   WHEN m.movementType IN (
+                       com.empresa.serpent.inventory.domain.enums.MovementType.IN,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.ADJUSTMENT_IN,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.TRANSFER_IN,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.RETURN_IN
+                   )
+                   THEN m.quantity
+                   ELSE 0
+               END
+           ), 0) AS totalIn,
+           COALESCE(SUM(
+               CASE
+                   WHEN m.movementType IN (
+                       com.empresa.serpent.inventory.domain.enums.MovementType.OUT,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.ADJUSTMENT_OUT,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.TRANSFER_OUT
+                   )
+                   THEN m.quantity
+                   ELSE 0
+               END
+           ), 0) AS totalOut,
+           COALESCE(SUM(
+               CASE
+                   WHEN m.movementType IN (
+                       com.empresa.serpent.inventory.domain.enums.MovementType.IN,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.ADJUSTMENT_IN,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.TRANSFER_IN,
+                       com.empresa.serpent.inventory.domain.enums.MovementType.RETURN_IN
+                   )
+                   THEN m.quantity
+                   ELSE -m.quantity
+               END
+           ), 0) AS netQuantity
+       FROM InventoryMovementEntity m
+       GROUP BY m.product.id, m.product.name
+       ORDER BY m.product.name
+       """)
+    List<InventoryMovementsByProductProjection> getInventoryMovementsByProductReportRaw();
 }

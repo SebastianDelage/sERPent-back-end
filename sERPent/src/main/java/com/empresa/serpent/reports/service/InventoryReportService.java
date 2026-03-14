@@ -7,7 +7,9 @@ import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.ProductStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.StockResponse;
 import com.empresa.serpent.reports.web.dto.response.InventoryByWarehouseResponse;
+import com.empresa.serpent.reports.web.dto.response.InventoryMovementsByProductResponse;
 import com.empresa.serpent.reports.web.dto.response.InventoryMovementsByTypeResponse;
+import com.empresa.serpent.reports.web.dto.response.InventoryMovementsByWarehouseResponse;
 import com.empresa.serpent.reports.web.dto.response.InventorySummaryResponse;
 import com.empresa.serpent.reports.web.dto.response.WarehouseSummaryResponse;
 import lombok.RequiredArgsConstructor;
@@ -81,6 +83,45 @@ public class InventoryReportService {
                 .toList();
     }
 
+    public List<InventoryMovementsByTypeResponse> getInventoryMovementsByType() {
+        return inventoryMovementRepository.getInventoryMovementsByTypeReportRaw()
+                .stream()
+                .map(row -> new InventoryMovementsByTypeResponse(
+                        row.getMovementType(),
+                        row.getMovements(),
+                        row.getTotalQuantity()
+                ))
+                .toList();
+    }
+
+    public List<InventoryMovementsByWarehouseResponse> getInventoryMovementsByWarehouse() {
+        return inventoryMovementRepository.getInventoryMovementsByWarehouseReportRaw()
+                .stream()
+                .map(row -> new InventoryMovementsByWarehouseResponse(
+                        row.getWarehouseId(),
+                        row.getWarehouseName(),
+                        row.getMovements(),
+                        row.getTotalIn(),
+                        row.getTotalOut(),
+                        row.getNetQuantity()
+                ))
+                .toList();
+    }
+
+    public List<InventoryMovementsByProductResponse> getInventoryMovementsByProduct() {
+        return inventoryMovementRepository.getInventoryMovementsByProductReportRaw()
+                .stream()
+                .map(row -> new InventoryMovementsByProductResponse(
+                        row.getProductId(),
+                        row.getProductName(),
+                        row.getMovements(),
+                        row.getTotalIn(),
+                        row.getTotalOut(),
+                        row.getNetQuantity()
+                ))
+                .toList();
+    }
+
     private InventorySummaryResponse toInventorySummaryResponse(ProductStockResponse row) {
         return new InventorySummaryResponse(
                 row.productId(),
@@ -97,17 +138,6 @@ public class InventoryReportService {
                 row.warehouseName(),
                 row.stock()
         );
-    }
-
-    public List<InventoryMovementsByTypeResponse> getInventoryMovementsByType() {
-        return inventoryMovementRepository.getInventoryMovementsByTypeReportRaw()
-                .stream()
-                .map(row -> new InventoryMovementsByTypeResponse(
-                        row.getMovementType(),
-                        row.getMovements(),
-                        row.getTotalQuantity()
-                ))
-                .toList();
     }
 
     private record WarehouseKey(

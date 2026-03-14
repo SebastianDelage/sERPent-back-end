@@ -3,7 +3,9 @@ package com.empresa.serpent.reports.web.controller;
 import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.reports.service.InventoryReportService;
 import com.empresa.serpent.reports.web.dto.response.InventoryByWarehouseResponse;
+import com.empresa.serpent.reports.web.dto.response.InventoryMovementsByProductResponse;
 import com.empresa.serpent.reports.web.dto.response.InventoryMovementsByTypeResponse;
+import com.empresa.serpent.reports.web.dto.response.InventoryMovementsByWarehouseResponse;
 import com.empresa.serpent.reports.web.dto.response.InventorySummaryResponse;
 import com.empresa.serpent.reports.web.dto.response.WarehouseSummaryResponse;
 import lombok.RequiredArgsConstructor;
@@ -43,5 +45,15 @@ public class InventoryReportController {
     @GetMapping("/movements/by-type")
     public List<InventoryMovementsByTypeResponse> getInventoryMovementsByType() {
         return inventoryReportService.getInventoryMovementsByType();
+    }
+
+    @GetMapping("/movements/by-warehouse")
+    public List<InventoryMovementsByWarehouseResponse> getInventoryMovementsByWarehouse() {
+        return inventoryReportService.getInventoryMovementsByWarehouse();
+    }
+
+    @GetMapping("/movements/by-product")
+    public List<InventoryMovementsByProductResponse> getInventoryMovementsByProduct() {
+        return inventoryReportService.getInventoryMovementsByProduct();
     }
 }
