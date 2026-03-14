@@ -2,12 +2,7 @@ package com.empresa.serpent.reports.web.controller;
 
 import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.reports.service.InventoryReportService;
-import com.empresa.serpent.reports.web.dto.response.InventoryByWarehouseResponse;
-import com.empresa.serpent.reports.web.dto.response.InventoryMovementsByProductResponse;
-import com.empresa.serpent.reports.web.dto.response.InventoryMovementsByTypeResponse;
-import com.empresa.serpent.reports.web.dto.response.InventoryMovementsByWarehouseResponse;
-import com.empresa.serpent.reports.web.dto.response.InventorySummaryResponse;
-import com.empresa.serpent.reports.web.dto.response.WarehouseSummaryResponse;
+import com.empresa.serpent.reports.web.dto.response.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -55,5 +50,10 @@ public class InventoryReportController {
     @GetMapping("/movements/by-product")
     public List<InventoryMovementsByProductResponse> getInventoryMovementsByProduct() {
         return inventoryReportService.getInventoryMovementsByProduct();
+    }
+
+    @GetMapping("/replenishment")
+    public List<InventoryReplenishmentResponse> getReplenishmentReport() {
+        return inventoryReportService.getReplenishmentReport();
     }
 }

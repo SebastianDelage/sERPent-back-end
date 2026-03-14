@@ -1,17 +1,13 @@
 package com.empresa.serpent.reports.service;
 
 import com.empresa.serpent.inventory.repository.InventoryMovementRepository;
+import com.empresa.serpent.inventory.repository.InventoryStockSnapshotRepository;
 import com.empresa.serpent.inventory.service.StockQueryService;
 import com.empresa.serpent.inventory.web.dto.filter.StockFilter;
 import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.ProductStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.StockResponse;
-import com.empresa.serpent.reports.web.dto.response.InventoryByWarehouseResponse;
-import com.empresa.serpent.reports.web.dto.response.InventoryMovementsByProductResponse;
-import com.empresa.serpent.reports.web.dto.response.InventoryMovementsByTypeResponse;
-import com.empresa.serpent.reports.web.dto.response.InventoryMovementsByWarehouseResponse;
-import com.empresa.serpent.reports.web.dto.response.InventorySummaryResponse;
-import com.empresa.serpent.reports.web.dto.response.WarehouseSummaryResponse;
+import com.empresa.serpent.reports.web.dto.response.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +24,7 @@ public class InventoryReportService {
 
     private final StockQueryService stockQueryService;
     private final InventoryMovementRepository inventoryMovementRepository;
+    private final InventoryStockSnapshotRepository snapshotRepository;
 
     public List<InventorySummaryResponse> getInventorySummary() {
         return stockQueryService.getTotalStockGroupedByProduct(false)
@@ -138,6 +135,38 @@ public class InventoryReportService {
                 row.warehouseName(),
                 row.stock()
         );
+    }
+
+    public List<InventoryReplenishmentResponse> getReplenishmentReport() {
+
+        return snapshotRepository.getReplenishmentReportRaw()
+                .stream()
+                .map(row -> {
+
+                    BigDecimal reorderQty =
+                            row.getReorderQuantity() == null
+                                    ? BigDecimal.ZERO
+                                    : row.getReorderQuantity();
+
+                    BigDecimal suggested =
+                            reorderQty.subtract(row.getCurrentStock());
+
+                    if (suggested.compareTo(BigDecimal.ZERO) < 0) {
+                        suggested = reorderQty;
+                    }
+
+                    return new InventoryReplenishmentResponse(
+                            row.getProductId(),
+                            row.getProductName(),
+                            row.getWarehouseId(),
+                            row.getWarehouseName(),
+                            row.getCurrentStock(),
+                            row.getReorderPoint(),
+                            reorderQty,
+                            suggested
+                    );
+                })
+                .toList();
     }
 
     private record WarehouseKey(
