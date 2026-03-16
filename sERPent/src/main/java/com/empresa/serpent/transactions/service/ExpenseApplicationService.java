@@ -1,5 +1,3 @@
-
-
 package com.empresa.serpent.transactions.service;
 
 import com.empresa.serpent.catalog.domain.SupplierEntity;
@@ -17,8 +15,6 @@ import com.empresa.serpent.transactions.repository.PaymentMethodRepository;
 import com.empresa.serpent.transactions.repository.TransactionRepository;
 import com.empresa.serpent.transactions.web.dto.request.CreateExpenseRequest;
 import com.empresa.serpent.transactions.web.dto.response.CreateExpenseResponse;
-import com.empresa.serpent.transactions.web.dto.response.ExpenseResponse;
-import com.empresa.serpent.transactions.web.mapper.ExpenseMapper;
 import com.empresa.serpent.users.domain.entity.UserEntity;
 import com.empresa.serpent.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,11 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class ExpenseService {
+public class ExpenseApplicationService {
 
     private final TransactionRepository transactionRepository;
     private final ExpenseRepository expenseRepository;
@@ -38,7 +33,6 @@ public class ExpenseService {
     private final PaymentMethodRepository paymentMethodRepository;
     private final SupplierRepository supplierRepository;
     private final ExpenseCategoryRepository expenseCategoryRepository;
-    private final ExpenseMapper expenseMapper;
 
     @Transactional
     public CreateExpenseResponse createExpense(CreateExpenseRequest request) {
@@ -104,55 +98,6 @@ public class ExpenseService {
                 savedTransaction.getStatus().name(),
                 "Expense created successfully"
         );
-    }
-
-    @Transactional(readOnly = true)
-    public ExpenseResponse findById(Long id) {
-        ExpenseEntity entity = expenseRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Expense not found: " + id));
-
-        return expenseMapper.toResponse(entity);
-    }
-
-    @Transactional(readOnly = true)
-    public ExpenseResponse findByTransactionId(Long transactionId) {
-        ExpenseEntity entity = expenseRepository.findByTransactionId(transactionId)
-                .orElseThrow(() -> new NotFoundException("Expense not found for transaction: " + transactionId));
-
-        return expenseMapper.toResponse(entity);
-    }
-
-    @Transactional(readOnly = true)
-    public ExpenseResponse findByReceiptNumber(String receiptNumber) {
-        if (receiptNumber == null || receiptNumber.isBlank()) {
-            throw new IllegalArgumentException("Receipt number cannot be blank");
-        }
-
-        ExpenseEntity entity = expenseRepository.findByReceiptNumberIgnoreCase(receiptNumber.trim())
-                .orElseThrow(() -> new NotFoundException("Expense not found for receipt number: " + receiptNumber.trim()));
-
-        return expenseMapper.toResponse(entity);
-    }
-
-    @Transactional(readOnly = true)
-    public List<ExpenseResponse> findBySupplierId(Long supplierId) {
-        return expenseRepository.findBySupplierId(supplierId).stream()
-                .map(expenseMapper::toResponse)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<ExpenseResponse> findByExpenseCategoryId(Long categoryId) {
-        return expenseRepository.findByExpenseCategoryId(categoryId).stream()
-                .map(expenseMapper::toResponse)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<ExpenseResponse> findReimbursable() {
-        return expenseRepository.findByReimbursableTrue().stream()
-                .map(expenseMapper::toResponse)
-                .toList();
     }
 
     private void validateTotal(BigDecimal total) {
