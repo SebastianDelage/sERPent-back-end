@@ -3,8 +3,8 @@ package com.empresa.serpent.transactions.service;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.transactions.domain.entity.ExpenseCategoryEntity;
 import com.empresa.serpent.transactions.repository.ExpenseCategoryRepository;
-import com.empresa.serpent.transactions.web.dto.request.ExpenseCategoryCreateRequest;
-import com.empresa.serpent.transactions.web.dto.request.ExpenseCategoryUpdateRequest;
+import com.empresa.serpent.transactions.web.dto.request.CreateExpenseCategoryRequest;
+import com.empresa.serpent.transactions.web.dto.request.UpdateExpenseCategoryRequest;
 import com.empresa.serpent.transactions.web.dto.response.ExpenseCategoryResponse;
 import com.empresa.serpent.transactions.web.mapper.ExpenseCategoryMapper;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +21,7 @@ public class ExpenseCategoryService {
     private final ExpenseCategoryMapper expenseCategoryMapper;
 
     @Transactional
-    public ExpenseCategoryResponse create(ExpenseCategoryCreateRequest request) {
+    public ExpenseCategoryResponse create(CreateExpenseCategoryRequest request) {
         validateName(request.name(), null);
 
         ExpenseCategoryEntity entity = expenseCategoryMapper.toEntity(request);
@@ -37,7 +37,7 @@ public class ExpenseCategoryService {
     }
 
     @Transactional
-    public ExpenseCategoryResponse update(Long id, ExpenseCategoryUpdateRequest request) {
+    public ExpenseCategoryResponse update(Long id, UpdateExpenseCategoryRequest request) {
         validateName(request.name(), id);
 
         ExpenseCategoryEntity entity = expenseCategoryRepository.findById(id)

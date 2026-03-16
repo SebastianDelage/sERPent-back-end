@@ -18,7 +18,7 @@ public class SaleController {
     private final SaleApplicationService saleApplicationService;
 
     @PostMapping
-    public CreateSaleResponse createSale(@Valid @RequestBody CreateSaleRequest request) {
+    public CreateSaleResponse create(@Valid @RequestBody CreateSaleRequest request) {
         return saleApplicationService.createSale(request);
     }
 }

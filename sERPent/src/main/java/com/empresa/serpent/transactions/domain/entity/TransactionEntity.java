@@ -61,6 +61,9 @@ public class TransactionEntity {
     @OneToOne(mappedBy = "transaction", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private ExpenseEntity expense;
 
+    @OneToOne(mappedBy = "transaction", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private PurchaseEntity purchase;
+
     @PrePersist
     public void prePersist() {
         if (this.total == null) this.total = BigDecimal.ZERO;

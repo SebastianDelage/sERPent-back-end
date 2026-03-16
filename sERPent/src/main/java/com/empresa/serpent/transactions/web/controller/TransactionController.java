@@ -61,7 +61,7 @@ public class TransactionController {
     }
 
     @GetMapping("/{id}")
-    public TransactionDetailResponse getById(@PathVariable Long id) {
+    public TransactionDetailResponse findById(@PathVariable Long id) {
         return transactionQueryService.getById(id);
     }
 }
