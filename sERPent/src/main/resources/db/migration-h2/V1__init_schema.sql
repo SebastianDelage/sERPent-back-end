@@ -131,7 +131,9 @@ CREATE TABLE transactions (
                               CONSTRAINT ck_transactions_type CHECK (
                                   type IN ('SALE','EXPENSE','PURCHASE','ADJUSTMENT','TRANSFER','RETURN')
                                   ),
-                              CONSTRAINT ck_transactions_status CHECK (status IN ('DRAFT','CONFIRMED','CANCELLED'))
+                              CONSTRAINT ck_transactions_status CHECK (
+                                  status IN ('PENDING','CONFIRMED','CANCELLED')
+                                  )
 );
 
 -- =========================
@@ -235,7 +237,31 @@ CREATE TABLE warehouses (
 );
 
 -- =========================
--- 13) INVENTORY_MOVEMENTS
+-- 13) PURCHASES
+-- =========================
+CREATE TABLE purchases (
+                           purchase_id BIGSERIAL PRIMARY KEY,
+                           transaction_id BIGINT NOT NULL,
+                           supplier_id BIGINT,
+                           warehouse_id BIGINT NOT NULL,
+                           receipt_number VARCHAR(80),
+                           notes TEXT,
+
+                           CONSTRAINT fk_purchases_transaction
+                               FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id),
+
+                           CONSTRAINT fk_purchases_supplier
+                               FOREIGN KEY (supplier_id) REFERENCES suppliers(supplier_id),
+
+                           CONSTRAINT fk_purchases_warehouse
+                               FOREIGN KEY (warehouse_id) REFERENCES warehouses(warehouse_id),
+
+                           CONSTRAINT ux_purchases_transaction UNIQUE (transaction_id),
+                           CONSTRAINT ux_purchases_receipt_number UNIQUE (receipt_number)
+);
+
+-- =========================
+-- 14) INVENTORY_MOVEMENTS
 -- =========================
 CREATE TABLE inventory_movements (
                                      movement_id BIGSERIAL PRIMARY KEY,
@@ -274,7 +300,7 @@ CREATE TABLE inventory_movements (
 );
 
 -- =========================
--- 14) INVENTORY STOCK SNAPSHOT
+-- 15) INVENTORY STOCK SNAPSHOT
 -- =========================
 CREATE TABLE inventory_stock_snapshot (
                                           snapshot_id BIGSERIAL PRIMARY KEY,
@@ -313,6 +339,9 @@ CREATE INDEX idx_sale_returns_original_sale ON sale_returns(original_sale_id);
 
 CREATE INDEX idx_expenses_supplier ON expenses(supplier_id);
 CREATE INDEX idx_expenses_category ON expenses(expense_category_id);
+
+CREATE INDEX idx_purchases_supplier ON purchases(supplier_id);
+CREATE INDEX idx_purchases_warehouse ON purchases(warehouse_id);
 
 CREATE INDEX idx_product_suppliers_supplier ON product_suppliers(supplier_id);
 CREATE INDEX idx_product_suppliers_product ON product_suppliers(product_id);

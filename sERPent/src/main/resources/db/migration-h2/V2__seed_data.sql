@@ -69,15 +69,21 @@ VALUES
 INSERT INTO transactions (transaction_id, date, type, status, total, payment_method_id, created_by_user_id, description)
 VALUES
     (1, CURRENT_TIMESTAMP, 'SALE', 'CONFIRMED', 9100, 1, 1, 'Venta mostrador'),
-    (2, CURRENT_TIMESTAMP, 'EXPENSE', 'CONFIRMED', 3000, 2, 1, 'Compra insumos');
+    (2, CURRENT_TIMESTAMP, 'EXPENSE', 'CONFIRMED', 3000, 2, 1, 'Compra insumos'),
+    (3, CURRENT_TIMESTAMP, 'PURCHASE', 'CONFIRMED', 46000, 1, 1, 'Compra inicial de mercadería');
 
 -- =========================
 -- TRANSACTION DETAILS
 -- =========================
 INSERT INTO transaction_details (transaction_detail_id, transaction_id, product_id, description, quantity, unit_price, subtotal)
 VALUES
+    -- Sale #1
     (1, 1, 1, 'Pollo entero', 1, 4500, 4500),
-    (2, 1, 2, 'Pata muslo', 1, 4600, 4600);
+    (2, 1, 2, 'Pata muslo', 1, 4600, 4600),
+
+    -- Purchase #1
+    (3, 3, 1, 'Pollo entero', 10, 3000, 30000),
+    (4, 3, 2, 'Pata muslo', 5, 3200, 16000);
 
 -- =========================
 -- SALES
@@ -92,6 +98,13 @@ VALUES
 INSERT INTO expenses (expense_id, transaction_id, supplier_id, expense_category_id, receipt_number, reimbursable)
 VALUES
     (1, 2, 1, 1, 'REC-001', FALSE);
+
+-- =========================
+-- PURCHASES
+-- =========================
+INSERT INTO purchases (purchase_id, transaction_id, supplier_id, warehouse_id, receipt_number, notes)
+VALUES
+    (1, 3, 1, 1, 'PUR-001', 'Compra inicial de mercadería');
 
 -- =========================
 -- INITIAL INVENTORY MOVEMENTS
@@ -119,7 +132,11 @@ VALUES
 
     -- Inventory impact of seeded sale #1 in warehouse 1
     (6, 1, 1, 1, 'OUT', 1, NULL, CURRENT_TIMESTAMP, 'Sale #1'),
-    (7, 2, 1, 1, 'OUT', 1, NULL, CURRENT_TIMESTAMP, 'Sale #1');
+    (7, 2, 1, 1, 'OUT', 1, NULL, CURRENT_TIMESTAMP, 'Sale #1'),
+
+    -- Inventory impact of seeded purchase #1 in warehouse 1
+    (8, 1, 1, 3, 'IN', 10, 3000, CURRENT_TIMESTAMP, 'Purchase #3'),
+    (9, 2, 1, 3, 'IN', 5, 3200, CURRENT_TIMESTAMP, 'Purchase #3');
 
 -- =========================
 -- INITIAL INVENTORY SNAPSHOT
@@ -133,8 +150,8 @@ INSERT INTO inventory_stock_snapshot (
     last_movement_id
 )
 VALUES
-    (1, 1, 1, 19, CURRENT_TIMESTAMP, 6),
-    (2, 2, 1, 19, CURRENT_TIMESTAMP, 7),
+    (1, 1, 1, 29, CURRENT_TIMESTAMP, 8),
+    (2, 2, 1, 24, CURRENT_TIMESTAMP, 9),
     (3, 3, 1, 15, CURRENT_TIMESTAMP, 3),
     (4, 1, 2, 8, CURRENT_TIMESTAMP, 4),
     (5, 3, 2, 5, CURRENT_TIMESTAMP, 5);
@@ -149,9 +166,10 @@ ALTER TABLE suppliers ALTER COLUMN supplier_id RESTART WITH 2;
 ALTER TABLE product_suppliers ALTER COLUMN product_supplier_id RESTART WITH 3;
 ALTER TABLE expense_categories ALTER COLUMN expense_category_id RESTART WITH 2;
 ALTER TABLE warehouses ALTER COLUMN warehouse_id RESTART WITH 4;
-ALTER TABLE transactions ALTER COLUMN transaction_id RESTART WITH 3;
-ALTER TABLE transaction_details ALTER COLUMN transaction_detail_id RESTART WITH 3;
+ALTER TABLE transactions ALTER COLUMN transaction_id RESTART WITH 4;
+ALTER TABLE transaction_details ALTER COLUMN transaction_detail_id RESTART WITH 5;
 ALTER TABLE sales ALTER COLUMN sale_id RESTART WITH 2;
 ALTER TABLE expenses ALTER COLUMN expense_id RESTART WITH 2;
-ALTER TABLE inventory_movements ALTER COLUMN movement_id RESTART WITH 8;
+ALTER TABLE purchases ALTER COLUMN purchase_id RESTART WITH 2;
+ALTER TABLE inventory_movements ALTER COLUMN movement_id RESTART WITH 10;
 ALTER TABLE inventory_stock_snapshot ALTER COLUMN snapshot_id RESTART WITH 6;
