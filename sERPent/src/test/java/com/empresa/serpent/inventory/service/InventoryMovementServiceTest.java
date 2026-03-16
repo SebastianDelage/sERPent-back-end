@@ -34,6 +34,9 @@ class InventoryMovementServiceTest {
     @Mock
     private InventoryMovementRepository inventoryMovementRepository;
 
+    @Mock
+    private InventoryStockSnapshotService inventoryStockSnapshotService;
+
     @InjectMocks
     private InventoryMovementService inventoryMovementService;
 
@@ -49,6 +52,7 @@ class InventoryMovementServiceTest {
 
         ArgumentCaptor<List<InventoryMovementEntity>> captor = ArgumentCaptor.forClass(List.class);
         verify(inventoryMovementRepository).saveAll(captor.capture());
+        verify(inventoryStockSnapshotService).applyMovements(anyList());
 
         List<InventoryMovementEntity> movements = captor.getValue();
         assertThat(movements).hasSize(1);
@@ -75,6 +79,7 @@ class InventoryMovementServiceTest {
 
         ArgumentCaptor<List<InventoryMovementEntity>> captor = ArgumentCaptor.forClass(List.class);
         verify(inventoryMovementRepository).saveAll(captor.capture());
+        verify(inventoryStockSnapshotService).applyMovements(anyList());
 
         List<InventoryMovementEntity> movements = captor.getValue();
         assertThat(movements).hasSize(1);
@@ -94,6 +99,9 @@ class InventoryMovementServiceTest {
         WarehouseEntity warehouse = warehouse(1L, "Central", true);
         ProductEntity product = product(10L, "Pollo entero");
 
+        when(inventoryMovementRepository.save(any(InventoryMovementEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
         inventoryMovementService.registerAdjustmentMovement(
                 transaction,
                 warehouse,
@@ -105,6 +113,7 @@ class InventoryMovementServiceTest {
 
         ArgumentCaptor<InventoryMovementEntity> captor = ArgumentCaptor.forClass(InventoryMovementEntity.class);
         verify(inventoryMovementRepository).save(captor.capture());
+        verify(inventoryStockSnapshotService).applyMovement(any(InventoryMovementEntity.class));
 
         InventoryMovementEntity movement = captor.getValue();
         assertThat(movement.getTransaction()).isEqualTo(transaction);
@@ -129,6 +138,7 @@ class InventoryMovementServiceTest {
 
         ArgumentCaptor<List<InventoryMovementEntity>> captor = ArgumentCaptor.forClass(List.class);
         verify(inventoryMovementRepository).saveAll(captor.capture());
+        verify(inventoryStockSnapshotService).applyMovements(anyList());
 
         List<InventoryMovementEntity> movements = captor.getValue();
         assertThat(movements).hasSize(2);
@@ -161,6 +171,7 @@ class InventoryMovementServiceTest {
                     .hasMessage("Transaction cannot be null");
 
             verify(inventoryMovementRepository, never()).saveAll(anyList());
+            verify(inventoryStockSnapshotService, never()).applyMovements(anyList());
         }
 
         @Test
@@ -176,6 +187,7 @@ class InventoryMovementServiceTest {
                     .hasMessage("Transaction id cannot be null");
 
             verify(inventoryMovementRepository, never()).saveAll(anyList());
+            verify(inventoryStockSnapshotService, never()).applyMovements(anyList());
         }
 
         @Test
@@ -190,6 +202,7 @@ class InventoryMovementServiceTest {
                     .hasMessage("Warehouse cannot be null");
 
             verify(inventoryMovementRepository, never()).saveAll(anyList());
+            verify(inventoryStockSnapshotService, never()).applyMovements(anyList());
         }
 
         @Test
@@ -205,6 +218,7 @@ class InventoryMovementServiceTest {
                     .hasMessage("Warehouse id cannot be null");
 
             verify(inventoryMovementRepository, never()).saveAll(anyList());
+            verify(inventoryStockSnapshotService, never()).applyMovements(anyList());
         }
 
         @Test
@@ -219,6 +233,7 @@ class InventoryMovementServiceTest {
                     .hasMessage("Transaction must contain at least one detail");
 
             verify(inventoryMovementRepository, never()).saveAll(anyList());
+            verify(inventoryStockSnapshotService, never()).applyMovements(anyList());
         }
 
         @Test
@@ -238,6 +253,7 @@ class InventoryMovementServiceTest {
                     .hasMessage("Transaction detail product cannot be null");
 
             verify(inventoryMovementRepository, never()).saveAll(anyList());
+            verify(inventoryStockSnapshotService, never()).applyMovements(anyList());
         }
 
         @Test
@@ -259,6 +275,7 @@ class InventoryMovementServiceTest {
                     .hasMessage("Transaction detail quantity cannot be null");
 
             verify(inventoryMovementRepository, never()).saveAll(anyList());
+            verify(inventoryStockSnapshotService, never()).applyMovements(anyList());
         }
 
         @Test
@@ -274,6 +291,7 @@ class InventoryMovementServiceTest {
                     .hasMessage("Transaction detail quantity must be greater than zero");
 
             verify(inventoryMovementRepository, never()).saveAll(anyList());
+            verify(inventoryStockSnapshotService, never()).applyMovements(anyList());
         }
 
         @Test
@@ -296,6 +314,7 @@ class InventoryMovementServiceTest {
                     .hasMessage("Movement type must be ADJUSTMENT_IN, ADJUSTMENT_OUT or RETURN_IN");
 
             verify(inventoryMovementRepository, never()).save(any());
+            verify(inventoryStockSnapshotService, never()).applyMovement(any());
         }
 
         @Test
@@ -318,6 +337,7 @@ class InventoryMovementServiceTest {
                     .hasMessage("Quantity must be greater than zero");
 
             verify(inventoryMovementRepository, never()).save(any());
+            verify(inventoryStockSnapshotService, never()).applyMovement(any());
         }
 
         @Test
@@ -333,6 +353,7 @@ class InventoryMovementServiceTest {
                     .hasMessage("Source and target warehouse cannot be the same");
 
             verify(inventoryMovementRepository, never()).saveAll(anyList());
+            verify(inventoryStockSnapshotService, never()).applyMovements(anyList());
         }
 
         @Test
@@ -348,6 +369,7 @@ class InventoryMovementServiceTest {
                     .hasMessage("Transaction must contain at least one detail");
 
             verify(inventoryMovementRepository, never()).saveAll(anyList());
+            verify(inventoryStockSnapshotService, never()).applyMovements(anyList());
         }
     }
 }

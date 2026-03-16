@@ -2,10 +2,9 @@ package com.empresa.serpent.inventory.service;
 
 import com.empresa.serpent.catalog.domain.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
-import com.empresa.serpent.inventory.domain.entity.InventoryMovementEntity;
+import com.empresa.serpent.inventory.domain.entity.InventoryStockSnapshotEntity;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
-import com.empresa.serpent.inventory.domain.enums.MovementType;
-import com.empresa.serpent.inventory.repository.InventoryMovementRepository;
+import com.empresa.serpent.inventory.repository.InventoryStockSnapshotRepository;
 import com.empresa.serpent.inventory.web.dto.filter.StockFilter;
 import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.ProductStockResponse;
@@ -16,13 +15,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -30,7 +28,7 @@ import static org.mockito.Mockito.verify;
 class StockQueryServiceTest {
 
     @Mock
-    private InventoryMovementRepository inventoryMovementRepository;
+    private InventoryStockSnapshotRepository inventoryStockSnapshotRepository;
 
     @Mock
     private ProductRepository productRepository;
@@ -39,20 +37,19 @@ class StockQueryServiceTest {
     private StockQueryService stockQueryService;
 
     @Test
-    @DisplayName("Should calculate stock grouped by product and warehouse using movement signs")
-    void shouldCalculateStockGroupedByProductAndWarehouseUsingMovementSigns() {
+    @DisplayName("Should return stock grouped by product and warehouse from snapshot")
+    void shouldReturnStockGroupedByProductAndWarehouseFromSnapshot() {
 
         ProductEntity pollo = product(1L, "Pollo entero", new BigDecimal("20.000"));
         WarehouseEntity central = warehouse(1L, "Depósito Central");
         WarehouseEntity norte = warehouse(2L, "Sucursal Norte");
 
-        List<InventoryMovementEntity> movements = List.of(
-                movement(pollo, central, MovementType.IN, "20.000"),
-                movement(pollo, central, MovementType.OUT, "1.000"),
-                movement(pollo, norte, MovementType.IN, "8.000")
+        List<InventoryStockSnapshotEntity> snapshots = List.of(
+                snapshot(pollo, central, "19.000"),
+                snapshot(pollo, norte, "8.000")
         );
 
-        given(inventoryMovementRepository.findAll(any(Specification.class))).willReturn(movements);
+        given(inventoryStockSnapshotRepository.findAll()).willReturn(snapshots);
 
         List<StockResponse> result = stockQueryService.getStock(new StockFilter(null, null, null));
 
@@ -70,7 +67,7 @@ class StockQueryServiceTest {
         assertThat(result.get(1).warehouseName()).isEqualTo("Sucursal Norte");
         assertThat(result.get(1).stock()).isEqualByComparingTo("8.000");
 
-        verify(inventoryMovementRepository).findAll(any(Specification.class));
+        verify(inventoryStockSnapshotRepository).findAll();
     }
 
     @Test
@@ -81,13 +78,12 @@ class StockQueryServiceTest {
         WarehouseEntity central = warehouse(1L, "Depósito Central");
         WarehouseEntity norte = warehouse(2L, "Sucursal Norte");
 
-        List<InventoryMovementEntity> movements = List.of(
-                movement(pollo, central, MovementType.IN, "5.000"),
-                movement(pollo, central, MovementType.OUT, "5.000"),
-                movement(pollo, norte, MovementType.IN, "3.000")
+        List<InventoryStockSnapshotEntity> snapshots = List.of(
+                snapshot(pollo, central, "0.000"),
+                snapshot(pollo, norte, "3.000")
         );
 
-        given(inventoryMovementRepository.findAll(any(Specification.class))).willReturn(movements);
+        given(inventoryStockSnapshotRepository.findAll()).willReturn(snapshots);
 
         List<StockResponse> result = stockQueryService.getStock(new StockFilter(null, null, true));
 
@@ -95,7 +91,7 @@ class StockQueryServiceTest {
         assertThat(result.get(0).warehouseId()).isEqualTo(2L);
         assertThat(result.get(0).stock()).isEqualByComparingTo("3.000");
 
-        verify(inventoryMovementRepository).findAll(any(Specification.class));
+        verify(inventoryStockSnapshotRepository).findAll();
     }
 
     @Test
@@ -106,19 +102,17 @@ class StockQueryServiceTest {
         WarehouseEntity central = warehouse(1L, "Depósito Central");
         WarehouseEntity norte = warehouse(2L, "Sucursal Norte");
 
-        List<InventoryMovementEntity> movements = List.of(
-                movement(pollo, central, MovementType.IN, "20.000"),
-                movement(pollo, central, MovementType.OUT, "1.000"),
-                movement(pollo, norte, MovementType.IN, "8.000")
-        );
-
-        given(inventoryMovementRepository.findAll(any(Specification.class))).willReturn(movements);
+        given(inventoryStockSnapshotRepository.findByProductId(1L))
+                .willReturn(List.of(
+                        snapshot(pollo, central, "19.000"),
+                        snapshot(pollo, norte, "8.000")
+                ));
 
         BigDecimal result = stockQueryService.getTotalStockByProduct(1L);
 
         assertThat(result).isEqualByComparingTo("27.000");
 
-        verify(inventoryMovementRepository).findAll(any(Specification.class));
+        verify(inventoryStockSnapshotRepository).findByProductId(1L);
     }
 
     @Test
@@ -128,18 +122,26 @@ class StockQueryServiceTest {
         ProductEntity pollo = product(1L, "Pollo entero", new BigDecimal("20.000"));
         WarehouseEntity central = warehouse(1L, "Depósito Central");
 
-        List<InventoryMovementEntity> movements = List.of(
-                movement(pollo, central, MovementType.IN, "20.000"),
-                movement(pollo, central, MovementType.OUT, "1.000")
-        );
-
-        given(inventoryMovementRepository.findAll(any(Specification.class))).willReturn(movements);
+        given(inventoryStockSnapshotRepository.findByProductIdAndWarehouseId(1L, 1L))
+                .willReturn(Optional.of(snapshot(pollo, central, "19.000")));
 
         BigDecimal result = stockQueryService.getStockByProductAndWarehouse(1L, 1L);
 
         assertThat(result).isEqualByComparingTo("19.000");
 
-        verify(inventoryMovementRepository).findAll(any(Specification.class));
+        verify(inventoryStockSnapshotRepository).findByProductIdAndWarehouseId(1L, 1L);
+    }
+
+    @Test
+    @DisplayName("Should return zero when stock by product and warehouse does not exist")
+    void shouldReturnZeroWhenStockByProductAndWarehouseDoesNotExist() {
+
+        given(inventoryStockSnapshotRepository.findByProductIdAndWarehouseId(1L, 1L))
+                .willReturn(Optional.empty());
+
+        BigDecimal result = stockQueryService.getStockByProductAndWarehouse(1L, 1L);
+
+        assertThat(result).isEqualByComparingTo("0.000");
     }
 
     @Test
@@ -152,15 +154,14 @@ class StockQueryServiceTest {
         WarehouseEntity central = warehouse(1L, "Depósito Central");
         WarehouseEntity norte = warehouse(2L, "Sucursal Norte");
 
-        List<InventoryMovementEntity> movements = List.of(
-                movement(milanesa, central, MovementType.IN, "15.000"),
-                movement(milanesa, norte, MovementType.IN, "5.000"),
-                movement(pollo, central, MovementType.IN, "20.000"),
-                movement(pollo, central, MovementType.OUT, "1.000"),
-                movement(pollo, norte, MovementType.IN, "8.000")
+        List<InventoryStockSnapshotEntity> snapshots = List.of(
+                snapshot(milanesa, central, "15.000"),
+                snapshot(milanesa, norte, "5.000"),
+                snapshot(pollo, central, "19.000"),
+                snapshot(pollo, norte, "8.000")
         );
 
-        given(inventoryMovementRepository.findAll(any(Specification.class))).willReturn(movements);
+        given(inventoryStockSnapshotRepository.findAll()).willReturn(snapshots);
 
         List<ProductStockResponse> result = stockQueryService.getTotalStockGroupedByProduct(false);
 
@@ -174,7 +175,7 @@ class StockQueryServiceTest {
         assertThat(result.get(1).productName()).isEqualTo("Pollo entero");
         assertThat(result.get(1).totalStock()).isEqualByComparingTo("27.000");
 
-        verify(inventoryMovementRepository).findAll(any(Specification.class));
+        verify(inventoryStockSnapshotRepository).findAll();
     }
 
     @Test
@@ -187,14 +188,13 @@ class StockQueryServiceTest {
         WarehouseEntity central = warehouse(1L, "Depósito Central");
         WarehouseEntity norte = warehouse(2L, "Sucursal Norte");
 
-        List<InventoryMovementEntity> movements = List.of(
-                movement(pataMuslo, central, MovementType.IN, "20.000"),
-                movement(pataMuslo, central, MovementType.OUT, "1.000"),
-                movement(milanesa, central, MovementType.IN, "15.000"),
-                movement(milanesa, norte, MovementType.IN, "5.000")
+        List<InventoryStockSnapshotEntity> snapshots = List.of(
+                snapshot(pataMuslo, central, "19.000"),
+                snapshot(milanesa, central, "15.000"),
+                snapshot(milanesa, norte, "5.000")
         );
 
-        given(inventoryMovementRepository.findAll(any(Specification.class))).willReturn(movements);
+        given(inventoryStockSnapshotRepository.findAll()).willReturn(snapshots);
         given(productRepository.findAll()).willReturn(List.of(pataMuslo, milanesa));
 
         List<LowStockResponse> result = stockQueryService.getLowStock();
@@ -205,7 +205,7 @@ class StockQueryServiceTest {
         assertThat(result.get(0).currentStock()).isEqualByComparingTo("19.000");
         assertThat(result.get(0).minimumStock()).isEqualByComparingTo("20.000");
 
-        verify(inventoryMovementRepository).findAll(any(Specification.class));
+        verify(inventoryStockSnapshotRepository).findAll();
         verify(productRepository).findAll();
     }
 
@@ -216,18 +216,18 @@ class StockQueryServiceTest {
         ProductEntity milanesa = product(3L, "Milanesa de pollo", null);
         WarehouseEntity central = warehouse(1L, "Depósito Central");
 
-        List<InventoryMovementEntity> movements = List.of(
-                movement(milanesa, central, MovementType.IN, "5.000")
+        List<InventoryStockSnapshotEntity> snapshots = List.of(
+                snapshot(milanesa, central, "5.000")
         );
 
-        given(inventoryMovementRepository.findAll(any(Specification.class))).willReturn(movements);
+        given(inventoryStockSnapshotRepository.findAll()).willReturn(snapshots);
         given(productRepository.findAll()).willReturn(List.of(milanesa));
 
         List<LowStockResponse> result = stockQueryService.getLowStock();
 
         assertThat(result).isEmpty();
 
-        verify(inventoryMovementRepository).findAll(any(Specification.class));
+        verify(inventoryStockSnapshotRepository).findAll();
         verify(productRepository).findAll();
     }
 
@@ -246,15 +246,13 @@ class StockQueryServiceTest {
                 .build();
     }
 
-    private InventoryMovementEntity movement(ProductEntity product,
-                                             WarehouseEntity warehouse,
-                                             MovementType movementType,
-                                             String quantity) {
-        return InventoryMovementEntity.builder()
+    private InventoryStockSnapshotEntity snapshot(ProductEntity product,
+                                                  WarehouseEntity warehouse,
+                                                  String currentStock) {
+        return InventoryStockSnapshotEntity.builder()
                 .product(product)
                 .warehouse(warehouse)
-                .movementType(movementType)
-                .quantity(new BigDecimal(quantity))
+                .currentStock(new BigDecimal(currentStock))
                 .build();
     }
 }

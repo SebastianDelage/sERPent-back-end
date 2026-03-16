@@ -212,7 +212,6 @@ class TransactionRepositoryTest {
                                                      PaymentMethodEntity paymentMethod,
                                                      UserEntity user) {
         TransactionEntity transaction = TransactionEntity.builder()
-                .date(date)
                 .type(TransactionType.SALE)
                 .status(TransactionStatus.CONFIRMED)
                 .total(total)
@@ -221,7 +220,12 @@ class TransactionRepositoryTest {
                 .description("Test sale")
                 .build();
 
-        return entityManager.persistAndFlush(transaction);
+        transaction = entityManager.persistAndFlush(transaction);
+
+        transaction.setDate(date);
+        transaction = entityManager.persistAndFlush(transaction);
+
+        return transaction;
     }
 
     private TransactionDetailEntity persistDetail(TransactionEntity transaction,
