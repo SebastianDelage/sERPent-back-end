@@ -9,7 +9,7 @@ Modular ERP backend designed for small and medium-sized businesses.
 
 sERPent focuses on transactional operations, warehouse-based inventory management, and a clean architecture that can evolve over time without requiring major redesigns.
 
-The goal of the project is to provide a **practical ERP backend foundation** that supports real-world business workflows such as product management, sales, and inventory tracking.
+The goal of the project is to provide a **practical ERP backend foundation** that supports real-world business workflows such as product management, sales, inventory tracking, and supplier purchasing.
 
 ---
 
@@ -78,6 +78,7 @@ Transactions --> TransactionDetails
 
 Transactions --> Sales
 Transactions --> Expenses
+Transactions --> Purchases
 
 Products --> InventoryMovements
 Warehouses --> InventoryMovements
@@ -111,6 +112,13 @@ The project is currently in a **core consolidation phase**, focusing on:
 - improving internal workflows
 - preparing the system for future modules
 
+The backend already supports:
+
+- transactional sales
+- supplier purchases
+- movement-based inventory
+- optimized stock queries
+
 This repository represents an **active development project**, and additional ERP capabilities will be added incrementally.
 
 ---
@@ -126,6 +134,9 @@ This repository represents an **active development project**, and additional ERP
 - H2 (development database)
 - Flyway (database migrations)
 - Postman (API testing)
+- JUnit 5
+- Mockito
+- JaCoCo
 
 ---
 
@@ -150,6 +161,14 @@ Validations:
 - price cannot be null
 - price cannot be negative
 - SKU must be unique if present
+
+Additional inventory configuration fields include:
+
+- `minimumStock`
+- `reorderPoint`
+- `reorderQuantity`
+
+These allow the system to support future replenishment logic.
 
 ---
 
@@ -237,6 +256,26 @@ Validations:
 - user existence validation
 - payment method validation
 
+Sales automatically register **inventory OUT movements**.
+
+---
+
+### Purchases
+
+Purchases represent **inbound stock operations from suppliers**.
+
+Features:
+
+- purchase registration
+- supplier association
+- transaction creation
+- transaction detail creation
+- inbound inventory movement registration
+
+Purchases automatically register **inventory IN movements** and update the current stock.
+
+This workflow is implemented through `PurchaseApplicationService`.
+
 ---
 
 ### Inventory Movements
@@ -248,6 +287,8 @@ Features:
 - full movement history
 - movement registration for sales
 - movement registration for purchases
+- adjustment movements
+- transfer movements
 
 Supported movement types:
 
@@ -257,6 +298,41 @@ Supported movement types:
 - ADJUSTMENT_OUT
 - TRANSFER_IN
 - TRANSFER_OUT
+- RETURN_IN
+
+Movement history acts as the **inventory ledger**.
+
+---
+
+### Inventory Snapshot
+
+To allow fast stock queries, the system also maintains an optimized stock snapshot.
+
+Table:
+
+```
+inventory_stock_snapshot
+```
+
+This table stores the **current stock balance per product and warehouse**.
+
+Snapshots are automatically updated through:
+
+```
+InventoryStockSnapshotService
+```
+
+Key operations include:
+
+- applying movements
+- rebuilding snapshot from ledger
+- reconciling snapshot against movement history
+- detecting inconsistencies
+
+This architecture combines:
+
+- **ledger accuracy**
+- **fast read performance**
 
 ---
 
@@ -272,6 +348,8 @@ Features:
 - grouped stock queries
 - positive stock filtering
 - low stock threshold filtering
+
+Current stock queries rely on the **snapshot model**, while full history remains available through movement queries.
 
 ---
 
@@ -333,6 +411,7 @@ Seed data includes:
 - warehouse
 - initial stock data
 - example transactions
+- example purchase data
 
 ---
 
@@ -352,18 +431,42 @@ http://localhost:8080
 
 ---
 
+## Testing
+
+Core services include unit tests implemented with:
+
+- **JUnit 5**
+- **Mockito**
+
+Test coverage is measured using:
+
+- **JaCoCo**
+
+These tests validate business logic such as:
+
+- product service validation
+- supplier service validation
+- expense workflows
+- purchase workflows
+- inventory movement behavior
+- stock queries
+
+---
+
 ## Roadmap
 
 The architecture has been designed to support additional ERP capabilities.
 
 Planned modules include:
 
-- purchase workflows
-- supplier purchasing flows
+- supplier purchasing flows expansion
 - inventory adjustments
 - branch / multi-location support
 - inventory planning
 - accounting integration
+- product transformation / production workflows
+
+A future roadmap item is the **product transformation approach (Approach D)**, which will allow transforming products into other products (for example, despiece operations in food businesses).
 
 ---
 
