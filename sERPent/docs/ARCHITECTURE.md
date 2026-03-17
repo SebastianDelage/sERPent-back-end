@@ -70,7 +70,9 @@ Current modules include:
 - Transactions
 - Transaction Details
 - Sales
+- Purchases
 - Inventory Movements
+- Inventory Stock Snapshot
 - Stock Queries
 - Suppliers
 - Product Suppliers
@@ -82,6 +84,18 @@ The project is currently in a **core consolidation phase**, where the main focus
 - stabilizing the architecture
 - improving consistency
 - preparing the system for future modules
+
+The purchase workflow is already implemented at command side level and integrated with inventory.
+
+The inventory model now uses a **ledger + snapshot hybrid approach**:
+
+- `inventory_movements` remains the historical source of truth
+- `inventory_stock_snapshot` acts as the optimized current-balance read model
+
+This means the backend now supports both:
+
+- auditable stock history
+- fast current-stock queries
 
 ---
 
@@ -98,6 +112,9 @@ The backend uses the following technologies:
 - H2 (development database)
 - Flyway (database migrations)
 - Postman (API testing)
+- JUnit 5
+- Mockito
+- JaCoCo
 
 ---
 
@@ -121,6 +138,8 @@ Future modules planned for the system include:
 - branch support
 - inventory planning
 - accounting integration
+
+Although purchases were initially planned as a future module, the backend now already supports the **base Purchase flow**, while additional purchase query/reporting capabilities may still be expanded later.
 
 ---
 
@@ -169,13 +188,13 @@ Controllers expose the API surface, services encapsulate business responsibiliti
 
 The base package is:
 
-```
+```text
 com.empresa.serpent
 ```
 
 Main modules:
 
-```
+```text
 catalog
 inventory
 transactions
@@ -185,7 +204,7 @@ shared
 
 Each module follows a consistent internal structure:
 
-```
+```text
 domain
 repository
 service
@@ -240,7 +259,7 @@ Used for **business workflows and orchestration logic**.
 
 Example:
 
-```
+```text
 SaleApplicationService
 ```
 
@@ -251,6 +270,17 @@ Responsibilities may include:
 - registering movements
 - coordinating related entities
 
+Current application services include:
+
+```text
+SaleApplicationService
+PurchaseApplicationService
+ExpenseApplicationService
+InventoryAdjustmentApplicationService
+WarehouseTransferApplicationService
+SaleReturnApplicationService
+```
+
 ---
 
 ## QueryService
@@ -259,7 +289,7 @@ Used for **filtered reads, searches, and aggregated queries**.
 
 Examples:
 
-```
+```text
 TransactionQueryService
 InventoryMovementQueryService
 StockQueryService
@@ -280,7 +310,7 @@ Used for **basic CRUD operations and simple domain logic**.
 
 Examples:
 
-```
+```text
 ProductService
 UserService
 WarehouseService
@@ -288,6 +318,13 @@ PaymentMethodService
 InventoryMovementService
 SupplierService
 ExpenseService
+```
+
+Additional inventory-specific services now include:
+
+```text
+InventoryStockSnapshotService
+StockValidationService
 ```
 
 ---
@@ -326,6 +363,44 @@ The sale workflow combines validation, transactional persistence, and inventory 
 
 ---
 
+# Request Flow Example: Purchase Creation
+
+The following diagram illustrates the current purchase creation workflow.
+
+```mermaid
+flowchart TD
+    A[Client Request: Create Purchase] --> B[PurchaseController]
+    B --> C[PurchaseApplicationService]
+
+    C --> D[Validate User]
+    C --> E[Validate Payment Method]
+    C --> F[Validate Supplier]
+    C --> G[Validate Warehouse]
+    C --> H[Validate Products]
+
+    C --> I[Create TransactionEntity]
+    C --> J[Create TransactionDetailEntity]
+    C --> K[Create PurchaseEntity]
+    C --> L[Register InventoryMovementEntity]
+    C --> M[Update Inventory Snapshot]
+
+    I --> N[TransactionRepository]
+    J --> O[TransactionDetailRepository]
+    K --> P[PurchaseRepository]
+    L --> Q[InventoryMovementRepository]
+    M --> R[InventoryStockSnapshotRepository]
+
+    N --> S[(Database)]
+    O --> S
+    P --> S
+    Q --> S
+    R --> S
+```
+
+The purchase workflow combines supplier validation, transactional persistence, inbound inventory registration, and snapshot update in a single business operation.
+
+---
+
 # Core Domain Concepts
 
 ## Transactions
@@ -338,13 +413,17 @@ It represents business operations such as:
 - EXPENSE
 - PURCHASE
 - ADJUSTMENT
+- TRANSFER
+- RETURN
 
 Related entities include:
 
-```
+```text
 TransactionEntity
 TransactionDetailEntity
 SaleEntity
+PurchaseEntity
+ExpenseEntity
 ```
 
 ---
@@ -363,6 +442,7 @@ Movement types include:
 - ADJUSTMENT_OUT
 - TRANSFER_IN
 - TRANSFER_OUT
+- RETURN_IN
 
 Benefits:
 
@@ -373,14 +453,68 @@ Benefits:
 
 ---
 
+## Inventory Snapshot Model
+
+In addition to the movement ledger, the system now uses an optimized stock snapshot model.
+
+### Ledger
+
+```text
+inventory_movements
+```
+
+This remains the historical source of truth.
+
+### Snapshot
+
+```text
+inventory_stock_snapshot
+```
+
+This stores the latest current stock by:
+
+- product
+- warehouse
+
+Snapshot fields include:
+
+```text
+snapshot_id
+product_id
+warehouse_id
+current_stock
+updated_at
+last_movement_id
+```
+
+### Snapshot Service Responsibilities
+
+`InventoryStockSnapshotService` is responsible for:
+
+- applying a single movement to snapshot state
+- applying multiple movements
+- rebuilding all snapshots from the movement ledger
+- reconciling ledger balances against snapshot balances
+- detecting inconsistencies between historical movements and current snapshot state
+
+This architecture provides:
+
+- fast current stock reads
+- preserved historical movement traceability
+- recovery/rebuild capability in case of inconsistencies
+
+---
+
 ## Stock Visibility
 
 Stock availability is separated from inventory history.
 
-```
+```text
 InventoryMovementQueryService → movement history
 StockQueryService → current stock state
 ```
+
+The system now reads current stock from the **snapshot model**, while movement history remains available through movement queries.
 
 ---
 
@@ -403,6 +537,17 @@ Validations:
 - SKU optional
 - SKU must be unique if present
 
+Additional implemented inventory configuration:
+
+- `minimumStock`
+- `reorderPoint`
+- `reorderQuantity`
+
+Business rule:
+
+- if `minimumStock` is null, the product is ignored by low-stock detection
+- if `reorderPoint` is null, the product is ignored by replenishment suggestions
+
 ---
 
 ## Suppliers
@@ -411,7 +556,7 @@ Responsible for managing product suppliers.
 
 Entities:
 
-```
+```text
 SupplierEntity
 ProductSupplierEntity
 ```
@@ -430,7 +575,7 @@ Responsible for expense tracking and categorization.
 
 Entities:
 
-```
+```text
 ExpenseEntity
 ExpenseCategoryEntity
 ```
@@ -440,6 +585,30 @@ Responsibilities:
 - record operational expenses
 - categorize expenses
 - optionally link expenses to suppliers
+
+The current expense flow is implemented through `ExpenseApplicationService` for command-side creation and query-side expense reads.
+
+---
+
+## Purchases
+
+Responsible for supplier purchase workflows and inbound inventory.
+
+Entity:
+
+```text
+PurchaseEntity
+```
+
+Responsibilities:
+
+- create purchase transaction
+- create purchase detail lines
+- associate purchase with supplier and warehouse
+- register inbound inventory movements
+- update inventory snapshot automatically
+
+This is the first implemented inbound-stock ERP flow and forms the base for more advanced supplier and replenishment capabilities.
 
 ---
 
@@ -451,6 +620,8 @@ Features:
 - update warehouse
 - get warehouse by id
 - list active warehouses
+- list all warehouses
+- deactivate warehouse
 
 Validations:
 
@@ -482,6 +653,7 @@ Features:
 - create transaction details
 - create sale
 - register inventory movements
+- update inventory snapshot automatically through inventory movement integration
 
 Validations include:
 
@@ -501,12 +673,11 @@ Features:
 - historical movement queries
 - movement registration for sales
 - movement registration for purchases
+- movement registration for adjustments
+- movement registration for transfers
+- movement registration for returns
 
-Future support planned:
-
-- adjustments
-- transfers
-- returns
+Inventory movements now also trigger snapshot updates so that current stock state remains synchronized.
 
 ---
 
@@ -521,6 +692,38 @@ Features:
 - grouped stock
 - low stock threshold queries
 
+These reads are now optimized through the snapshot model instead of recalculating every stock query from the full movement ledger.
+
+---
+
+## Inventory Snapshot
+
+Features:
+
+- apply movement into current stock snapshot
+- rebuild snapshot table from movement ledger
+- reconcile ledger vs snapshot balances
+- detect snapshot inconsistencies
+
+This module provides the optimized read-side balance model for inventory.
+
+---
+
+## Inventory Reporting
+
+Implemented reporting capabilities include:
+
+- stock summary by product
+- stock by warehouse
+- warehouse summary
+- low stock report
+- inventory movements by type
+- inventory movements by warehouse
+- inventory movements by product
+- replenishment report based on reorder configuration
+
+This reporting layer now benefits from the ledger + snapshot architecture.
+
 ---
 
 # Planned Modules
@@ -529,11 +732,20 @@ The architecture has been designed to support additional ERP capabilities that w
 
 ### Purchases
 
-Will manage supplier purchase workflows and inbound inventory.
+The base purchase workflow is already implemented.
+
+Future purchase-related work may still include:
+
+- purchase query endpoints
+- purchase-specific reporting
+- stronger supplier integration
+- purchase analytics
 
 ### Inventory Adjustments
 
 Will support manual stock corrections and auditing operations.
+
+The first adjustment flow is already present in the inventory layer and can be expanded further.
 
 ### Branch / Multi-Warehouse Support
 
@@ -543,22 +755,46 @@ Future capability to support multiple business locations.
 
 Future features may include:
 
-```
+```text
 minimumStock
 reorderPoint
 reorderQuantity
 ```
 
+Core inventory planning fields are already implemented in products. Future work may expand them into more advanced replenishment logic and supplier ordering workflows.
+
 ### Product Identification Modes
 
 Future identification modes may include:
 
-```
+```text
 MANUAL
 SKU
 BARCODE
 PLU
 ```
+
+### Production / Transformation Workflows
+
+A future roadmap item is the so-called **Approach D**, where products can be transformed into other products through production/despiece-style operations.
+
+This is especially relevant for businesses such as:
+
+- poultry shops
+- butcher shops
+- food production businesses
+
+The architecture is expected to evolve toward explicit transformation flows after purchase consolidation.
+
+### Hybrid Architecture
+
+A future roadmap item is an **online-first hybrid architecture** with:
+
+- limited offline local cache
+- local operation queue
+- deferred synchronization against the remote backend
+
+The backend will remain the authoritative source of truth.
 
 ---
 
@@ -571,11 +807,12 @@ The system currently uses:
 
 Example error messages:
 
-```
+```text
 Product not found: 1
 SKU already exists: POLLO-001
 Price cannot be negative
 Insufficient stock for product 1 in warehouse 1
+Receipt number already exists: PUR-001
 ```
 
 ---
@@ -584,7 +821,7 @@ Insufficient stock for product 1 in warehouse 1
 
 DTO ↔ Entity mapping is handled using **MapStruct**.
 
-```
+```text
 @Mapper(config = MapStructConfig.class)
 ```
 
@@ -608,6 +845,10 @@ Seed data includes:
 - warehouse
 - stock initialization
 - example transactions
+- example purchase flow
+- inventory snapshot initialization
+
+This allows development and manual testing of the core transactional flows without depending on production-like infrastructure.
 
 ---
 
@@ -616,6 +857,11 @@ Seed data includes:
 Production environments use **PostgreSQL**.
 
 Schema changes are managed through **Flyway migrations**.
+
+The current schema includes both:
+
+- movement ledger tables
+- inventory snapshot tables
 
 ---
 
@@ -630,6 +876,28 @@ The system has been validated through:
 - inventory validation
 - stock recalculation
 - transaction filtering
+- purchase creation
+- snapshot rebuild
+- snapshot reconciliation
+
+The backend also now includes unit tests for important service-layer business logic using:
+
+- JUnit 5
+- Mockito
+
+Coverage is measured with:
+
+- JaCoCo
+
+Covered services now include core flows such as:
+
+- purchase creation
+- expense creation
+- product service
+- supplier service
+- inventory movement service
+- stock query service
+- snapshot service
 
 ---
 
@@ -645,6 +913,22 @@ Future implementations may include:
 - resolving warehouse via user context
 - branch-based resolution
 - configured default warehouse
+
+### Purchase Read Side
+
+Although the command side of Purchase is already implemented, future work may still expand:
+
+- purchase-specific query endpoints
+- purchase-specific reporting
+- richer purchase read models
+
+### Inventory Reporting Expansion
+
+The inventory reporting layer is already functional, but future improvements may include:
+
+- stock valuation
+- turnover / rotation metrics
+- more advanced operational inventory KPIs
 
 ---
 
@@ -663,6 +947,12 @@ Future modules may include:
 - inventory planning
 - accounting modules
 
+Near-term roadmap priorities currently include:
+
+1. close the Purchase module properly at ERP level
+2. continue with the future transformation / despiece approach (Approach D)
+3. later define the hybrid online-first architecture
+
 ---
 
 # Development Principles
@@ -674,6 +964,13 @@ Future modules may include:
 - verify real code before assuming missing implementations
 - treat the current system as a **solid base, not a prototype**
 
+Additional principles reinforced during development:
+
+- keep command-side workflows explicit
+- keep query-side responsibilities separated when needed
+- preserve movement history as source of truth
+- use snapshot tables as optimized read models, not as replacements for the ledger
+
 ---
 
 # Summary
@@ -681,3 +978,14 @@ Future modules may include:
 sERPent is a **modular, transaction-driven, inventory-centric ERP backend** designed for extensibility and long-term maintainability.
 
 The current codebase provides a strong foundation for building additional ERP capabilities while keeping the core simple, explicit, and scalable.
+
+The backend now already includes:
+
+- transactional sales
+- transactional purchases
+- warehouse-based inventory
+- movement ledger history
+- optimized stock snapshot reads
+- core replenishment-related inventory reporting
+
+This makes the current architecture significantly closer to a real ERP core while preserving room for future expansion.
