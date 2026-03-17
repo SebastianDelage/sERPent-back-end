@@ -1,3 +1,6 @@
+-- V2__seed_data.sql
+-- H2 seed data for sERPent ERP (core + inventory)
+
 -- =========================
 -- USERS
 -- =========================
@@ -171,5 +174,8 @@ ALTER TABLE transaction_details ALTER COLUMN transaction_detail_id RESTART WITH 
 ALTER TABLE sales ALTER COLUMN sale_id RESTART WITH 2;
 ALTER TABLE expenses ALTER COLUMN expense_id RESTART WITH 2;
 ALTER TABLE purchases ALTER COLUMN purchase_id RESTART WITH 2;
+ALTER TABLE product_transformations ALTER COLUMN product_transformation_id RESTART WITH 1;
+ALTER TABLE product_transformation_inputs ALTER COLUMN product_transformation_input_id RESTART WITH 1;
+ALTER TABLE product_transformation_outputs ALTER COLUMN product_transformation_output_id RESTART WITH 1;
 ALTER TABLE inventory_movements ALTER COLUMN movement_id RESTART WITH 10;
 ALTER TABLE inventory_stock_snapshot ALTER COLUMN snapshot_id RESTART WITH 6;

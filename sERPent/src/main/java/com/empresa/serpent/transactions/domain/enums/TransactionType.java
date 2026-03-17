@@ -6,5 +6,6 @@ public enum TransactionType {
     PURCHASE,
     ADJUSTMENT,
     TRANSFER,
-    RETURN
+    RETURN,
+    TRANSFORMATION
 }

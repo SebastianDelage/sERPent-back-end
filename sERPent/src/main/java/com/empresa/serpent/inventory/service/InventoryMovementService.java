@@ -5,8 +5,7 @@ import com.empresa.serpent.inventory.domain.entity.InventoryMovementEntity;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.domain.enums.MovementType;
 import com.empresa.serpent.inventory.repository.InventoryMovementRepository;
-import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
-import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
+import com.empresa.serpent.transactions.domain.entity.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -267,5 +266,136 @@ public class InventoryMovementService {
                 .build();
 
         return Stream.of(transferOut, transferIn);
+    }
+
+    private void validateTransformation(ProductTransformationEntity transformation) {
+        if (transformation == null) {
+            throw new IllegalArgumentException("Transformation cannot be null");
+        }
+
+        if (transformation.getId() == null) {
+            throw new IllegalArgumentException("Transformation id cannot be null");
+        }
+
+        if (transformation.getTransaction() == null) {
+            throw new IllegalArgumentException("Transformation transaction cannot be null");
+        }
+
+        if (transformation.getTransaction().getId() == null) {
+            throw new IllegalArgumentException("Transformation transaction id cannot be null");
+        }
+
+        if (transformation.getWarehouse() == null) {
+            throw new IllegalArgumentException("Transformation warehouse cannot be null");
+        }
+
+        if (transformation.getWarehouse().getId() == null) {
+            throw new IllegalArgumentException("Transformation warehouse id cannot be null");
+        }
+
+        if (transformation.getInputs() == null || transformation.getInputs().isEmpty()) {
+            throw new IllegalArgumentException("Transformation must contain at least one input");
+        }
+
+        if (transformation.getOutputs() == null || transformation.getOutputs().isEmpty()) {
+            throw new IllegalArgumentException("Transformation must contain at least one output");
+        }
+
+        for (ProductTransformationInputEntity input : transformation.getInputs()) {
+            validateTransformationInput(input);
+        }
+
+        for (ProductTransformationOutputEntity output : transformation.getOutputs()) {
+            validateTransformationOutput(output);
+        }
+    }
+
+    private void validateTransformationInput(ProductTransformationInputEntity input) {
+        if (input == null) {
+            throw new IllegalArgumentException("Transformation input cannot be null");
+        }
+
+        if (input.getProduct() == null || input.getProduct().getId() == null) {
+            throw new IllegalArgumentException("Transformation input product cannot be null");
+        }
+
+        if (input.getQuantity() == null) {
+            throw new IllegalArgumentException("Transformation input quantity cannot be null");
+        }
+
+        if (input.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Transformation input quantity must be greater than zero");
+        }
+    }
+
+    private void validateTransformationOutput(ProductTransformationOutputEntity output) {
+        if (output == null) {
+            throw new IllegalArgumentException("Transformation output cannot be null");
+        }
+
+        if (output.getProduct() == null || output.getProduct().getId() == null) {
+            throw new IllegalArgumentException("Transformation output product cannot be null");
+        }
+
+        if (output.getQuantity() == null) {
+            throw new IllegalArgumentException("Transformation output quantity cannot be null");
+        }
+
+        if (output.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Transformation output quantity must be greater than zero");
+        }
+    }
+
+    private InventoryMovementEntity toTransformationInputMovement(
+            ProductTransformationInputEntity input,
+            ProductTransformationEntity transformation
+    ) {
+        return InventoryMovementEntity.builder()
+                .product(input.getProduct())
+                .warehouse(transformation.getWarehouse())
+                .transaction(transformation.getTransaction())
+                .movementType(MovementType.OUT)
+                .quantity(input.getQuantity())
+                .unitCost(null)
+                .note("Transformation #" + transformation.getId() + " input")
+                .build();
+    }
+
+    private InventoryMovementEntity toTransformationOutputMovement(
+            ProductTransformationOutputEntity output,
+            ProductTransformationEntity transformation
+    ) {
+        return InventoryMovementEntity.builder()
+                .product(output.getProduct())
+                .warehouse(transformation.getWarehouse())
+                .transaction(transformation.getTransaction())
+                .movementType(MovementType.IN)
+                .quantity(output.getQuantity())
+                .unitCost(null)
+                .note("Transformation #" + transformation.getId() + " output")
+                .build();
+    }
+
+    @Transactional
+    public void registerTransformationMovements(ProductTransformationEntity transformation) {
+        validateTransformation(transformation);
+
+        List<InventoryMovementEntity> inputMovements = transformation.getInputs()
+                .stream()
+                .map(input -> toTransformationInputMovement(input, transformation))
+                .toList();
+
+        List<InventoryMovementEntity> outputMovements = transformation.getOutputs()
+                .stream()
+                .map(output -> toTransformationOutputMovement(output, transformation))
+                .toList();
+
+        List<InventoryMovementEntity> allMovements = Stream.concat(
+                inputMovements.stream(),
+                outputMovements.stream()
+        ).toList();
+
+        List<InventoryMovementEntity> savedMovements = inventoryMovementRepository.saveAll(allMovements);
+        inventoryStockSnapshotService.applyMovements(savedMovements);
     }
 }

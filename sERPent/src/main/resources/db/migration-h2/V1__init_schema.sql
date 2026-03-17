@@ -129,7 +129,15 @@ CREATE TABLE transactions (
                               CONSTRAINT ck_transactions_total_nonneg CHECK (total >= 0),
 
                               CONSTRAINT ck_transactions_type CHECK (
-                                  type IN ('SALE','EXPENSE','PURCHASE','ADJUSTMENT','TRANSFER','RETURN')
+                                  type IN (
+                                           'SALE',
+                                           'EXPENSE',
+                                           'PURCHASE',
+                                           'ADJUSTMENT',
+                                           'TRANSFER',
+                                           'RETURN',
+                                           'TRANSFORMATION'
+                                      )
                                   ),
                               CONSTRAINT ck_transactions_status CHECK (
                                   status IN ('PENDING','CONFIRMED','CANCELLED')
@@ -261,7 +269,61 @@ CREATE TABLE purchases (
 );
 
 -- =========================
--- 14) INVENTORY_MOVEMENTS
+-- 14) PRODUCT TRANSFORMATIONS
+-- =========================
+CREATE TABLE product_transformations (
+                                         product_transformation_id BIGSERIAL PRIMARY KEY,
+                                         transaction_id BIGINT NOT NULL,
+                                         warehouse_id BIGINT NOT NULL,
+                                         notes TEXT,
+
+                                         CONSTRAINT fk_product_transformations_transaction
+                                             FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id),
+
+                                         CONSTRAINT fk_product_transformations_warehouse
+                                             FOREIGN KEY (warehouse_id) REFERENCES warehouses(warehouse_id),
+
+                                         CONSTRAINT ux_product_transformations_transaction UNIQUE (transaction_id)
+);
+
+CREATE TABLE product_transformation_inputs (
+                                               product_transformation_input_id BIGSERIAL PRIMARY KEY,
+                                               product_transformation_id BIGINT NOT NULL,
+                                               product_id BIGINT NOT NULL,
+                                               description TEXT,
+                                               quantity NUMERIC(12,3) NOT NULL,
+
+                                               CONSTRAINT fk_transformation_inputs_transformation
+                                                   FOREIGN KEY (product_transformation_id)
+                                                       REFERENCES product_transformations(product_transformation_id),
+
+                                               CONSTRAINT fk_transformation_inputs_product
+                                                   FOREIGN KEY (product_id)
+                                                       REFERENCES products(product_id),
+
+                                               CONSTRAINT ck_transformation_inputs_qty_pos CHECK (quantity > 0)
+);
+
+CREATE TABLE product_transformation_outputs (
+                                                product_transformation_output_id BIGSERIAL PRIMARY KEY,
+                                                product_transformation_id BIGINT NOT NULL,
+                                                product_id BIGINT NOT NULL,
+                                                description TEXT,
+                                                quantity NUMERIC(12,3) NOT NULL,
+
+                                                CONSTRAINT fk_transformation_outputs_transformation
+                                                    FOREIGN KEY (product_transformation_id)
+                                                        REFERENCES product_transformations(product_transformation_id),
+
+                                                CONSTRAINT fk_transformation_outputs_product
+                                                    FOREIGN KEY (product_id)
+                                                        REFERENCES products(product_id),
+
+                                                CONSTRAINT ck_transformation_outputs_qty_pos CHECK (quantity > 0)
+);
+
+-- =========================
+-- 15) INVENTORY_MOVEMENTS
 -- =========================
 CREATE TABLE inventory_movements (
                                      movement_id BIGSERIAL PRIMARY KEY,
@@ -300,7 +362,7 @@ CREATE TABLE inventory_movements (
 );
 
 -- =========================
--- 15) INVENTORY STOCK SNAPSHOT
+-- 16) INVENTORY STOCK SNAPSHOT
 -- =========================
 CREATE TABLE inventory_stock_snapshot (
                                           snapshot_id BIGSERIAL PRIMARY KEY,
@@ -342,6 +404,12 @@ CREATE INDEX idx_expenses_category ON expenses(expense_category_id);
 
 CREATE INDEX idx_purchases_supplier ON purchases(supplier_id);
 CREATE INDEX idx_purchases_warehouse ON purchases(warehouse_id);
+
+CREATE INDEX idx_product_transformations_warehouse ON product_transformations(warehouse_id);
+CREATE INDEX idx_transformation_inputs_transformation ON product_transformation_inputs(product_transformation_id);
+CREATE INDEX idx_transformation_outputs_transformation ON product_transformation_outputs(product_transformation_id);
+CREATE INDEX idx_transformation_inputs_product ON product_transformation_inputs(product_id);
+CREATE INDEX idx_transformation_outputs_product ON product_transformation_outputs(product_id);
 
 CREATE INDEX idx_product_suppliers_supplier ON product_suppliers(supplier_id);
 CREATE INDEX idx_product_suppliers_product ON product_suppliers(product_id);
