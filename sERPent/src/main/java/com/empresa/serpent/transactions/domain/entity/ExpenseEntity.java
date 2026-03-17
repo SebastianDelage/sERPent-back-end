@@ -1,7 +1,7 @@
     package com.empresa.serpent.transactions.domain.entity;
 
     import jakarta.persistence.*;
-    import com.empresa.serpent.catalog.domain.SupplierEntity;
+    import com.empresa.serpent.catalog.domain.entity.SupplierEntity;
     import lombok.*;
 
     @Getter

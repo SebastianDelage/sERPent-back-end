@@ -1,6 +1,6 @@
 package com.empresa.serpent.support;
 
-import com.empresa.serpent.catalog.domain.ProductEntity;
+import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;

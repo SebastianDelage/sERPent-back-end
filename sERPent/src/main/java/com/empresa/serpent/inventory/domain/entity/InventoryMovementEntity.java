@@ -1,6 +1,6 @@
 package com.empresa.serpent.inventory.domain.entity;
 
-import com.empresa.serpent.catalog.domain.ProductEntity;
+import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.inventory.domain.enums.MovementType;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import jakarta.persistence.*;

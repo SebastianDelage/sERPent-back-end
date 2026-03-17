@@ -1,4 +1,4 @@
-package com.empresa.serpent.catalog.domain;
+package com.empresa.serpent.catalog.domain.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;

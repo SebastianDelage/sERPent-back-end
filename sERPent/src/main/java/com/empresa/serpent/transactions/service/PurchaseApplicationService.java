@@ -1,7 +1,7 @@
 package com.empresa.serpent.transactions.service;
 
-import com.empresa.serpent.catalog.domain.ProductEntity;
-import com.empresa.serpent.catalog.domain.SupplierEntity;
+import com.empresa.serpent.catalog.domain.entity.ProductEntity;
+import com.empresa.serpent.catalog.domain.entity.SupplierEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.catalog.repository.SupplierRepository;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;

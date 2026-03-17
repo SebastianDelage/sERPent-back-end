@@ -1,6 +1,6 @@
 package com.empresa.serpent.inventory.service;
 
-import com.empresa.serpent.catalog.domain.ProductEntity;
+import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.InventoryStockSnapshotEntity;
 import com.empresa.serpent.inventory.web.dto.filter.StockFilter;

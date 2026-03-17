@@ -1,6 +1,6 @@
 package com.empresa.serpent.transactions.domain.entity;
 
-import com.empresa.serpent.catalog.domain.ProductEntity;
+import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;

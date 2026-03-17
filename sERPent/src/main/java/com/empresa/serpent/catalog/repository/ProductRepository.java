@@ -1,6 +1,6 @@
 package com.empresa.serpent.catalog.repository;
 
-import com.empresa.serpent.catalog.domain.ProductEntity;
+import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;

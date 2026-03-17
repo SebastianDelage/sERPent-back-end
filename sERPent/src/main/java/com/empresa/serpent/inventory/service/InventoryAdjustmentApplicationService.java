@@ -1,6 +1,6 @@
 package com.empresa.serpent.inventory.service;
 
-import com.empresa.serpent.catalog.domain.ProductEntity;
+import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.domain.enums.MovementType;

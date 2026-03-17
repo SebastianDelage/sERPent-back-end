@@ -1,6 +1,6 @@
 package com.empresa.serpent.catalog.service;
 
-import com.empresa.serpent.catalog.domain.ProductEntity;
+import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.catalog.web.dto.request.ProductCreateRequest;
 import com.empresa.serpent.catalog.web.dto.request.ProductUpdateRequest;

@@ -1,6 +1,6 @@
 package com.empresa.serpent.catalog.repository;
 
-import com.empresa.serpent.catalog.domain.SupplierEntity;
+import com.empresa.serpent.catalog.domain.entity.SupplierEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

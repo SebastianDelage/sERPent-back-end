@@ -1,6 +1,6 @@
 package com.empresa.serpent.transactions.domain.entity;
 
-import com.empresa.serpent.catalog.domain.SupplierEntity;
+import com.empresa.serpent.catalog.domain.entity.SupplierEntity;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import jakarta.persistence.*;
 import lombok.*;

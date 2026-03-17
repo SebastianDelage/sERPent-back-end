@@ -1,5 +1,6 @@
-package com.empresa.serpent.catalog.domain;
+package com.empresa.serpent.catalog.domain.entity;
 
+import com.empresa.serpent.catalog.domain.enums.UnitOfMeasure;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -29,6 +30,11 @@ public class ProductEntity {
 
     @Column(name = "price", nullable = false, precision = 19, scale = 4)
     private BigDecimal price;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "unit_of_measure", nullable = false, length = 20)
+    private UnitOfMeasure unitOfMeasure = UnitOfMeasure.UNIT;
 
     /*
      SKU is optional because not every product necessarily has a barcode

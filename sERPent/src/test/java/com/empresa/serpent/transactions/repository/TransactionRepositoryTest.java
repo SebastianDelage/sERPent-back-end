@@ -1,6 +1,6 @@
 package com.empresa.serpent.transactions.repository;
 
-import com.empresa.serpent.catalog.domain.ProductEntity;
+import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.reports.repository.projection.SalesDailyProjection;
 import com.empresa.serpent.reports.repository.projection.SalesSummaryProjection;
 import com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodResponse;

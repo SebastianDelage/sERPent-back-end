@@ -1,7 +1,7 @@
 package com.empresa.serpent.catalog.web.mapper;
 
 
-import com.empresa.serpent.catalog.domain.SupplierEntity;
+import com.empresa.serpent.catalog.domain.entity.SupplierEntity;
 import com.empresa.serpent.catalog.web.dto.request.SupplierCreateRequest;
 import com.empresa.serpent.catalog.web.dto.request.SupplierUpdateRequest;
 import com.empresa.serpent.catalog.web.dto.response.SupplierResponse;

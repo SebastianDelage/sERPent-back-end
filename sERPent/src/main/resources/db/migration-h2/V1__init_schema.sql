@@ -42,6 +42,7 @@ CREATE TABLE products (
                           minimum_stock NUMERIC(12,3),
                           reorder_point NUMERIC(12,3),
                           reorder_quantity NUMERIC(12,3),
+                          unit_of_measure VARCHAR(20) NOT NULL,
                           created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 
                           CONSTRAINT ux_products_sku UNIQUE (sku),

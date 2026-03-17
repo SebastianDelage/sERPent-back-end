@@ -1,7 +1,7 @@
 package com.empresa.serpent.catalog.repository;
 
 
-import com.empresa.serpent.catalog.domain.ProductSupplierEntity;
+import com.empresa.serpent.catalog.domain.entity.ProductSupplierEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

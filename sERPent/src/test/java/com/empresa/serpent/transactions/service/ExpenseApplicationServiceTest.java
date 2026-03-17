@@ -1,6 +1,6 @@
 package com.empresa.serpent.transactions.service;
 
-import com.empresa.serpent.catalog.domain.SupplierEntity;
+import com.empresa.serpent.catalog.domain.entity.SupplierEntity;
 import com.empresa.serpent.catalog.repository.SupplierRepository;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.transactions.domain.entity.ExpenseCategoryEntity;
