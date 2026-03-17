@@ -31,6 +31,6 @@ public record ProductCreateRequest(
         @PositiveOrZero(message = "Reorder quantity cannot be negative")
         BigDecimal reorderQuantity,
 
-        @NotBlank(message = "Unit of measure cannot be null")
+        @NotNull(message = "Unit of measure cannot be null")
         UnitOfMeasure unitOfMeasure
 ) {}

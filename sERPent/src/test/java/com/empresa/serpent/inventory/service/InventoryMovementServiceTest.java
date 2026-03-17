@@ -157,6 +157,71 @@ class InventoryMovementServiceTest {
         assertThat(transferIn.getNote()).isEqualTo("Transfer #400 from warehouse 1");
     }
 
+    @Test
+    @DisplayName("Should register transformation movements with OUT for inputs and IN for outputs")
+    void shouldRegisterTransformationMovementsCorrectly() {
+
+        ProductEntity inputProduct = product(1L, "Pollo entero");
+        ProductEntity outputProduct1 = product(2L, "Pata muslo");
+        ProductEntity outputProduct2 = product(3L, "Milanesa");
+
+        WarehouseEntity warehouse = warehouse(1L, "Central", true);
+
+        TransactionEntity transaction = transactionWithoutDetails(500L);
+
+        // Simulamos transformation
+        var transformation = new com.empresa.serpent.transactions.domain.entity.ProductTransformationEntity();
+        transformation.setId(1L);
+        transformation.setTransaction(transaction);
+        transformation.setWarehouse(warehouse);
+
+        var input = new com.empresa.serpent.transactions.domain.entity.ProductTransformationInputEntity();
+        input.setProduct(inputProduct);
+        input.setQuantity(new BigDecimal("2.000"));
+        input.setTransformation(transformation);
+
+        var output1 = new com.empresa.serpent.transactions.domain.entity.ProductTransformationOutputEntity();
+        output1.setProduct(outputProduct1);
+        output1.setQuantity(new BigDecimal("2.000"));
+        output1.setTransformation(transformation);
+
+        var output2 = new com.empresa.serpent.transactions.domain.entity.ProductTransformationOutputEntity();
+        output2.setProduct(outputProduct2);
+        output2.setQuantity(new BigDecimal("1.000"));
+        output2.setTransformation(transformation);
+
+        transformation.setInputs(List.of(input));
+        transformation.setOutputs(List.of(output1, output2));
+
+        inventoryMovementService.registerTransformationMovements(transformation);
+
+        ArgumentCaptor<List<InventoryMovementEntity>> captor = ArgumentCaptor.forClass(List.class);
+        verify(inventoryMovementRepository).saveAll(captor.capture());
+        verify(inventoryStockSnapshotService).applyMovements(anyList());
+
+        List<InventoryMovementEntity> movements = captor.getValue();
+
+        assertThat(movements).hasSize(3);
+
+        // INPUT → OUT
+        InventoryMovementEntity inputMovement = movements.get(0);
+        assertThat(inputMovement.getMovementType()).isEqualTo(MovementType.OUT);
+        assertThat(inputMovement.getProduct()).isEqualTo(inputProduct);
+        assertThat(inputMovement.getQuantity()).isEqualByComparingTo("2.000");
+
+        // OUTPUT 1 → IN
+        InventoryMovementEntity outputMovement1 = movements.get(1);
+        assertThat(outputMovement1.getMovementType()).isEqualTo(MovementType.IN);
+        assertThat(outputMovement1.getProduct()).isEqualTo(outputProduct1);
+        assertThat(outputMovement1.getQuantity()).isEqualByComparingTo("2.000");
+
+        // OUTPUT 2 → IN
+        InventoryMovementEntity outputMovement2 = movements.get(2);
+        assertThat(outputMovement2.getMovementType()).isEqualTo(MovementType.IN);
+        assertThat(outputMovement2.getProduct()).isEqualTo(outputProduct2);
+        assertThat(outputMovement2.getQuantity()).isEqualByComparingTo("1.000");
+    }
+
     @Nested
     class ValidationCases {
 

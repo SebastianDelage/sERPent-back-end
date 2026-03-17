@@ -1,5 +1,7 @@
 package com.empresa.serpent.catalog.web.dto.response;
 
+import com.empresa.serpent.catalog.domain.enums.UnitOfMeasure;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -13,6 +15,7 @@ public record ProductResponse(
         BigDecimal minimumStock,
         BigDecimal reorderPoint,
         BigDecimal reorderQuantity,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        UnitOfMeasure unitOfMeasure
 ) {
 }

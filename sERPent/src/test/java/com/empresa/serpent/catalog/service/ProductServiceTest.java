@@ -1,6 +1,7 @@
 package com.empresa.serpent.catalog.service;
 
 import com.empresa.serpent.catalog.domain.entity.ProductEntity;
+import com.empresa.serpent.catalog.domain.enums.UnitOfMeasure;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.catalog.web.dto.request.ProductCreateRequest;
 import com.empresa.serpent.catalog.web.dto.request.ProductUpdateRequest;
@@ -50,7 +51,8 @@ class ProductServiceTest {
                 true,
                 new BigDecimal("20.000"),
                 new BigDecimal("25.000"),
-                new BigDecimal("50.000")
+                new BigDecimal("50.000"),
+                UnitOfMeasure.UNIT
         );
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.empty());
@@ -74,6 +76,7 @@ class ProductServiceTest {
         assertEquals(0, response.minimumStock().compareTo(new BigDecimal("20.000")));
         assertEquals(0, response.reorderPoint().compareTo(new BigDecimal("25.000")));
         assertEquals(0, response.reorderQuantity().compareTo(new BigDecimal("50.000")));
+        assertEquals(UnitOfMeasure.UNIT, response.unitOfMeasure());
     }
 
     @Test
@@ -87,7 +90,8 @@ class ProductServiceTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                UnitOfMeasure.KG
         );
 
         when(productRepository.findBySku("POLLO002")).thenReturn(Optional.empty());
@@ -102,6 +106,7 @@ class ProductServiceTest {
 
         assertEquals(2L, response.id());
         assertTrue(response.active());
+        assertEquals(UnitOfMeasure.KG, response.unitOfMeasure());
     }
 
     @Test
@@ -115,7 +120,8 @@ class ProductServiceTest {
                 true,
                 null,
                 null,
-                null
+                null,
+                UnitOfMeasure.KG
         );
 
         when(productRepository.save(any(ProductEntity.class))).thenAnswer(invocation -> {
@@ -131,6 +137,7 @@ class ProductServiceTest {
 
         assertNull(captor.getValue().getSku());
         assertNull(response.sku());
+        assertEquals(UnitOfMeasure.KG, captor.getValue().getUnitOfMeasure());
         verify(productRepository, never()).findBySku(any());
     }
 
@@ -145,10 +152,15 @@ class ProductServiceTest {
                 true,
                 null,
                 null,
-                null
+                null,
+                UnitOfMeasure.UNIT
         );
 
-        ProductEntity existing = ProductEntity.builder().id(99L).sku("POLLO001").build();
+        ProductEntity existing = ProductEntity.builder()
+                .id(99L)
+                .sku("POLLO001")
+                .unitOfMeasure(UnitOfMeasure.UNIT)
+                .build();
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.of(existing));
 
@@ -172,7 +184,8 @@ class ProductServiceTest {
                 true,
                 null,
                 null,
-                null
+                null,
+                UnitOfMeasure.UNIT
         );
 
         IllegalArgumentException ex = assertThrows(
@@ -195,7 +208,8 @@ class ProductServiceTest {
                 true,
                 null,
                 null,
-                null
+                null,
+                UnitOfMeasure.UNIT
         );
 
         IllegalArgumentException ex = assertThrows(
@@ -218,7 +232,8 @@ class ProductServiceTest {
                 true,
                 new BigDecimal("-1.000"),
                 null,
-                null
+                null,
+                UnitOfMeasure.UNIT
         );
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.empty());
@@ -243,7 +258,8 @@ class ProductServiceTest {
                 true,
                 new BigDecimal("20.000"),
                 new BigDecimal("10.000"),
-                new BigDecimal("50.000")
+                new BigDecimal("50.000"),
+                UnitOfMeasure.UNIT
         );
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.empty());
@@ -270,6 +286,7 @@ class ProductServiceTest {
                 .minimumStock(new BigDecimal("20.000"))
                 .reorderPoint(new BigDecimal("25.000"))
                 .reorderQuantity(new BigDecimal("50.000"))
+                .unitOfMeasure(UnitOfMeasure.UNIT)
                 .build();
 
         ProductUpdateRequest request = new ProductUpdateRequest(
@@ -280,7 +297,8 @@ class ProductServiceTest {
                 false,
                 new BigDecimal("15.000"),
                 new BigDecimal("20.000"),
-                new BigDecimal("40.000")
+                new BigDecimal("40.000"),
+                UnitOfMeasure.UNIT
         );
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.of(existing));
@@ -297,12 +315,17 @@ class ProductServiceTest {
         assertEquals(0, response.minimumStock().compareTo(new BigDecimal("15.000")));
         assertEquals(0, response.reorderPoint().compareTo(new BigDecimal("20.000")));
         assertEquals(0, response.reorderQuantity().compareTo(new BigDecimal("40.000")));
+        assertEquals(UnitOfMeasure.UNIT, response.unitOfMeasure());
     }
 
     @Test
     @DisplayName("Should throw when SKU already exists on update for another product")
     void shouldThrowWhenSkuAlreadyExistsOnUpdateForAnotherProduct() {
-        ProductEntity other = ProductEntity.builder().id(2L).sku("POLLO002").build();
+        ProductEntity other = ProductEntity.builder()
+                .id(2L)
+                .sku("POLLO002")
+                .unitOfMeasure(UnitOfMeasure.UNIT)
+                .build();
 
         ProductUpdateRequest request = new ProductUpdateRequest(
                 "Pollo entero",
@@ -312,7 +335,8 @@ class ProductServiceTest {
                 true,
                 null,
                 null,
-                null
+                null,
+                UnitOfMeasure.UNIT
         );
 
         when(productRepository.findBySku("POLLO002")).thenReturn(Optional.of(other));
@@ -338,7 +362,8 @@ class ProductServiceTest {
                 true,
                 null,
                 null,
-                null
+                null,
+                UnitOfMeasure.UNIT
         );
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.empty());
@@ -363,6 +388,7 @@ class ProductServiceTest {
                 .price(new BigDecimal("2500.0000"))
                 .sku("POLLO001")
                 .active(true)
+                .unitOfMeasure(UnitOfMeasure.UNIT)
                 .build();
 
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
@@ -372,6 +398,7 @@ class ProductServiceTest {
         assertEquals(1L, response.id());
         assertEquals("Pollo entero", response.name());
         assertEquals("POLLO001", response.sku());
+        assertEquals(UnitOfMeasure.UNIT, response.unitOfMeasure());
     }
 
     @Test
@@ -390,8 +417,19 @@ class ProductServiceTest {
     @Test
     @DisplayName("Should return all active products")
     void shouldReturnAllActiveProducts() {
-        ProductEntity p1 = ProductEntity.builder().id(1L).name("Pollo entero").active(true).build();
-        ProductEntity p2 = ProductEntity.builder().id(2L).name("Pata muslo").active(true).build();
+        ProductEntity p1 = ProductEntity.builder()
+                .id(1L)
+                .name("Pollo entero")
+                .active(true)
+                .unitOfMeasure(UnitOfMeasure.UNIT)
+                .build();
+
+        ProductEntity p2 = ProductEntity.builder()
+                .id(2L)
+                .name("Pata muslo")
+                .active(true)
+                .unitOfMeasure(UnitOfMeasure.KG)
+                .build();
 
         when(productRepository.findByActiveTrue()).thenReturn(List.of(p1, p2));
 
@@ -399,13 +437,20 @@ class ProductServiceTest {
 
         assertEquals(2, result.size());
         assertEquals("Pollo entero", result.get(0).name());
+        assertEquals(UnitOfMeasure.UNIT, result.get(0).unitOfMeasure());
         assertEquals("Pata muslo", result.get(1).name());
+        assertEquals(UnitOfMeasure.KG, result.get(1).unitOfMeasure());
     }
 
     @Test
     @DisplayName("Should search active products by name")
     void shouldSearchActiveProductsByName() {
-        ProductEntity p1 = ProductEntity.builder().id(1L).name("Pollo entero").active(true).build();
+        ProductEntity p1 = ProductEntity.builder()
+                .id(1L)
+                .name("Pollo entero")
+                .active(true)
+                .unitOfMeasure(UnitOfMeasure.UNIT)
+                .build();
 
         when(productRepository.findByActiveTrueAndNameContainingIgnoreCase("pollo"))
                 .thenReturn(List.of(p1));
@@ -414,19 +459,33 @@ class ProductServiceTest {
 
         assertEquals(1, result.size());
         assertEquals("Pollo entero", result.get(0).name());
+        assertEquals(UnitOfMeasure.UNIT, result.get(0).unitOfMeasure());
     }
 
     @Test
     @DisplayName("Should return all active products when search name is blank")
     void shouldReturnAllActiveProductsWhenSearchNameIsBlank() {
-        ProductEntity p1 = ProductEntity.builder().id(1L).name("Pollo entero").active(true).build();
-        ProductEntity p2 = ProductEntity.builder().id(2L).name("Pata muslo").active(true).build();
+        ProductEntity p1 = ProductEntity.builder()
+                .id(1L)
+                .name("Pollo entero")
+                .active(true)
+                .unitOfMeasure(UnitOfMeasure.UNIT)
+                .build();
+
+        ProductEntity p2 = ProductEntity.builder()
+                .id(2L)
+                .name("Pata muslo")
+                .active(true)
+                .unitOfMeasure(UnitOfMeasure.KG)
+                .build();
 
         when(productRepository.findByActiveTrue()).thenReturn(List.of(p1, p2));
 
         List<ProductResponse> result = productService.searchActiveByName("   ");
 
         assertEquals(2, result.size());
+        assertEquals(UnitOfMeasure.UNIT, result.get(0).unitOfMeasure());
+        assertEquals(UnitOfMeasure.KG, result.get(1).unitOfMeasure());
         verify(productRepository).findByActiveTrue();
         verify(productRepository, never()).findByActiveTrueAndNameContainingIgnoreCase(any());
     }
