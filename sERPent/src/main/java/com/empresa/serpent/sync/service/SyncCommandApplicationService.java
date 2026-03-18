@@ -3,7 +3,6 @@ package com.empresa.serpent.sync.service;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.sync.domain.entity.ClientSyncCommandEntity;
 import com.empresa.serpent.sync.domain.enums.SyncCommandStatus;
-import com.empresa.serpent.sync.domain.enums.SyncCommandType;
 import com.empresa.serpent.sync.domain.enums.SyncResultReferenceType;
 import com.empresa.serpent.sync.repository.ClientSyncCommandRepository;
 import com.empresa.serpent.sync.web.dto.request.SyncCommandRequest;
