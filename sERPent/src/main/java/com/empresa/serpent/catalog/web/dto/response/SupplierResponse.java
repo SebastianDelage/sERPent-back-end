@@ -11,6 +11,8 @@ public record SupplierResponse(
         String taxCondition,
         String phone,
         String email,
+        String address,
+        String notes,
         Boolean active,
         LocalDateTime createdAt
 ) {}
