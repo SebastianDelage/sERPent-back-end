@@ -13,7 +13,7 @@ public class CorsConfig {
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.addAllowedOrigin("http://localhost:4200");  // Angular dev
+        config.addAllowedOriginPattern("*");  // Angular dev
         config.addAllowedMethod("*");   // GET, POST, PUT, DELETE
         config.addAllowedHeader("*");   // todos los headers
         config.setAllowCredentials(true);

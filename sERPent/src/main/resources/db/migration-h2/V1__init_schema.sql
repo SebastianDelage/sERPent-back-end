@@ -38,6 +38,7 @@ CREATE TABLE products (
                           description TEXT,
                           price NUMERIC(19,4) NOT NULL DEFAULT 0,
                           sku VARCHAR(80),
+                          barcode VARCHAR(50),
                           active BOOLEAN NOT NULL DEFAULT TRUE,
                           minimum_stock NUMERIC(12,3),
                           reorder_point NUMERIC(12,3),

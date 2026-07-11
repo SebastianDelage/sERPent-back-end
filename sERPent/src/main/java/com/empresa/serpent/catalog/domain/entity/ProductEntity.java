@@ -36,15 +36,12 @@ public class ProductEntity {
     @Column(name = "unit_of_measure", nullable = false, length = 20)
     private UnitOfMeasure unitOfMeasure = UnitOfMeasure.UNIT;
 
-    /*
-     SKU is optional because not every product necessarily has a barcode
-     or internal SKU code. Some businesses may sell items individually
-     (for example bags, accessories or loose items) without barcode scanning.
 
-     If present, it must be unique.
-     */
     @Column(name = "sku", length = 80, unique = true)
     private String sku;
+
+    @Column(name = "barcode", length = 50)
+    private String barcode;
 
     @Builder.Default
     @Column(name = "active", nullable = false)

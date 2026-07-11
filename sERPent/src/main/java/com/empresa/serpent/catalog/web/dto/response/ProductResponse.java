@@ -11,6 +11,7 @@ public record ProductResponse(
         String description,
         BigDecimal price,
         String sku,
+        String barcode,
         Boolean active,
         BigDecimal minimumStock,
         BigDecimal reorderPoint,

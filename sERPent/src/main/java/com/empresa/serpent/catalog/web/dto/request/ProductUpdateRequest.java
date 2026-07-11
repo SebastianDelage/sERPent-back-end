@@ -20,6 +20,8 @@ public record ProductUpdateRequest(
 
         String sku,
 
+        String barcode,
+
         Boolean active,
 
         @PositiveOrZero(message = "Minimum stock cannot be negative")
