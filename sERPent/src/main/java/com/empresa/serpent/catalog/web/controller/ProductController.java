@@ -41,4 +41,9 @@ public class ProductController {
     ) {
         return productService.searchActiveByName(name);
     }
+
+    @GetMapping("/all")
+    public List<ProductResponse> findAll() {
+        return productService.findAll();
+    }
 }

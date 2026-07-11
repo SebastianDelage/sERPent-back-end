@@ -79,6 +79,13 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
+    public List<ProductResponse> findAll() {
+        return productRepository.findAll().stream()
+                .map(productMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<ProductResponse> searchActiveByName(String name) {
         if (name == null || name.isBlank()) {
             return findAllActive();
