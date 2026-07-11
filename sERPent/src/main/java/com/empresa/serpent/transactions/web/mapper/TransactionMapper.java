@@ -20,6 +20,7 @@ public interface TransactionMapper {
     @Mapping(target = "paymentMethodName", source = "paymentMethod.name")
     @Mapping(target = "createdByUserId", source = "createdByUserEntity.id")
     @Mapping(target = "createdByUsername", source = "createdByUserEntity.username")
+    @Mapping(target = "saleId", source = "sale.id")
     TransactionDetailResponse toDetailResponse(TransactionEntity entity);
 
     @Mapping(target = "productId", source = "product.id")
