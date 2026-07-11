@@ -41,4 +41,9 @@ public class SupplierController {
     ) {
         return supplierService.searchActiveByName(name);
     }
+
+    @GetMapping("/all")
+    public List<SupplierResponse> findAll() {
+        return supplierService.findAll();
+    }
 }

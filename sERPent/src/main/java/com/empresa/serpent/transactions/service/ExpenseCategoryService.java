@@ -66,6 +66,13 @@ public class ExpenseCategoryService {
     }
 
     @Transactional(readOnly = true)
+    public List<ExpenseCategoryResponse> findAll() {
+        return expenseCategoryRepository.findAll().stream()
+                .map(expenseCategoryMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<ExpenseCategoryResponse> searchActiveByName(String name) {
         if (name == null || name.isBlank()) {
             return findAllActive();

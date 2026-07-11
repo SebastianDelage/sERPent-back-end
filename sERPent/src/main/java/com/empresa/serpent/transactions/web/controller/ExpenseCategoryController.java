@@ -41,4 +41,9 @@ public class ExpenseCategoryController {
     ) {
         return expenseCategoryService.searchActiveByName(name);
     }
+
+    @GetMapping("/all")
+    public List<ExpenseCategoryResponse> findAll() {
+        return expenseCategoryService.findAll();
+    }
 }

@@ -66,6 +66,13 @@ public class SupplierService {
     }
 
     @Transactional(readOnly = true)
+    public List<SupplierResponse> findAll() {
+        return supplierRepository.findAll().stream()
+                .map(supplierMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<SupplierResponse> searchActiveByName(String name) {
         if (name == null || name.isBlank()) {
             return findAllActive();

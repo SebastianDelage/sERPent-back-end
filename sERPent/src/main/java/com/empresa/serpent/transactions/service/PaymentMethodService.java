@@ -65,6 +65,13 @@ public class PaymentMethodService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<PaymentMethodResponse> findAll() {
+        return paymentMethodRepository.findAll().stream()
+                .map(paymentMethodMapper::toResponse)
+                .toList();
+    }
+
     private void validateName(String name, Long currentPaymentMethodId) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("Name cannot be blank");

@@ -39,4 +39,9 @@ public class PaymentMethodController {
     public List<PaymentMethodResponse> findAllActive() {
         return paymentMethodService.findAllActive();
     }
+
+    @GetMapping("/all")
+    public List<PaymentMethodResponse> findAll() {
+        return paymentMethodService.findAll();
+    }
 }
