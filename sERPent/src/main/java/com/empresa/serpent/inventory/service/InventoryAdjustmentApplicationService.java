@@ -8,6 +8,7 @@ import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import com.empresa.serpent.inventory.web.dto.request.CreateInventoryAdjustmentRequest;
 import com.empresa.serpent.inventory.web.dto.response.CreateInventoryAdjustmentResponse;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
@@ -49,7 +50,7 @@ public class InventoryAdjustmentApplicationService {
                         new NotFoundException("Warehouse not found: " + request.warehouseId()));
 
         if (!Boolean.TRUE.equals(warehouse.getActive())) {
-            throw new IllegalArgumentException("Warehouse is inactive: " + request.warehouseId());
+            throw new ValidationException("El depósito seleccionado está inactivo.");
         }
 
         BigDecimal previousStock = stockQueryService.getStockByProductAndWarehouse(
@@ -58,7 +59,7 @@ public class InventoryAdjustmentApplicationService {
         );
 
         if (request.countedQuantity().compareTo(previousStock) == 0) {
-            throw new IllegalArgumentException("Counted quantity matches current stock. No adjustment is required");
+            throw new ValidationException("La cantidad contada coincide con el stock actual. No hace falta registrar un ajuste.");
         }
 
         MovementType movementType = request.countedQuantity().compareTo(previousStock) > 0

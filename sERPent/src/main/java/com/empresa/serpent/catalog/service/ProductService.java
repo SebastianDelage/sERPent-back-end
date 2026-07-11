@@ -6,7 +6,9 @@ import com.empresa.serpent.catalog.web.dto.request.ProductCreateRequest;
 import com.empresa.serpent.catalog.web.dto.request.ProductUpdateRequest;
 import com.empresa.serpent.catalog.web.dto.response.ProductResponse;
 import com.empresa.serpent.catalog.web.mapper.ProductMapper;
+import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -98,11 +100,10 @@ public class ProductService {
 
     private void validatePrice(BigDecimal price) {
         if (price == null) {
-            throw new IllegalArgumentException("Price cannot be null");
+            throw new ValidationException("El precio es obligatorio.");
         }
-
         if (price.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Price cannot be negative");
+            throw new ValidationException("El precio no puede ser negativo.");
         }
     }
 
@@ -110,34 +111,27 @@ public class ProductService {
         if (sku == null || sku.isBlank()) {
             return;
         }
-
         productRepository.findBySku(sku.trim())
                 .ifPresent(existing -> {
                     if (currentProductId == null || !existing.getId().equals(currentProductId)) {
-                        throw new IllegalArgumentException("SKU already exists: " + sku.trim());
+                        throw new ConflictException("Ya existe un producto con el código SKU \"" + sku.trim() + "\".");
                     }
                 });
     }
 
-    private void validateInventoryConfiguration(
-            BigDecimal minimumStock,
-            BigDecimal reorderPoint,
-            BigDecimal reorderQuantity
-    ) {
-        validateNonNegative(minimumStock, "Minimum stock cannot be negative");
-        validateNonNegative(reorderPoint, "Reorder point cannot be negative");
-        validateNonNegative(reorderQuantity, "Reorder quantity cannot be negative");
+    private void validateInventoryConfiguration(BigDecimal minimumStock, BigDecimal reorderPoint, BigDecimal reorderQuantity) {
+        validateNonNegative(minimumStock, "El stock mínimo no puede ser negativo.");
+        validateNonNegative(reorderPoint, "El punto de reposición no puede ser negativo.");
+        validateNonNegative(reorderQuantity, "La cantidad de reposición no puede ser negativa.");
 
-        if (minimumStock != null
-                && reorderPoint != null
-                && reorderPoint.compareTo(minimumStock) < 0) {
-            throw new IllegalArgumentException("Reorder point cannot be less than minimum stock");
+        if (minimumStock != null && reorderPoint != null && reorderPoint.compareTo(minimumStock) < 0) {
+            throw new ValidationException("El punto de reposición no puede ser menor al stock mínimo.");
         }
     }
 
     private void validateNonNegative(BigDecimal value, String message) {
         if (value != null && value.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException(message);
+            throw new ValidationException(message);
         }
     }
 

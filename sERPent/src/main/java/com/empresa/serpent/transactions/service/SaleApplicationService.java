@@ -7,7 +7,9 @@ import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import com.empresa.serpent.inventory.service.InventoryMovementService;
 import com.empresa.serpent.inventory.service.StockValidationService;
 import com.empresa.serpent.inventory.web.dto.request.StockCheckItemRequest;
+import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
@@ -65,13 +67,13 @@ public class SaleApplicationService {
                         new NotFoundException("Warehouse not found: " + request.warehouseId()));
 
         if (!Boolean.TRUE.equals(warehouse.getActive())) {
-            throw new IllegalArgumentException("Warehouse is inactive: " + request.warehouseId());
+            throw new ValidationException("El depósito seleccionado está inactivo.");
         }
 
         if (request.invoiceNumber() != null
                 && !request.invoiceNumber().isBlank()
                 && saleRepository.existsByInvoiceNumber(request.invoiceNumber())) {
-            throw new IllegalArgumentException("Invoice number already exists: " + request.invoiceNumber());
+            throw new ConflictException("Ya existe una venta con el comprobante \"" + request.invoiceNumber() + "\".");
         }
 
         stockValidationService.validateSaleItemsStock(
@@ -113,11 +115,11 @@ public class SaleApplicationService {
             }
 
             if (item.unitPrice() == null) {
-                throw new IllegalArgumentException("Item unitPrice cannot be null");
+                throw new ValidationException("El precio de un ítem es obligatorio.");
             }
 
             if (item.unitPrice().compareTo(BigDecimal.ZERO) < 0) {
-                throw new IllegalArgumentException("Item unitPrice cannot be negative");
+                throw new ValidationException("El precio de un ítem no puede ser negativo.");
             }
 
             BigDecimal subtotal = item.unitPrice().multiply(item.quantity());
