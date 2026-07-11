@@ -96,10 +96,12 @@ public class InventoryAdjustmentApplicationService {
 
         TransactionEntity savedTransaction = transactionRepository.save(transaction);
 
-        String movementNote = "Stock adjustment: counted "
-                + request.countedQuantity()
-                + ", previous "
-                + previousStock;
+        String countDetail = "Conteo: " + request.countedQuantity()
+                + ", anterior: " + previousStock;
+
+        String movementNote = request.reason() != null && !request.reason().isBlank()
+                ? request.reason().trim() + " — " + countDetail
+                : countDetail;
 
         inventoryMovementService.registerAdjustmentMovement(
                 savedTransaction,
