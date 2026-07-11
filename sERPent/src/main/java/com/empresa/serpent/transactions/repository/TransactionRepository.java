@@ -10,6 +10,7 @@ import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -37,10 +38,15 @@ public interface TransactionRepository extends
            JOIN t.details d
            WHERE t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.SALE
              AND d.product IS NOT NULL
+             AND (:dateFrom IS NULL OR t.date >= :dateFrom)
+             AND (:dateTo IS NULL OR t.date <= :dateTo)
            GROUP BY d.product.id, d.product.name
            ORDER BY SUM(d.quantity) DESC
            """)
-    List<SalesByProductResponse> getSalesByProductReport();
+    List<SalesByProductResponse> getSalesByProductReport(
+            @Param("dateFrom") LocalDateTime dateFrom,
+            @Param("dateTo") LocalDateTime dateTo
+    );
 
     @Query(value = """
            SELECT
@@ -49,10 +55,15 @@ public interface TransactionRepository extends
                SUM(t.total) AS totalRevenue
            FROM transactions t
            WHERE t.type = 'SALE'
+             AND (:dateFrom IS NULL OR t.date >= :dateFrom)
+             AND (:dateTo IS NULL OR t.date <= :dateTo)
            GROUP BY CAST(t.date AS DATE)
            ORDER BY CAST(t.date AS DATE) DESC
            """, nativeQuery = true)
-    List<SalesDailyProjection> getSalesDailyReportRaw();
+    List<SalesDailyProjection> getSalesDailyReportRaw(
+            @Param("dateFrom") LocalDateTime dateFrom,
+            @Param("dateTo") LocalDateTime dateTo
+    );
 
     @Query("""
            SELECT new com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodResponse(
@@ -64,10 +75,15 @@ public interface TransactionRepository extends
            FROM TransactionEntity t
            JOIN t.paymentMethod pm
            WHERE t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.SALE
+             AND (:dateFrom IS NULL OR t.date >= :dateFrom)
+             AND (:dateTo IS NULL OR t.date <= :dateTo)
            GROUP BY pm.id, pm.name
            ORDER BY SUM(t.total) DESC
            """)
-    List<SalesByPaymentMethodResponse> getSalesByPaymentMethodReport();
+    List<SalesByPaymentMethodResponse> getSalesByPaymentMethodReport(
+            @Param("dateFrom") LocalDateTime dateFrom,
+            @Param("dateTo") LocalDateTime dateTo
+    );
 
     @Query(value = """
        SELECT
@@ -76,6 +92,11 @@ public interface TransactionRepository extends
            COALESCE(AVG(t.total), 0) AS averageTicket
        FROM transactions t
        WHERE t.type = 'SALE'
+         AND (:dateFrom IS NULL OR t.date >= :dateFrom)
+         AND (:dateTo IS NULL OR t.date <= :dateTo)
        """, nativeQuery = true)
-    SalesSummaryProjection getSalesSummaryReportRaw();
+    SalesSummaryProjection getSalesSummaryReportRaw(
+            @Param("dateFrom") LocalDateTime dateFrom,
+            @Param("dateTo") LocalDateTime dateTo
+    );
 }

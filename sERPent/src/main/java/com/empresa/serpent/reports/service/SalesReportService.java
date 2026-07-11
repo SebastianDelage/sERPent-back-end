@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -19,12 +20,12 @@ public class SalesReportService {
 
     private final TransactionRepository transactionRepository;
 
-    public List<SalesByProductResponse> getSalesByProduct() {
-        return transactionRepository.getSalesByProductReport();
+    public List<SalesByProductResponse> getSalesByProduct(LocalDateTime dateFrom, LocalDateTime dateTo) {
+        return transactionRepository.getSalesByProductReport(dateFrom, dateTo);
     }
 
-    public List<SalesDailyResponse> getSalesDaily() {
-        return transactionRepository.getSalesDailyReportRaw()
+    public List<SalesDailyResponse> getSalesDaily(LocalDateTime dateFrom, LocalDateTime dateTo) {
+        return transactionRepository.getSalesDailyReportRaw(dateFrom, dateTo)
                 .stream()
                 .map(row -> new SalesDailyResponse(
                         row.getDate(),
@@ -34,13 +35,13 @@ public class SalesReportService {
                 .toList();
     }
 
-    public List<SalesByPaymentMethodResponse> getSalesByPaymentMethod() {
-        return transactionRepository.getSalesByPaymentMethodReport();
+    public List<SalesByPaymentMethodResponse> getSalesByPaymentMethod(LocalDateTime dateFrom, LocalDateTime dateTo) {
+        return transactionRepository.getSalesByPaymentMethodReport(dateFrom, dateTo);
     }
 
-    public SalesSummaryResponse getSalesSummary() {
+    public SalesSummaryResponse getSalesSummary(LocalDateTime dateFrom, LocalDateTime dateTo) {
 
-        var row = transactionRepository.getSalesSummaryReportRaw();
+        var row = transactionRepository.getSalesSummaryReportRaw(dateFrom, dateTo);
 
         return new SalesSummaryResponse(
                 row.getTransactions(),

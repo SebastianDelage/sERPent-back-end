@@ -16,9 +16,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -40,9 +42,9 @@ class SalesReportServiceTest {
                 new SalesByProductResponse(2L, "Pata muslo", new BigDecimal("1.000"), new BigDecimal("4600.0000"))
         );
 
-        given(transactionRepository.getSalesByProductReport()).willReturn(rows);
+        given(transactionRepository.getSalesByProductReport(any(), any())).willReturn(rows);
 
-        List<SalesByProductResponse> result = salesReportService.getSalesByProduct();
+        List<SalesByProductResponse> result = salesReportService.getSalesByProduct(null, null);
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).productId()).isEqualTo(1L);
@@ -55,7 +57,7 @@ class SalesReportServiceTest {
         assertThat(result.get(1).quantitySold()).isEqualByComparingTo("1.000");
         assertThat(result.get(1).totalRevenue()).isEqualByComparingTo("4600.0000");
 
-        verify(transactionRepository).getSalesByProductReport();
+        verify(transactionRepository).getSalesByProductReport(any(), any());
     }
 
     @Test
@@ -79,16 +81,16 @@ class SalesReportServiceTest {
             }
         };
 
-        given(transactionRepository.getSalesDailyReportRaw()).willReturn(List.of(row));
+        given(transactionRepository.getSalesDailyReportRaw(any(), any())).willReturn(List.of(row));
 
-        List<SalesDailyResponse> result = salesReportService.getSalesDaily();
+        List<SalesDailyResponse> result = salesReportService.getSalesDaily(null, null);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).date()).isEqualTo(LocalDate.of(2026, 3, 12));
         assertThat(result.get(0).transactions()).isEqualTo(1L);
         assertThat(result.get(0).totalRevenue()).isEqualByComparingTo("9100.0000");
 
-        verify(transactionRepository).getSalesDailyReportRaw();
+        verify(transactionRepository).getSalesDailyReportRaw(any(), any());
     }
 
     @Test
@@ -99,9 +101,9 @@ class SalesReportServiceTest {
                 new SalesByPaymentMethodResponse(1L, "Cash", 1L, new BigDecimal("9100.0000"))
         );
 
-        given(transactionRepository.getSalesByPaymentMethodReport()).willReturn(rows);
+        given(transactionRepository.getSalesByPaymentMethodReport(any(), any())).willReturn(rows);
 
-        List<SalesByPaymentMethodResponse> result = salesReportService.getSalesByPaymentMethod();
+        List<SalesByPaymentMethodResponse> result = salesReportService.getSalesByPaymentMethod(null, null);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).paymentMethodId()).isEqualTo(1L);
@@ -109,7 +111,7 @@ class SalesReportServiceTest {
         assertThat(result.get(0).transactions()).isEqualTo(1L);
         assertThat(result.get(0).totalRevenue()).isEqualByComparingTo("9100.0000");
 
-        verify(transactionRepository).getSalesByPaymentMethodReport();
+        verify(transactionRepository).getSalesByPaymentMethodReport(any(), any());
     }
 
     @Test
@@ -133,15 +135,15 @@ class SalesReportServiceTest {
             }
         };
 
-        given(transactionRepository.getSalesSummaryReportRaw()).willReturn(row);
+        given(transactionRepository.getSalesSummaryReportRaw(any(), any())).willReturn(row);
 
-        SalesSummaryResponse result = salesReportService.getSalesSummary();
+        SalesSummaryResponse result = salesReportService.getSalesSummary(null, null);
 
         assertThat(result.transactions()).isEqualTo(3L);
         assertThat(result.totalRevenue()).isEqualByComparingTo("100.0");
         assertThat(result.averageTicket()).isEqualByComparingTo("33.3333");
         assertThat(result.averageTicket().scale()).isEqualTo(4);
 
-        verify(transactionRepository).getSalesSummaryReportRaw();
+        verify(transactionRepository).getSalesSummaryReportRaw(any(), any());
     }
 }
