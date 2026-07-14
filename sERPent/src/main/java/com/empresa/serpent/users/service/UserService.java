@@ -1,6 +1,8 @@
 package com.empresa.serpent.users.service;
 
+import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.users.domain.entity.UserEntity;
 import com.empresa.serpent.users.repository.UserRepository;
 import com.empresa.serpent.users.web.dto.request.CreateUserRequest;
@@ -8,6 +10,7 @@ import com.empresa.serpent.users.web.dto.request.UpdateUserRequest;
 import com.empresa.serpent.users.web.dto.response.UserResponse;
 import com.empresa.serpent.users.web.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +22,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public UserResponse create(CreateUserRequest request) {
@@ -26,6 +30,8 @@ public class UserService {
         validateEmail(request.email(), null);
 
         UserEntity entity = userMapper.toEntity(request);
+
+        entity.setPasswordHash(passwordEncoder.encode(request.password()));
 
         if (entity.getActive() == null) {
             entity.setActive(true);
@@ -46,6 +52,11 @@ public class UserService {
                 .orElseThrow(() -> new NotFoundException("User not found: " + id));
 
         userMapper.updateEntityFromRequest(request, entity);
+
+        if (request.password() != null && !request.password().isBlank()) {
+            entity.setPasswordHash(passwordEncoder.encode(request.password()));
+        }
+
         normalizeFields(entity);
 
         UserEntity saved = userRepository.save(entity);
@@ -69,13 +80,13 @@ public class UserService {
 
     private void validateUsername(String username, Long currentUserId) {
         if (username == null || username.isBlank()) {
-            throw new IllegalArgumentException("Username cannot be blank");
+            throw new ValidationException("El nombre de usuario es obligatorio.");
         }
 
         userRepository.findByUsername(username.trim())
                 .ifPresent(existing -> {
                     if (currentUserId == null || !existing.getId().equals(currentUserId)) {
-                        throw new IllegalArgumentException("Username already exists: " + username.trim());
+                        throw new ConflictException("Ya existe un usuario con el nombre \"" + username.trim() + "\".");
                     }
                 });
     }
@@ -88,7 +99,7 @@ public class UserService {
         userRepository.findByEmail(email.trim())
                 .ifPresent(existing -> {
                     if (currentUserId == null || !existing.getId().equals(currentUserId)) {
-                        throw new IllegalArgumentException("Email already exists: " + email.trim());
+                        throw new ConflictException("Ya existe un usuario con el email \"" + email.trim() + "\".");
                     }
                 });
     }

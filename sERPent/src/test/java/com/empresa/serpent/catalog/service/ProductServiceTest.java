@@ -7,7 +7,9 @@ import com.empresa.serpent.catalog.web.dto.request.ProductCreateRequest;
 import com.empresa.serpent.catalog.web.dto.request.ProductUpdateRequest;
 import com.empresa.serpent.catalog.web.dto.response.ProductResponse;
 import com.empresa.serpent.catalog.web.mapper.ProductMapper;
+import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,6 +50,7 @@ class ProductServiceTest {
                 "Whole chicken",
                 new BigDecimal("2500.0000"),
                 "POLLO001",
+                null,
                 true,
                 new BigDecimal("20.000"),
                 new BigDecimal("25.000"),
@@ -91,6 +94,7 @@ class ProductServiceTest {
                 null,
                 null,
                 null,
+                null,
                 UnitOfMeasure.KG
         );
 
@@ -117,6 +121,7 @@ class ProductServiceTest {
                 "Chicken milanese",
                 new BigDecimal("3000.0000"),
                 "   ",
+                null,
                 true,
                 null,
                 null,
@@ -149,6 +154,7 @@ class ProductServiceTest {
                 "Whole chicken",
                 new BigDecimal("2500.0000"),
                 "POLLO001",
+                null,
                 true,
                 null,
                 null,
@@ -164,12 +170,12 @@ class ProductServiceTest {
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.of(existing));
 
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
+        ConflictException ex = assertThrows(
+                ConflictException.class,
                 () -> productService.create(request)
         );
 
-        assertEquals("SKU already exists: POLLO001", ex.getMessage());
+        assertEquals("Ya existe un producto con el código SKU \"POLLO001\".", ex.getMessage());
         verify(productRepository, never()).save(any());
     }
 
@@ -181,6 +187,7 @@ class ProductServiceTest {
                 "Whole chicken",
                 null,
                 "POLLO001",
+                null,
                 true,
                 null,
                 null,
@@ -188,12 +195,12 @@ class ProductServiceTest {
                 UnitOfMeasure.UNIT
         );
 
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
+        ValidationException ex = assertThrows(
+                ValidationException.class,
                 () -> productService.create(request)
         );
 
-        assertEquals("Price cannot be null", ex.getMessage());
+        assertEquals("El precio es obligatorio.", ex.getMessage());
         verify(productRepository, never()).save(any());
     }
 
@@ -205,6 +212,7 @@ class ProductServiceTest {
                 "Whole chicken",
                 new BigDecimal("-1.0000"),
                 "POLLO001",
+                null,
                 true,
                 null,
                 null,
@@ -212,12 +220,12 @@ class ProductServiceTest {
                 UnitOfMeasure.UNIT
         );
 
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
+        ValidationException ex = assertThrows(
+                ValidationException.class,
                 () -> productService.create(request)
         );
 
-        assertEquals("Price cannot be negative", ex.getMessage());
+        assertEquals("El precio no puede ser negativo.", ex.getMessage());
         verify(productRepository, never()).save(any());
     }
 
@@ -229,6 +237,7 @@ class ProductServiceTest {
                 "Whole chicken",
                 new BigDecimal("2500.0000"),
                 "POLLO001",
+                null,
                 true,
                 new BigDecimal("-1.000"),
                 null,
@@ -238,12 +247,12 @@ class ProductServiceTest {
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.empty());
 
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
+        ValidationException ex = assertThrows(
+                ValidationException.class,
                 () -> productService.create(request)
         );
 
-        assertEquals("Minimum stock cannot be negative", ex.getMessage());
+        assertEquals("El stock mínimo no puede ser negativo.", ex.getMessage());
         verify(productRepository, never()).save(any());
     }
 
@@ -255,6 +264,7 @@ class ProductServiceTest {
                 "Whole chicken",
                 new BigDecimal("2500.0000"),
                 "POLLO001",
+                null,
                 true,
                 new BigDecimal("20.000"),
                 new BigDecimal("10.000"),
@@ -264,12 +274,12 @@ class ProductServiceTest {
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.empty());
 
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
+        ValidationException ex = assertThrows(
+                ValidationException.class,
                 () -> productService.create(request)
         );
 
-        assertEquals("Reorder point cannot be less than minimum stock", ex.getMessage());
+        assertEquals("El punto de reposición no puede ser menor al stock mínimo.", ex.getMessage());
         verify(productRepository, never()).save(any());
     }
 
@@ -294,6 +304,7 @@ class ProductServiceTest {
                 "Updated description",
                 new BigDecimal("3000.0000"),
                 "POLLO001",
+                null,
                 false,
                 new BigDecimal("15.000"),
                 new BigDecimal("20.000"),
@@ -332,6 +343,7 @@ class ProductServiceTest {
                 "Whole chicken",
                 new BigDecimal("2500.0000"),
                 "POLLO002",
+                null,
                 true,
                 null,
                 null,
@@ -341,12 +353,12 @@ class ProductServiceTest {
 
         when(productRepository.findBySku("POLLO002")).thenReturn(Optional.of(other));
 
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
+        ConflictException ex = assertThrows(
+                ConflictException.class,
                 () -> productService.update(1L, request)
         );
 
-        assertEquals("SKU already exists: POLLO002", ex.getMessage());
+        assertEquals("Ya existe un producto con el código SKU \"POLLO002\".", ex.getMessage());
         verify(productRepository, never()).findById(any());
         verify(productRepository, never()).save(any());
     }
@@ -359,6 +371,7 @@ class ProductServiceTest {
                 "Whole chicken",
                 new BigDecimal("2500.0000"),
                 "POLLO001",
+                null,
                 true,
                 null,
                 null,

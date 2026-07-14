@@ -5,10 +5,14 @@ import com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodResponse
 import com.empresa.serpent.reports.web.dto.response.SalesByProductResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesDailyResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesSummaryResponse;
+import com.empresa.serpent.shared.security.JwtAuthenticationFilter;
+import com.empresa.serpent.shared.security.JwtService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -17,11 +21,19 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(SalesReportController.class)
+@WebMvcTest(
+        controllers = SalesReportController.class,
+        excludeFilters = @ComponentScan.Filter(
+                type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE,
+                classes = { JwtAuthenticationFilter.class, JwtService.class }
+        )
+)
+@AutoConfigureMockMvc(addFilters = false)
 class SalesReportControllerTest {
 
     @Autowired
@@ -39,7 +51,7 @@ class SalesReportControllerTest {
                 new SalesByProductResponse(2L, "Pata muslo", new BigDecimal("1.000"), new BigDecimal("4600.0000"))
         );
 
-        given(salesReportService.getSalesByProduct()).willReturn(response);
+        given(salesReportService.getSalesByProduct(any(), any())).willReturn(response);
 
         mockMvc.perform(get("/api/reports/sales/by-product"))
                 .andExpect(status().isOk())
@@ -62,7 +74,7 @@ class SalesReportControllerTest {
                 new SalesDailyResponse(LocalDate.of(2026, 3, 12), 1L, new BigDecimal("9100.0000"))
         );
 
-        given(salesReportService.getSalesDaily()).willReturn(response);
+        given(salesReportService.getSalesDaily(any(), any())).willReturn(response);
 
         mockMvc.perform(get("/api/reports/sales/daily"))
                 .andExpect(status().isOk())
@@ -80,7 +92,7 @@ class SalesReportControllerTest {
                 new SalesByPaymentMethodResponse(1L, "Cash", 1L, new BigDecimal("9100.0000"))
         );
 
-        given(salesReportService.getSalesByPaymentMethod()).willReturn(response);
+        given(salesReportService.getSalesByPaymentMethod(any(), any())).willReturn(response);
 
         mockMvc.perform(get("/api/reports/sales/by-payment-method"))
                 .andExpect(status().isOk())
@@ -101,7 +113,7 @@ class SalesReportControllerTest {
                 new BigDecimal("9100.0000")
         );
 
-        given(salesReportService.getSalesSummary()).willReturn(response);
+        given(salesReportService.getSalesSummary(any(), any())).willReturn(response);
 
         mockMvc.perform(get("/api/reports/sales/summary"))
                 .andExpect(status().isOk())

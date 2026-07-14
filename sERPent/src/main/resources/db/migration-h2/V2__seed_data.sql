@@ -6,7 +6,7 @@
 -- =========================
 INSERT INTO users (user_id, name, last_name, username, password_hash, email, active, created_at)
 VALUES
-    (1, 'Admin', 'System', 'admin', 'dev-only-password', 'admin@serpent.com', TRUE, CURRENT_TIMESTAMP);
+    (1, 'Admin', 'System', 'admin', '$2a$10$Ed/CfmUU/BQ40u1vk0ODVOGpWwial7OKrS6FdnVwe2RWWpmevW0le', 'admin@serpent.com', TRUE, CURRENT_TIMESTAMP);
 
 -- =========================
 -- PAYMENT METHODS

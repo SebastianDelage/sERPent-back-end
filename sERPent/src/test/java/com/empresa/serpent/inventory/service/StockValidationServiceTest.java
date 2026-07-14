@@ -1,6 +1,10 @@
 package com.empresa.serpent.inventory.service;
 
+import com.empresa.serpent.catalog.domain.entity.ProductEntity;
+import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.web.dto.request.StockCheckItemRequest;
+import com.empresa.serpent.shared.exception.InsufficientStockException;
+import com.empresa.serpent.shared.exception.ValidationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -11,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -22,6 +27,9 @@ class StockValidationServiceTest {
 
     @Mock
     private StockQueryService stockQueryService;
+
+    @Mock
+    private ProductRepository productRepository;
 
     @InjectMocks
     private StockValidationService stockValidationService;
@@ -40,24 +48,24 @@ class StockValidationServiceTest {
         @DisplayName("Should throw when quantity is null")
         void shouldThrowWhenQuantityIsNull() {
             assertThatThrownBy(() -> stockValidationService.validatePositiveQuantity(null))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Quantity must be greater than zero");
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("La cantidad debe ser mayor a cero.");
         }
 
         @Test
         @DisplayName("Should throw when quantity is zero")
         void shouldThrowWhenQuantityIsZero() {
             assertThatThrownBy(() -> stockValidationService.validatePositiveQuantity(BigDecimal.ZERO))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Quantity must be greater than zero");
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("La cantidad debe ser mayor a cero.");
         }
 
         @Test
         @DisplayName("Should throw when quantity is negative")
         void shouldThrowWhenQuantityIsNegative() {
             assertThatThrownBy(() -> stockValidationService.validatePositiveQuantity(new BigDecimal("-1.000")))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Quantity must be greater than zero");
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("La cantidad debe ser mayor a cero.");
         }
     }
 
@@ -95,12 +103,14 @@ class StockValidationServiceTest {
         void shouldThrowWhenStockIsInsufficient() {
             given(stockQueryService.getStockByProductAndWarehouse(10L, 1L))
                     .willReturn(new BigDecimal("2.000"));
+            given(productRepository.findById(10L))
+                    .willReturn(Optional.of(ProductEntity.builder().id(10L).name("Pollo entero").build()));
 
             assertThatThrownBy(() ->
                     stockValidationService.validateAvailableStock(10L, 1L, new BigDecimal("3.000"))
             )
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Insufficient stock for product 10 in warehouse 1. Current stock: 2.000, requested: 3.000");
+                    .isInstanceOf(InsufficientStockException.class)
+                    .hasMessage("No hay stock suficiente de \"Pollo entero\". Disponible: 2.000, solicitado: 3.000.");
 
             verify(stockQueryService).getStockByProductAndWarehouse(10L, 1L);
         }
@@ -111,8 +121,8 @@ class StockValidationServiceTest {
             assertThatThrownBy(() ->
                     stockValidationService.validateAvailableStock(10L, 1L, null)
             )
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Quantity must be greater than zero");
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("La cantidad debe ser mayor a cero.");
 
             verify(stockQueryService, never()).getStockByProductAndWarehouse(anyLong(), anyLong());
         }
@@ -123,8 +133,8 @@ class StockValidationServiceTest {
             assertThatThrownBy(() ->
                     stockValidationService.validateAvailableStock(10L, 1L, BigDecimal.ZERO)
             )
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Quantity must be greater than zero");
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("La cantidad debe ser mayor a cero.");
 
             verify(stockQueryService, never()).getStockByProductAndWarehouse(anyLong(), anyLong());
         }
@@ -135,8 +145,8 @@ class StockValidationServiceTest {
             assertThatThrownBy(() ->
                     stockValidationService.validateAvailableStock(10L, 1L, new BigDecimal("-1.000"))
             )
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Quantity must be greater than zero");
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("La cantidad debe ser mayor a cero.");
 
             verify(stockQueryService, never()).getStockByProductAndWarehouse(anyLong(), anyLong());
         }
@@ -172,8 +182,8 @@ class StockValidationServiceTest {
             assertThatThrownBy(() ->
                     stockValidationService.validateSaleItemsStock(null, 1L)
             )
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Sale must contain at least one item");
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("La venta debe tener al menos un ítem.");
 
             verify(stockQueryService, never()).getStockByProductAndWarehouse(anyLong(), anyLong());
         }
@@ -184,8 +194,8 @@ class StockValidationServiceTest {
             assertThatThrownBy(() ->
                     stockValidationService.validateSaleItemsStock(List.of(), 1L)
             )
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Sale must contain at least one item");
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("La venta debe tener al menos un ítem.");
 
             verify(stockQueryService, never()).getStockByProductAndWarehouse(anyLong(), anyLong());
         }
@@ -200,8 +210,8 @@ class StockValidationServiceTest {
             assertThatThrownBy(() ->
                     stockValidationService.validateSaleItemsStock(items, 1L)
             )
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Item productId cannot be null");
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Falta indicar el producto de un ítem.");
 
             verify(stockQueryService, never()).getStockByProductAndWarehouse(anyLong(), anyLong());
         }
@@ -218,12 +228,14 @@ class StockValidationServiceTest {
                     .willReturn(new BigDecimal("5.000"));
             given(stockQueryService.getStockByProductAndWarehouse(20L, 1L))
                     .willReturn(new BigDecimal("3.000"));
+            given(productRepository.findById(20L))
+                    .willReturn(Optional.of(ProductEntity.builder().id(20L).name("Pata muslo").build()));
 
             assertThatThrownBy(() ->
                     stockValidationService.validateSaleItemsStock(items, 1L)
             )
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Insufficient stock for product 20 in warehouse 1. Current stock: 3.000, requested: 10.000");
+                    .isInstanceOf(InsufficientStockException.class)
+                    .hasMessage("No hay stock suficiente de \"Pata muslo\". Disponible: 3.000, solicitado: 10.000.");
 
             verify(stockQueryService).getStockByProductAndWarehouse(10L, 1L);
             verify(stockQueryService).getStockByProductAndWarehouse(20L, 1L);

@@ -14,11 +14,13 @@ public interface UserMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "passwordHash", ignore = true)
     UserEntity toEntity(CreateUserRequest request);
 
     UserResponse toResponse(UserEntity entity);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "passwordHash", ignore = true)
     void updateEntityFromRequest(UpdateUserRequest request, @MappingTarget UserEntity entity);
 }

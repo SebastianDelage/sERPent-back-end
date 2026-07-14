@@ -1,0 +1,2 @@
+INSERT INTO users (name, last_name, username, password_hash, email, active, created_at)
+VALUES ('Administrador', NULL, 'admin', '$2a$10$SKO.JDINC7B9N9Kc2VkDI.AXkS3arX4RfX85apVl/1kVTb9njrWnu', NULL, TRUE, NOW());

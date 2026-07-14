@@ -21,3 +21,8 @@ spring:
 server:
   port: 8080
 
+serpent:
+  jwt:
+    secret: ${JWT_SECRET:claveDeDesarrolloLargaYAleatoriaDeAlMenos32Caracteres1234567890}
+    expiration-ms: 28800000
+

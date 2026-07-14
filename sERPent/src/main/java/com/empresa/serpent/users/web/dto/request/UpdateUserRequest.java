@@ -13,8 +13,8 @@ public record UpdateUserRequest(
         @NotBlank(message = "Username cannot be blank")
         String username,
 
-        @NotBlank(message = "Password hash cannot be blank")
-        String passwordHash,
+        // Optional on update: if null/blank, the current password is kept.
+        String password,
 
         @Email(message = "Email must be a valid email address")
         String email,

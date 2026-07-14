@@ -6,7 +6,9 @@ import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.service.InventoryMovementService;
 import com.empresa.serpent.inventory.service.StockValidationService;
 import com.empresa.serpent.inventory.web.dto.request.StockCheckItemRequest;
+import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
@@ -623,8 +625,8 @@ class SaleApplicationServiceTest {
             given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", false)));
 
             assertThatThrownBy(() -> saleApplicationService.createSale(request))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Warehouse is inactive: 1");
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("El depósito seleccionado está inactivo.");
 
             verify(transactionRepository, never()).save(any());
             verify(saleRepository, never()).save(any());
@@ -641,8 +643,8 @@ class SaleApplicationServiceTest {
             given(saleRepository.existsByInvoiceNumber("A-0001-00000001")).willReturn(true);
 
             assertThatThrownBy(() -> saleApplicationService.createSale(request))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Invoice number already exists: A-0001-00000001");
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Ya existe una venta con el comprobante \"A-0001-00000001\".");
 
             verify(transactionRepository, never()).save(any());
             verify(saleRepository, never()).save(any());
@@ -698,8 +700,8 @@ class SaleApplicationServiceTest {
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
 
             assertThatThrownBy(() -> saleApplicationService.createSale(request))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Item unitPrice cannot be null");
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("El precio de un ítem es obligatorio.");
 
             verify(transactionRepository, never()).save(any());
             verify(saleRepository, never()).save(any());
@@ -736,8 +738,8 @@ class SaleApplicationServiceTest {
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
 
             assertThatThrownBy(() -> saleApplicationService.createSale(request))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Item unitPrice cannot be negative");
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("El precio de un ítem no puede ser negativo.");
 
             verify(transactionRepository, never()).save(any());
             verify(saleRepository, never()).save(any());

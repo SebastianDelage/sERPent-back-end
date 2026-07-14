@@ -58,7 +58,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        List<SalesByProductResponse> result = transactionRepository.getSalesByProductReport();
+        List<SalesByProductResponse> result = transactionRepository.getSalesByProductReport(null, null);
 
         assertThat(result).hasSize(2);
 
@@ -95,7 +95,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        List<SalesDailyProjection> result = transactionRepository.getSalesDailyReportRaw();
+        List<SalesDailyProjection> result = transactionRepository.getSalesDailyReportRaw(null, null);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getDate()).isEqualTo(LocalDate.of(2026, 3, 12));
@@ -128,7 +128,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        List<SalesByPaymentMethodResponse> result = transactionRepository.getSalesByPaymentMethodReport();
+        List<SalesByPaymentMethodResponse> result = transactionRepository.getSalesByPaymentMethodReport(null, null);
 
         assertThat(result).hasSize(2);
 
@@ -165,7 +165,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw();
+        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null);
 
         assertThat(result).isNotNull();
         assertThat(result.getTransactions()).isEqualTo(2L);

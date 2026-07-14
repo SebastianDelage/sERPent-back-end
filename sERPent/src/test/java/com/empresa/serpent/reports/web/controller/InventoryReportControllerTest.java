@@ -5,13 +5,17 @@ import com.empresa.serpent.reports.service.InventoryReportService;
 import com.empresa.serpent.reports.web.dto.response.InventoryByWarehouseResponse;
 import com.empresa.serpent.reports.web.dto.response.InventorySummaryResponse;
 import com.empresa.serpent.reports.web.dto.response.WarehouseSummaryResponse;
+import com.empresa.serpent.shared.security.JwtAuthenticationFilter;
+import com.empresa.serpent.shared.security.JwtService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -20,7 +24,14 @@ import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(InventoryReportController.class)
+@WebMvcTest(
+        controllers = InventoryReportController.class,
+        excludeFilters = @ComponentScan.Filter(
+                type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE,
+                classes = { JwtAuthenticationFilter.class, JwtService.class }
+        )
+)
+@AutoConfigureMockMvc(addFilters = false)
 class InventoryReportControllerTest {
 
     @Autowired
