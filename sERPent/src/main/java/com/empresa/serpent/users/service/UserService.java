@@ -80,15 +80,8 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public List<UserResponse> findAllActive() {
-        return userRepository.findByActiveTrue().stream()
-                .map(userMapper::toResponse)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<UserResponse> findAll() {
-        return userRepository.findAll().stream()
+    public List<UserResponse> search(boolean includeInactive) {
+        return userRepository.search(includeInactive).stream()
                 .map(userMapper::toResponse)
                 .toList();
     }

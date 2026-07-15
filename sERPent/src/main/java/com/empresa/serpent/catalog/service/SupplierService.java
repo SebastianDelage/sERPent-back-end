@@ -6,7 +6,9 @@ import com.empresa.serpent.catalog.web.dto.request.SupplierCreateRequest;
 import com.empresa.serpent.catalog.web.dto.request.SupplierUpdateRequest;
 import com.empresa.serpent.catalog.web.dto.response.SupplierResponse;
 import com.empresa.serpent.catalog.web.mapper.SupplierMapper;
+import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,39 +61,24 @@ public class SupplierService {
     }
 
     @Transactional(readOnly = true)
-    public List<SupplierResponse> findAllActive() {
-        return supplierRepository.findByActiveTrue().stream()
-                .map(supplierMapper::toResponse)
-                .toList();
-    }
+    public List<SupplierResponse> search(String name, boolean includeInactive) {
+        String term = (name == null || name.isBlank()) ? null : name.trim();
 
-    @Transactional(readOnly = true)
-    public List<SupplierResponse> findAll() {
-        return supplierRepository.findAll().stream()
-                .map(supplierMapper::toResponse)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<SupplierResponse> searchActiveByName(String name) {
-        if (name == null || name.isBlank()) {
-            return findAllActive();
-        }
-
-        return supplierRepository.findByActiveTrueAndNameContainingIgnoreCase(name.trim()).stream()
+        return supplierRepository.search(term, includeInactive).stream()
                 .map(supplierMapper::toResponse)
                 .toList();
     }
 
     private void validateName(String name, Long currentSupplierId) {
         if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("Supplier name cannot be blank");
+            throw new ValidationException("El nombre del proveedor es obligatorio.");
         }
 
         supplierRepository.findByNameIgnoreCase(name.trim())
                 .ifPresent(existing -> {
                     if (currentSupplierId == null || !existing.getId().equals(currentSupplierId)) {
-                        throw new IllegalArgumentException("Supplier name already exists: " + name.trim());
+                        throw new ConflictException(
+                                "Ya existe un proveedor con el nombre \"" + name.trim() + "\".");
                     }
                 });
     }

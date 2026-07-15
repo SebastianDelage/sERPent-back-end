@@ -1,6 +1,8 @@
 package com.empresa.serpent.transactions.service;
 
+import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.repository.PaymentMethodRepository;
 import com.empresa.serpent.transactions.web.dto.request.CreatePaymentMethodRequest;
@@ -59,28 +61,22 @@ public class PaymentMethodService {
     }
 
     @Transactional(readOnly = true)
-    public List<PaymentMethodResponse> findAllActive() {
-        return paymentMethodRepository.findByActiveTrue().stream()
-                .map(paymentMethodMapper::toResponse)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<PaymentMethodResponse> findAll() {
-        return paymentMethodRepository.findAll().stream()
+    public List<PaymentMethodResponse> search(boolean includeInactive) {
+        return paymentMethodRepository.search(includeInactive).stream()
                 .map(paymentMethodMapper::toResponse)
                 .toList();
     }
 
     private void validateName(String name, Long currentPaymentMethodId) {
         if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("Name cannot be blank");
+            throw new ValidationException("El nombre del método de pago es obligatorio.");
         }
 
         paymentMethodRepository.findByName(name.trim())
                 .ifPresent(existing -> {
                     if (currentPaymentMethodId == null || !existing.getId().equals(currentPaymentMethodId)) {
-                        throw new IllegalArgumentException("Payment method already exists: " + name.trim());
+                        throw new ConflictException(
+                                "Ya existe un método de pago con el nombre \"" + name.trim() + "\".");
                     }
                 });
     }

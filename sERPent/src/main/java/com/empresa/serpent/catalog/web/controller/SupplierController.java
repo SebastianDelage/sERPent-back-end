@@ -36,14 +36,10 @@ public class SupplierController {
     }
 
     @GetMapping
-    public List<SupplierResponse> findAllActive(
-            @RequestParam(required = false) String name
+    public List<SupplierResponse> search(
+            @RequestParam(required = false) String name,
+            @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
-        return supplierService.searchActiveByName(name);
-    }
-
-    @GetMapping("/all")
-    public List<SupplierResponse> findAll() {
-        return supplierService.findAll();
+        return supplierService.search(name, includeInactive);
     }
 }

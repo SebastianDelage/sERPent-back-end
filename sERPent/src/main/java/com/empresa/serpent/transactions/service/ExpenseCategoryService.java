@@ -1,6 +1,8 @@
 package com.empresa.serpent.transactions.service;
 
+import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.transactions.domain.entity.ExpenseCategoryEntity;
 import com.empresa.serpent.transactions.repository.ExpenseCategoryRepository;
 import com.empresa.serpent.transactions.web.dto.request.CreateExpenseCategoryRequest;
@@ -59,39 +61,24 @@ public class ExpenseCategoryService {
     }
 
     @Transactional(readOnly = true)
-    public List<ExpenseCategoryResponse> findAllActive() {
-        return expenseCategoryRepository.findByActiveTrue().stream()
-                .map(expenseCategoryMapper::toResponse)
-                .toList();
-    }
+    public List<ExpenseCategoryResponse> search(String name, boolean includeInactive) {
+        String term = (name == null || name.isBlank()) ? null : name.trim();
 
-    @Transactional(readOnly = true)
-    public List<ExpenseCategoryResponse> findAll() {
-        return expenseCategoryRepository.findAll().stream()
-                .map(expenseCategoryMapper::toResponse)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<ExpenseCategoryResponse> searchActiveByName(String name) {
-        if (name == null || name.isBlank()) {
-            return findAllActive();
-        }
-
-        return expenseCategoryRepository.findByActiveTrueAndNameContainingIgnoreCase(name.trim()).stream()
+        return expenseCategoryRepository.search(term, includeInactive).stream()
                 .map(expenseCategoryMapper::toResponse)
                 .toList();
     }
 
     private void validateName(String name, Long currentCategoryId) {
         if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("Expense category name cannot be blank");
+            throw new ValidationException("El nombre de la categoría es obligatorio.");
         }
 
         expenseCategoryRepository.findByNameIgnoreCase(name.trim())
                 .ifPresent(existing -> {
                     if (currentCategoryId == null || !existing.getId().equals(currentCategoryId)) {
-                        throw new IllegalArgumentException("Expense category name already exists: " + name.trim());
+                        throw new ConflictException(
+                                "Ya existe una categoría de gasto con el nombre \"" + name.trim() + "\".");
                     }
                 });
     }

@@ -36,14 +36,10 @@ public class ExpenseCategoryController {
     }
 
     @GetMapping
-    public List<ExpenseCategoryResponse> findAllActive(
-            @RequestParam(required = false) String name
+    public List<ExpenseCategoryResponse> search(
+            @RequestParam(required = false) String name,
+            @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
-        return expenseCategoryService.searchActiveByName(name);
-    }
-
-    @GetMapping("/all")
-    public List<ExpenseCategoryResponse> findAll() {
-        return expenseCategoryService.findAll();
+        return expenseCategoryService.search(name, includeInactive);
     }
 }

@@ -19,7 +19,7 @@ public class OfflineBootstrapService {
 
     public OfflineBootstrapResponse bootstrap() {
 
-        var products = productRepository.findByActiveTrue()
+        var products = productRepository.search(null, false)
                 .stream()
                 .map(p -> new ProductLiteDto(
                         p.getId(),
@@ -40,7 +40,7 @@ public class OfflineBootstrapService {
                 ))
                 .collect(Collectors.toList());
 
-        var paymentMethods = paymentMethodRepository.findByActiveTrue()
+        var paymentMethods = paymentMethodRepository.search(false)
                 .stream()
                 .map(pm -> new PaymentMethodLiteDto(
                         pm.getId(),

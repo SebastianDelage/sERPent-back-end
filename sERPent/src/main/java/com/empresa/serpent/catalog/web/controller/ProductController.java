@@ -36,14 +36,10 @@ public class ProductController {
     }
 
     @GetMapping
-    public List<ProductResponse> findAllActive(
-            @RequestParam(required = false) String name
+    public List<ProductResponse> search(
+            @RequestParam(required = false) String name,
+            @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
-        return productService.searchActiveByName(name);
-    }
-
-    @GetMapping("/all")
-    public List<ProductResponse> findAll() {
-        return productService.findAll();
+        return productService.search(name, includeInactive);
     }
 }

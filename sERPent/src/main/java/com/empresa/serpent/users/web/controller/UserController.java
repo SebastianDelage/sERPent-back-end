@@ -36,12 +36,9 @@ public class UserController {
     }
 
     @GetMapping
-    public List<UserResponse> findAllActive() {
-        return userService.findAllActive();
-    }
-
-    @GetMapping("/all")
-    public List<UserResponse> findAll() {
-        return userService.findAll();
+    public List<UserResponse> search(
+            @RequestParam(defaultValue = "false") boolean includeInactive
+    ) {
+        return userService.search(includeInactive);
     }
 }
