@@ -13,8 +13,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
+
+
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +24,9 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+
+    /** Seeded admin: it must always stay usable, so it can't be deactivated. */
+    private static final Long PROTECTED_USER_ID = 1L;
 
     @Transactional
     public UserResponse create(CreateUserRequest request) {
@@ -50,6 +54,10 @@ public class UserService {
 
         UserEntity entity = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User not found: " + id));
+
+        if (PROTECTED_USER_ID.equals(id) && Boolean.FALSE.equals(request.active())) {
+            throw new ValidationException("El usuario administrador no se puede desactivar.");
+        }
 
         userMapper.updateEntityFromRequest(request, entity);
 
