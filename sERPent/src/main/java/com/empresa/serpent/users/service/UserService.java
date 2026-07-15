@@ -78,6 +78,13 @@ public class UserService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<UserResponse> findAll() {
+        return userRepository.findAll().stream()
+                .map(userMapper::toResponse)
+                .toList();
+    }
+
     private void validateUsername(String username, Long currentUserId) {
         if (username == null || username.isBlank()) {
             throw new ValidationException("El nombre de usuario es obligatorio.");

@@ -39,4 +39,9 @@ public class UserController {
     public List<UserResponse> findAllActive() {
         return userService.findAllActive();
     }
+
+    @GetMapping("/all")
+    public List<UserResponse> findAll() {
+        return userService.findAll();
+    }
 }
