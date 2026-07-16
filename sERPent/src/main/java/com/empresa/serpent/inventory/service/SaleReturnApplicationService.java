@@ -7,7 +7,9 @@ import com.empresa.serpent.inventory.domain.enums.MovementType;
 import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import com.empresa.serpent.inventory.web.dto.request.CreateSaleReturnRequest;
 import com.empresa.serpent.inventory.web.dto.response.CreateSaleReturnResponse;
+import com.empresa.serpent.inventory.web.dto.response.SaleReturnResponse;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.transactions.domain.entity.SaleEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleReturnEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
@@ -54,7 +56,7 @@ public class SaleReturnApplicationService {
                 .orElseThrow(() -> new NotFoundException("Warehouse not found: " + request.warehouseId()));
 
         if (!Boolean.TRUE.equals(warehouse.getActive())) {
-            throw new IllegalArgumentException("Warehouse is inactive: " + request.warehouseId());
+            throw new ValidationException("El depósito seleccionado está inactivo.");
         }
 
         SaleEntity originalSale = saleRepository.findById(request.saleId())
@@ -63,18 +65,18 @@ public class SaleReturnApplicationService {
         TransactionEntity originalTransaction = originalSale.getTransaction();
 
         if (originalTransaction == null) {
-            throw new IllegalArgumentException("Original sale transaction cannot be null");
+            throw new ValidationException("La venta original no tiene una transacción asociada.");
         }
 
         if (originalTransaction.getType() != TransactionType.SALE) {
-            throw new IllegalArgumentException("Original transaction must be of type SALE");
+            throw new ValidationException("La transacción original no es una venta.");
         }
 
         BigDecimal soldQuantity = getSoldQuantity(originalTransaction.getId(), request.productId());
 
         if (soldQuantity.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException(
-                    "Product " + request.productId() + " was not sold in sale " + request.saleId()
+            throw new ValidationException(
+                    "El producto \"" + product.getName() + "\" no forma parte de esta venta."
             );
         }
 
@@ -83,25 +85,22 @@ public class SaleReturnApplicationService {
         BigDecimal remainingReturnableQuantity = soldQuantity.subtract(alreadyReturnedQuantity);
 
         if (remainingReturnableQuantity.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException(
-                    "All sold quantity for product " + request.productId() + " has already been returned"
+            throw new ValidationException(
+                    "Ya se devolvió toda la cantidad vendida de \"" + product.getName() + "\"."
             );
         }
 
         if (request.quantity().compareTo(remainingReturnableQuantity) > 0) {
-            throw new IllegalArgumentException(
-                    "Return quantity exceeds available returnable quantity. Sold: "
-                            + soldQuantity
-                            + ", already returned: "
-                            + alreadyReturnedQuantity
-                            + ", requested: "
-                            + request.quantity()
+            throw new ValidationException(
+                    "No podés devolver esa cantidad de \"" + product.getName() + "\". "
+                            + "Se vendieron " + soldQuantity
+                            + " y ya se devolvieron " + alreadyReturnedQuantity + "."
             );
         }
 
         String description = request.reason() != null && !request.reason().isBlank()
                 ? request.reason().trim()
-                : "Return for sale " + request.saleId() + ", product " + request.productId();
+                : "Devolución de la venta #" + request.saleId() + " — " + product.getName();
 
         TransactionEntity transaction = TransactionEntity.builder()
                 .type(TransactionType.RETURN)
@@ -116,7 +115,7 @@ public class SaleReturnApplicationService {
         TransactionDetailEntity detail = TransactionDetailEntity.builder()
                 .transaction(transaction)
                 .product(product)
-                .description("Sale return")
+                .description("Devolución")
                 .quantity(request.quantity())
                 .unitPrice(BigDecimal.ZERO)
                 .subtotal(BigDecimal.ZERO)
@@ -140,7 +139,7 @@ public class SaleReturnApplicationService {
                 product,
                 MovementType.RETURN_IN,
                 request.quantity(),
-                "Return from sale #" + request.saleId()
+                "Devolución de la venta #" + request.saleId()
         );
 
         return new CreateSaleReturnResponse(
@@ -151,8 +150,26 @@ public class SaleReturnApplicationService {
                 warehouse.getId(),
                 warehouse.getName(),
                 request.quantity(),
-                "Sale return created successfully"
+                "Devolución registrada correctamente."
         );
+    }
+
+    /** Returns every return registered against a sale, one row per returned product. */
+    @Transactional(readOnly = true)
+    public List<SaleReturnResponse> findBySaleId(Long saleId) {
+        return saleReturnRepository.findByOriginalSaleId(saleId).stream()
+                .flatMap(saleReturn -> saleReturn.getTransaction().getDetails().stream()
+                        .map(detail -> new SaleReturnResponse(
+                                saleReturn.getId(),
+                                saleReturn.getTransaction().getId(),
+                                saleReturn.getTransaction().getDate(),
+                                saleId,
+                                detail.getProduct().getId(),
+                                detail.getProduct().getName(),
+                                detail.getQuantity(),
+                                saleReturn.getReason()
+                        )))
+                .toList();
     }
 
     private BigDecimal getSoldQuantity(Long saleTransactionId, Long productId) {
