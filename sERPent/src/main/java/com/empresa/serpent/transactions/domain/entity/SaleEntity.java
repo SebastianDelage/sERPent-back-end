@@ -1,5 +1,6 @@
 package com.empresa.serpent.transactions.domain.entity;
 
+import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -38,6 +39,10 @@ public class SaleEntity {
 
     @Column(name = "due_date")
     private LocalDate dueDate;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warehouse_id")
+    private WarehouseEntity warehouse;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transaction_id", nullable = false)

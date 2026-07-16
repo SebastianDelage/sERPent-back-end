@@ -147,6 +147,7 @@ public class SaleApplicationService {
 
         SaleEntity sale = SaleEntity.builder()
                 .transaction(savedTransaction)
+                .warehouse(warehouse)
                 .customerId(request.customerId())
                 .customerName(request.customerName())
                 .customerDocument(request.customerDocument())

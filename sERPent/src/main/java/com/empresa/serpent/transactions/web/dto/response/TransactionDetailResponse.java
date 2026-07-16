@@ -19,6 +19,8 @@ public record TransactionDetailResponse(
         Long createdByUserId,
         String createdByUsername,
         Long saleId,
+        Long warehouseId,
+        String warehouseName,
         List<TransactionItemResponse> details
 ) {
 }

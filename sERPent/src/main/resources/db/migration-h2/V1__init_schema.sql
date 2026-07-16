@@ -170,11 +170,24 @@ CREATE TABLE transaction_details (
 );
 
 -- =========================
--- 9) SALES
+-- 9) WAREHOUSES
+-- =========================
+CREATE TABLE warehouses (
+                            warehouse_id BIGSERIAL PRIMARY KEY,
+                            name VARCHAR(120) NOT NULL,
+                            active BOOLEAN NOT NULL DEFAULT TRUE,
+                            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+                            CONSTRAINT ux_warehouses_name UNIQUE (name)
+);
+
+-- =========================
+-- 10) SALES
 -- =========================
 CREATE TABLE sales (
                        sale_id BIGSERIAL PRIMARY KEY,
                        transaction_id BIGINT NOT NULL,
+                       warehouse_id BIGINT,
                        customer_id BIGINT,
                        customer_name VARCHAR(150),
                        customer_document VARCHAR(60),
@@ -186,6 +199,9 @@ CREATE TABLE sales (
                        CONSTRAINT fk_sales_transaction
                            FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id),
 
+                       CONSTRAINT fk_sales_warehouse
+                           FOREIGN KEY (warehouse_id) REFERENCES warehouses(warehouse_id),
+
                        CONSTRAINT ux_sales_transaction UNIQUE (transaction_id),
                        CONSTRAINT ux_sales_invoice_number UNIQUE (invoice_number),
 
@@ -193,7 +209,7 @@ CREATE TABLE sales (
 );
 
 -- =========================
--- 10) SALE RETURNS
+-- 11) SALE RETURNS
 -- =========================
 CREATE TABLE sale_returns (
                               sale_return_id BIGSERIAL PRIMARY KEY,
@@ -211,7 +227,7 @@ CREATE TABLE sale_returns (
 );
 
 -- =========================
--- 11) EXPENSES
+-- 12) EXPENSES
 -- =========================
 CREATE TABLE expenses (
                           expense_id BIGSERIAL PRIMARY KEY,
@@ -232,18 +248,6 @@ CREATE TABLE expenses (
                               FOREIGN KEY (expense_category_id) REFERENCES expense_categories(expense_category_id),
 
                           CONSTRAINT ux_expenses_transaction UNIQUE (transaction_id)
-);
-
--- =========================
--- 12) WAREHOUSES
--- =========================
-CREATE TABLE warehouses (
-                            warehouse_id BIGSERIAL PRIMARY KEY,
-                            name VARCHAR(120) NOT NULL,
-                            active BOOLEAN NOT NULL DEFAULT TRUE,
-                            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-
-                            CONSTRAINT ux_warehouses_name UNIQUE (name)
 );
 
 -- =========================
