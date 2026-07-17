@@ -103,6 +103,18 @@ public class ProductService {
                 });
     }
 
+    @Transactional(readOnly = true)
+    public ProductResponse findByBarcode(String barcode) {
+        if (barcode == null || barcode.isBlank()) {
+            throw new ValidationException("El código de barras es obligatorio.");
+        }
+
+        return productRepository.findFirstByBarcodeAndActiveTrue(barcode.trim())
+                .map(productMapper::toResponse)
+                .orElseThrow(() -> new ValidationException(
+                        "No se encontró ningún producto con el código \"" + barcode.trim() + "\"."));
+    }
+
     private void validateInventoryConfiguration(BigDecimal minimumStock, BigDecimal reorderPoint, BigDecimal reorderQuantity) {
         validateNonNegative(minimumStock, "El stock mínimo no puede ser negativo.");
         validateNonNegative(reorderPoint, "El punto de reposición no puede ser negativo.");

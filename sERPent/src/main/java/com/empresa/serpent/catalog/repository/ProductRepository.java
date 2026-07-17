@@ -18,9 +18,13 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
 
     boolean existsByNameIgnoreCase(String name);
 
+    /** Quick search: partial name, or exact SKU / barcode. */
     @Query("""
            SELECT p FROM ProductEntity p
-           WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
+           WHERE (:name IS NULL
+                  OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))
+                  OR LOWER(p.sku) = LOWER(:name)
+                  OR p.barcode = :name)
              AND (:includeInactive = TRUE OR p.active = TRUE)
            ORDER BY p.name
            """)
@@ -28,4 +32,7 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
             @Param("name") String name,
             @Param("includeInactive") boolean includeInactive
     );
+
+    /** Barcodes aren't unique by design, so the first active match wins. */
+    Optional<ProductEntity> findFirstByBarcodeAndActiveTrue(String barcode);
 }

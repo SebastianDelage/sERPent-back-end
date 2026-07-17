@@ -42,4 +42,9 @@ public class ProductController {
     ) {
         return productService.search(name, includeInactive);
     }
+
+    @GetMapping("/barcode/{barcode}")
+    public ProductResponse findByBarcode(@PathVariable String barcode) {
+        return productService.findByBarcode(barcode);
+    }
 }
