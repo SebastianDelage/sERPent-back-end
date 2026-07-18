@@ -428,8 +428,8 @@ class ProductServiceTest {
     }
 
     @Test
-    @DisplayName("Should return all active products")
-    void shouldReturnAllActiveProducts() {
+    @DisplayName("Should return active products by default")
+    void shouldReturnActiveProductsByDefault() {
         ProductEntity p1 = ProductEntity.builder()
                 .id(1L)
                 .name("Pollo entero")
@@ -444,9 +444,9 @@ class ProductServiceTest {
                 .unitOfMeasure(UnitOfMeasure.KG)
                 .build();
 
-        when(productRepository.findByActiveTrue()).thenReturn(List.of(p1, p2));
+        when(productRepository.search(null, false)).thenReturn(List.of(p1, p2));
 
-        List<ProductResponse> result = productService.findAllActive();
+        List<ProductResponse> result = productService.search(null, false);
 
         assertEquals(2, result.size());
         assertEquals("Pollo entero", result.get(0).name());
@@ -456,8 +456,8 @@ class ProductServiceTest {
     }
 
     @Test
-    @DisplayName("Should search active products by name")
-    void shouldSearchActiveProductsByName() {
+    @DisplayName("Should search products by name")
+    void shouldSearchProductsByName() {
         ProductEntity p1 = ProductEntity.builder()
                 .id(1L)
                 .name("Pollo entero")
@@ -465,10 +465,9 @@ class ProductServiceTest {
                 .unitOfMeasure(UnitOfMeasure.UNIT)
                 .build();
 
-        when(productRepository.findByActiveTrueAndNameContainingIgnoreCase("pollo"))
-                .thenReturn(List.of(p1));
+        when(productRepository.search("pollo", false)).thenReturn(List.of(p1));
 
-        List<ProductResponse> result = productService.searchActiveByName("pollo");
+        List<ProductResponse> result = productService.search("pollo", false);
 
         assertEquals(1, result.size());
         assertEquals("Pollo entero", result.get(0).name());
@@ -476,8 +475,8 @@ class ProductServiceTest {
     }
 
     @Test
-    @DisplayName("Should return all active products when search name is blank")
-    void shouldReturnAllActiveProductsWhenSearchNameIsBlank() {
+    @DisplayName("Should pass a blank search name to the repository as null")
+    void shouldPassBlankSearchNameAsNull() {
         ProductEntity p1 = ProductEntity.builder()
                 .id(1L)
                 .name("Pollo entero")
@@ -492,14 +491,13 @@ class ProductServiceTest {
                 .unitOfMeasure(UnitOfMeasure.KG)
                 .build();
 
-        when(productRepository.findByActiveTrue()).thenReturn(List.of(p1, p2));
+        when(productRepository.search(null, false)).thenReturn(List.of(p1, p2));
 
-        List<ProductResponse> result = productService.searchActiveByName("   ");
+        List<ProductResponse> result = productService.search("   ", false);
 
         assertEquals(2, result.size());
         assertEquals(UnitOfMeasure.UNIT, result.get(0).unitOfMeasure());
         assertEquals(UnitOfMeasure.KG, result.get(1).unitOfMeasure());
-        verify(productRepository).findByActiveTrue();
-        verify(productRepository, never()).findByActiveTrueAndNameContainingIgnoreCase(any());
+        verify(productRepository).search(null, false);
     }
 }

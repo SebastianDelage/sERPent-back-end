@@ -6,7 +6,9 @@ import com.empresa.serpent.catalog.web.dto.request.SupplierCreateRequest;
 import com.empresa.serpent.catalog.web.dto.request.SupplierUpdateRequest;
 import com.empresa.serpent.catalog.web.dto.response.SupplierResponse;
 import com.empresa.serpent.catalog.web.mapper.SupplierMapper;
+import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -157,12 +159,12 @@ class SupplierServiceTest {
 
         when(supplierRepository.findByNameIgnoreCase("Proveedor Central")).thenReturn(Optional.of(existing));
 
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
+        ConflictException ex = assertThrows(
+                ConflictException.class,
                 () -> supplierService.create(request)
         );
 
-        assertEquals("Supplier name already exists: Proveedor Central", ex.getMessage());
+        assertEquals("Ya existe un proveedor con el nombre \"Proveedor Central\".", ex.getMessage());
         verify(supplierRepository, never()).save(any());
     }
 
@@ -174,12 +176,12 @@ class SupplierServiceTest {
                 null, null, null, null, null, null, null, true
         );
 
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
+        ValidationException ex = assertThrows(
+                ValidationException.class,
                 () -> supplierService.create(request)
         );
 
-        assertEquals("Supplier name cannot be blank", ex.getMessage());
+        assertEquals("El nombre del proveedor es obligatorio.", ex.getMessage());
         verify(supplierRepository, never()).save(any());
     }
 
@@ -238,12 +240,12 @@ class SupplierServiceTest {
 
         when(supplierRepository.findByNameIgnoreCase("Proveedor Norte")).thenReturn(Optional.of(other));
 
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
+        ConflictException ex = assertThrows(
+                ConflictException.class,
                 () -> supplierService.update(1L, request)
         );
 
-        assertEquals("Supplier name already exists: Proveedor Norte", ex.getMessage());
+        assertEquals("Ya existe un proveedor con el nombre \"Proveedor Norte\".", ex.getMessage());
         verify(supplierRepository, never()).findById(any());
         verify(supplierRepository, never()).save(any());
     }
@@ -305,14 +307,14 @@ class SupplierServiceTest {
     }
 
     @Test
-    @DisplayName("Should return all active suppliers")
-    void shouldReturnAllActiveSuppliers() {
+    @DisplayName("Should return active suppliers by default")
+    void shouldReturnActiveSuppliersByDefault() {
         SupplierEntity s1 = SupplierEntity.builder().id(1L).name("Proveedor Central").active(true).build();
         SupplierEntity s2 = SupplierEntity.builder().id(2L).name("Proveedor Norte").active(true).build();
 
-        when(supplierRepository.findByActiveTrue()).thenReturn(List.of(s1, s2));
+        when(supplierRepository.search(null, false)).thenReturn(List.of(s1, s2));
 
-        List<SupplierResponse> result = supplierService.findAllActive();
+        List<SupplierResponse> result = supplierService.search(null, false);
 
         assertEquals(2, result.size());
         assertEquals("Proveedor Central", result.get(0).name());
@@ -320,31 +322,29 @@ class SupplierServiceTest {
     }
 
     @Test
-    @DisplayName("Should search active suppliers by name")
-    void shouldSearchActiveSuppliersByName() {
+    @DisplayName("Should search suppliers by name")
+    void shouldSearchSuppliersByName() {
         SupplierEntity s1 = SupplierEntity.builder().id(1L).name("Proveedor Central").active(true).build();
 
-        when(supplierRepository.findByActiveTrueAndNameContainingIgnoreCase("central"))
-                .thenReturn(List.of(s1));
+        when(supplierRepository.search("central", false)).thenReturn(List.of(s1));
 
-        List<SupplierResponse> result = supplierService.searchActiveByName("central");
+        List<SupplierResponse> result = supplierService.search("central", false);
 
         assertEquals(1, result.size());
         assertEquals("Proveedor Central", result.get(0).name());
     }
 
     @Test
-    @DisplayName("Should return all active suppliers when search name is blank")
-    void shouldReturnAllActiveSuppliersWhenSearchNameIsBlank() {
+    @DisplayName("Should pass a blank search name to the repository as null")
+    void shouldPassBlankSearchNameAsNull() {
         SupplierEntity s1 = SupplierEntity.builder().id(1L).name("Proveedor Central").active(true).build();
         SupplierEntity s2 = SupplierEntity.builder().id(2L).name("Proveedor Norte").active(true).build();
 
-        when(supplierRepository.findByActiveTrue()).thenReturn(List.of(s1, s2));
+        when(supplierRepository.search(null, false)).thenReturn(List.of(s1, s2));
 
-        List<SupplierResponse> result = supplierService.searchActiveByName("   ");
+        List<SupplierResponse> result = supplierService.search("   ", false);
 
         assertEquals(2, result.size());
-        verify(supplierRepository).findByActiveTrue();
-        verify(supplierRepository, never()).findByActiveTrueAndNameContainingIgnoreCase(any());
+        verify(supplierRepository).search(null, false);
     }
 }
