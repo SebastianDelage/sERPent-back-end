@@ -1,21 +1,14 @@
 package com.empresa.serpent.sync.service;
 
+import com.empresa.serpent.shared.exception.BusinessException;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.sync.domain.entity.ClientSyncCommandEntity;
 import com.empresa.serpent.sync.domain.enums.SyncCommandStatus;
-import com.empresa.serpent.sync.domain.enums.SyncResultReferenceType;
 import com.empresa.serpent.sync.repository.ClientSyncCommandRepository;
 import com.empresa.serpent.sync.web.dto.request.SyncCommandRequest;
 import com.empresa.serpent.sync.web.dto.response.SyncCommandResponse;
-import com.empresa.serpent.transactions.service.ExpenseApplicationService;
-import com.empresa.serpent.transactions.service.SaleApplicationService;
-import com.empresa.serpent.transactions.web.dto.request.CreateExpenseRequest;
-import com.empresa.serpent.transactions.web.dto.request.CreateSaleRequest;
-import com.empresa.serpent.transactions.web.dto.response.CreateExpenseResponse;
-import com.empresa.serpent.transactions.web.dto.response.CreateSaleResponse;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -27,9 +20,7 @@ public class SyncCommandApplicationService {
 
     private final ClientSyncCommandRepository repository;
     private final ClientSyncCommandPersistenceService persistenceService;
-    private final ObjectMapper objectMapper;
-    private final SaleApplicationService saleApplicationService;
-    private final ExpenseApplicationService expenseApplicationService;
+    private final SyncCommandResultService resultService;
 
     public SyncCommandResponse process(SyncCommandRequest request) {
 
@@ -39,18 +30,37 @@ public class SyncCommandApplicationService {
                         request.clientOperationId()
                 );
 
-        if (existing.isPresent()) {
-            ClientSyncCommandEntity cmd = existing.get();
+        ClientSyncCommandEntity command;
 
-            return new SyncCommandResponse(
-                    cmd.getClientOperationId(),
-                    SyncCommandStatus.DUPLICATE,
-                    cmd.getResultReferenceType(),
-                    cmd.getResultReferenceId(),
-                    "Command already processed"
-            );
+        if (existing.isPresent()) {
+            command = existing.get();
+
+            // Only a terminal command is a real duplicate. A command left in RECEIVED (an
+            // interrupted attempt whose operation never committed) or FAILED (a retriable
+            // technical failure) is reprocessed reusing the same row.
+            if (isTerminal(command.getStatus())) {
+                return duplicateResponse(command);
+            }
+        } else {
+            Optional<ClientSyncCommandEntity> inserted = insertReceived(request);
+
+            if (inserted.isEmpty()) {
+                // A concurrent request inserted the same (clientId, clientOperationId) first.
+                // Resolve the unique-constraint collision as DUPLICATE, never as FAILED.
+                return repository
+                        .findByClientIdAndClientOperationId(request.clientId(), request.clientOperationId())
+                        .map(this::duplicateResponse)
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Sync command disappeared after a unique constraint violation"));
+            }
+
+            command = inserted.get();
         }
 
+        return dispatch(command);
+    }
+
+    private Optional<ClientSyncCommandEntity> insertReceived(SyncCommandRequest request) {
         ClientSyncCommandEntity command = ClientSyncCommandEntity.builder()
                 .clientId(request.clientId())
                 .clientOperationId(request.clientOperationId())
@@ -59,87 +69,72 @@ public class SyncCommandApplicationService {
                 .payload(request.payload())
                 .build();
 
-        command = persistenceService.save(command);
-
         try {
-            return switch (request.commandType()) {
-                case CREATE_SALE -> processCreateSale(command);
-                case CREATE_EXPENSE -> processCreateExpense(command);
+            // Committed in its own transaction (REQUIRES_NEW) so the row exists for dedup even if
+            // the later processing transaction rolls back.
+            return Optional.of(persistenceService.save(command));
+        } catch (DataIntegrityViolationException ex) {
+            return Optional.empty();
+        }
+    }
+
+    private SyncCommandResponse dispatch(ClientSyncCommandEntity command) {
+        try {
+            return switch (command.getCommandType()) {
+                case CREATE_SALE -> resultService.processCreateSale(command.getId());
+                case CREATE_EXPENSE -> resultService.processCreateExpense(command.getId());
             };
-        } catch (IllegalArgumentException | NotFoundException ex) {
-            command.setStatus(SyncCommandStatus.REJECTED);
-            command.setErrorMessage(ex.getMessage());
-            command.setProcessedAt(LocalDateTime.now());
-            persistenceService.save(command);
-
-            return new SyncCommandResponse(
-                    command.getClientOperationId(),
-                    SyncCommandStatus.REJECTED,
-                    null,
-                    null,
-                    ex.getMessage()
-            );
+        } catch (BusinessException | NotFoundException | IllegalArgumentException ex) {
+            // Expected business rejection (insufficient stock, validation, not found, bad payload):
+            // terminal REJECTED, not a retriable failure.
+            return markTerminalFailure(command, SyncCommandStatus.REJECTED, ex.getMessage());
         } catch (Exception ex) {
-            command.setStatus(SyncCommandStatus.FAILED);
-            command.setErrorMessage(ex.getMessage());
-            command.setProcessedAt(LocalDateTime.now());
-            persistenceService.save(command);
-
-            return new SyncCommandResponse(
-                    command.getClientOperationId(),
+            // Unexpected technical failure: FAILED is the only retriable state.
+            return markTerminalFailure(
+                    command,
                     SyncCommandStatus.FAILED,
-                    null,
-                    null,
                     ex.getMessage() != null ? ex.getMessage() : "Unexpected sync error"
             );
         }
     }
 
-    private SyncCommandResponse processCreateSale(ClientSyncCommandEntity command) {
-        CreateSaleRequest payload = readPayload(command.getPayload(), CreateSaleRequest.class);
-
-        CreateSaleResponse result = saleApplicationService.createSale(payload);
-
-        command.setStatus(SyncCommandStatus.PROCESSED);
+    private SyncCommandResponse markTerminalFailure(
+            ClientSyncCommandEntity command,
+            SyncCommandStatus status,
+            String message
+    ) {
+        command.setStatus(status);
+        command.setErrorMessage(message);
         command.setProcessedAt(LocalDateTime.now());
-        command.setResultReferenceType(SyncResultReferenceType.SALE);
-        command.setResultReferenceId(result.saleId());
+        command.setResultReferenceType(null);
+        command.setResultReferenceId(null);
+
+        // The processing transaction has rolled back, so this status write needs its own
+        // transaction (REQUIRES_NEW).
         persistenceService.save(command);
 
         return new SyncCommandResponse(
                 command.getClientOperationId(),
-                SyncCommandStatus.PROCESSED,
-                SyncResultReferenceType.SALE,
-                result.saleId(),
-                result.message()
+                status,
+                null,
+                null,
+                message
         );
     }
 
-    private SyncCommandResponse processCreateExpense(ClientSyncCommandEntity command) {
-        CreateExpenseRequest payload = readPayload(command.getPayload(), CreateExpenseRequest.class);
-
-        CreateExpenseResponse result = expenseApplicationService.createExpense(payload);
-
-        command.setStatus(SyncCommandStatus.PROCESSED);
-        command.setProcessedAt(LocalDateTime.now());
-        command.setResultReferenceType(SyncResultReferenceType.EXPENSE);
-        command.setResultReferenceId(result.expenseId());
-        persistenceService.save(command);
-
+    private SyncCommandResponse duplicateResponse(ClientSyncCommandEntity command) {
         return new SyncCommandResponse(
                 command.getClientOperationId(),
-                SyncCommandStatus.PROCESSED,
-                SyncResultReferenceType.EXPENSE,
-                result.expenseId(),
-                result.message()
+                SyncCommandStatus.DUPLICATE,
+                command.getResultReferenceType(),
+                command.getResultReferenceId(),
+                "Command already processed"
         );
     }
 
-    private <T> T readPayload(String payload, Class<T> clazz) {
-        try {
-            return objectMapper.readValue(payload, clazz);
-        } catch (JsonProcessingException ex) {
-            throw new IllegalArgumentException("Invalid payload for " + clazz.getSimpleName());
-        }
+    private boolean isTerminal(SyncCommandStatus status) {
+        return status == SyncCommandStatus.PROCESSED
+                || status == SyncCommandStatus.REJECTED
+                || status == SyncCommandStatus.DUPLICATE;
     }
 }

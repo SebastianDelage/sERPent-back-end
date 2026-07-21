@@ -7,10 +7,10 @@ import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.domain.enums.MovementType;
 import com.empresa.serpent.inventory.repository.InventoryMovementRepository;
 import com.empresa.serpent.inventory.repository.InventoryStockSnapshotRepository;
+import com.empresa.serpent.shared.exception.InsufficientStockException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -20,6 +20,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,6 +35,9 @@ class InventoryStockSnapshotServiceTest {
 
     @Mock
     private InventoryMovementRepository inventoryMovementRepository;
+
+    @Mock
+    private InventoryStockSnapshotSeedService inventoryStockSnapshotSeedService;
 
     @InjectMocks
     private InventoryStockSnapshotService inventoryStockSnapshotService;
@@ -64,167 +69,142 @@ class InventoryStockSnapshotServiceTest {
     }
 
     @Test
-    void applyMovement_shouldCreateSnapshotWhenItDoesNotExist_andAddStockForInMovement() {
+    void applyMovement_shouldIncreaseStockForInMovementWhenRowExists() {
         InventoryMovementEntity movement = buildMovement(
-                100L,
-                MovementType.IN,
-                "10.000",
-                product,
-                warehouseOne,
+                100L, MovementType.IN, "10.000", product, warehouseOne,
                 LocalDateTime.of(2026, 3, 13, 10, 0)
         );
 
-        when(inventoryStockSnapshotRepository.findByProductIdAndWarehouseId(1L, 10L))
-                .thenReturn(Optional.empty());
-        when(inventoryStockSnapshotRepository.save(any(InventoryStockSnapshotEntity.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(inventoryStockSnapshotRepository.increaseStock(1L, 10L, new BigDecimal("10.000"), 100L))
+                .thenReturn(1);
 
         inventoryStockSnapshotService.applyMovement(movement);
 
-        ArgumentCaptor<InventoryStockSnapshotEntity> captor =
-                ArgumentCaptor.forClass(InventoryStockSnapshotEntity.class);
-
-        verify(inventoryStockSnapshotRepository).save(captor.capture());
-
-        InventoryStockSnapshotEntity saved = captor.getValue();
-
-        assertEquals(product.getId(), saved.getProduct().getId());
-        assertEquals(warehouseOne.getId(), saved.getWarehouse().getId());
-        assertEquals(new BigDecimal("10.000"), saved.getCurrentStock());
-        assertEquals(100L, saved.getLastMovementId());
+        verify(inventoryStockSnapshotRepository).increaseStock(1L, 10L, new BigDecimal("10.000"), 100L);
+        verify(inventoryStockSnapshotSeedService, never()).seedZeroSnapshot(any(), any());
     }
 
     @Test
-    void applyMovement_shouldSubtractStockForOutMovement() {
+    void applyMovement_shouldSeedZeroRowAndReapplyWhenRowDoesNotExistForIncrease() {
+        InventoryMovementEntity movement = buildMovement(
+                100L, MovementType.IN, "10.000", product, warehouseOne,
+                LocalDateTime.of(2026, 3, 13, 10, 0)
+        );
+
+        // First UPDATE matches no row (snapshot missing), then after seeding it succeeds.
+        when(inventoryStockSnapshotRepository.increaseStock(1L, 10L, new BigDecimal("10.000"), 100L))
+                .thenReturn(0, 1);
+
+        inventoryStockSnapshotService.applyMovement(movement);
+
+        verify(inventoryStockSnapshotSeedService).seedZeroSnapshot(1L, 10L);
+        verify(inventoryStockSnapshotRepository, times(2))
+                .increaseStock(1L, 10L, new BigDecimal("10.000"), 100L);
+    }
+
+    @Test
+    void applyMovement_shouldDecreaseWithFloorForOutMovementWhenStockIsSufficient() {
         InventoryStockSnapshotEntity existingSnapshot = InventoryStockSnapshotEntity.builder()
-                .id(1L)
-                .product(product)
-                .warehouse(warehouseOne)
-                .currentStock(new BigDecimal("10.000"))
-                .lastMovementId(90L)
-                .build();
+                .id(1L).product(product).warehouse(warehouseOne)
+                .currentStock(new BigDecimal("10.000")).lastMovementId(90L).build();
 
         InventoryMovementEntity movement = buildMovement(
-                101L,
-                MovementType.OUT,
-                "3.000",
-                product,
-                warehouseOne,
+                101L, MovementType.OUT, "3.000", product, warehouseOne,
                 LocalDateTime.of(2026, 3, 13, 11, 0)
         );
 
-        when(inventoryStockSnapshotRepository.findByProductIdAndWarehouseId(1L, 10L))
-                .thenReturn(Optional.of(existingSnapshot));
-        when(inventoryStockSnapshotRepository.save(any(InventoryStockSnapshotEntity.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(inventoryStockSnapshotRepository.decreaseStockWithFloor(1L, 10L, new BigDecimal("3.000"), 101L))
+                .thenReturn(1);
 
         inventoryStockSnapshotService.applyMovement(movement);
 
-        ArgumentCaptor<InventoryStockSnapshotEntity> captor =
-                ArgumentCaptor.forClass(InventoryStockSnapshotEntity.class);
-
-        verify(inventoryStockSnapshotRepository).save(captor.capture());
-
-        InventoryStockSnapshotEntity saved = captor.getValue();
-
-        assertEquals(new BigDecimal("7.000"), saved.getCurrentStock());
-        assertEquals(101L, saved.getLastMovementId());
+        verify(inventoryStockSnapshotRepository).decreaseStockWithFloor(1L, 10L, new BigDecimal("3.000"), 101L);
+        verify(inventoryStockSnapshotSeedService, never()).seedZeroSnapshot(any(), any());
+        // The row is never seeded nor read for a vendible OUT: the conditional UPDATE is the guard.
+        verifyNoMoreInteractions(inventoryStockSnapshotSeedService);
+        assertThat(existingSnapshot.getCurrentStock()).isEqualByComparingTo("10.000");
     }
 
     @Test
-    void applyMovement_shouldHandleTransferOutAndTransferInCorrectly() {
-        InventoryStockSnapshotEntity sourceSnapshot = InventoryStockSnapshotEntity.builder()
-                .id(1L)
-                .product(product)
-                .warehouse(warehouseOne)
-                .currentStock(new BigDecimal("8.000"))
-                .lastMovementId(80L)
-                .build();
-
-        InventoryMovementEntity transferOut = buildMovement(
-                102L,
-                MovementType.TRANSFER_OUT,
-                "2.000",
-                product,
-                warehouseOne,
-                LocalDateTime.of(2026, 3, 13, 12, 0)
+    void applyMovement_shouldThrowInsufficientStockForOutMovementWhenFloorRejects() {
+        InventoryMovementEntity movement = buildMovement(
+                101L, MovementType.OUT, "999.000", product, warehouseOne,
+                LocalDateTime.of(2026, 3, 13, 11, 0)
         );
 
-        when(inventoryStockSnapshotRepository.findByProductIdAndWarehouseId(1L, 10L))
-                .thenReturn(Optional.of(sourceSnapshot));
-        when(inventoryStockSnapshotRepository.save(any(InventoryStockSnapshotEntity.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        // Conditional UPDATE matched no row: not enough stock (or no row). Real oversell guard.
+        when(inventoryStockSnapshotRepository.decreaseStockWithFloor(1L, 10L, new BigDecimal("999.000"), 101L))
+                .thenReturn(0);
 
-        inventoryStockSnapshotService.applyMovement(transferOut);
+        assertThatThrownBy(() -> inventoryStockSnapshotService.applyMovement(movement))
+                .isInstanceOf(InsufficientStockException.class)
+                .hasMessageContaining("No hay stock suficiente")
+                .hasMessageContaining("Pollo entero");
 
-        assertEquals(new BigDecimal("6.000"), sourceSnapshot.getCurrentStock());
-        assertEquals(102L, sourceSnapshot.getLastMovementId());
+        verify(inventoryStockSnapshotSeedService, never()).seedZeroSnapshot(any(), any());
+    }
 
+    @Test
+    void applyMovement_shouldDecreaseWithoutFloorForAdjustmentOut() {
+        InventoryMovementEntity movement = buildMovement(
+                105L, MovementType.ADJUSTMENT_OUT, "4.000", product, warehouseOne,
+                LocalDateTime.of(2026, 3, 13, 13, 30)
+        );
+
+        when(inventoryStockSnapshotRepository.decreaseStockWithoutFloor(1L, 10L, new BigDecimal("4.000"), 105L))
+                .thenReturn(1);
+
+        inventoryStockSnapshotService.applyMovement(movement);
+
+        verify(inventoryStockSnapshotRepository).decreaseStockWithoutFloor(1L, 10L, new BigDecimal("4.000"), 105L);
+        verify(inventoryStockSnapshotRepository, never()).decreaseStockWithFloor(any(), any(), any(), any());
+        verify(inventoryStockSnapshotSeedService, never()).seedZeroSnapshot(any(), any());
+    }
+
+    @Test
+    void applyMovement_shouldHandleTransferOutWithFloorAndTransferInAsIncrease() {
+        InventoryMovementEntity transferOut = buildMovement(
+                102L, MovementType.TRANSFER_OUT, "2.000", product, warehouseOne,
+                LocalDateTime.of(2026, 3, 13, 12, 0)
+        );
         InventoryMovementEntity transferIn = buildMovement(
-                103L,
-                MovementType.TRANSFER_IN,
-                "2.000",
-                product,
-                warehouseTwo,
+                103L, MovementType.TRANSFER_IN, "2.000", product, warehouseTwo,
                 LocalDateTime.of(2026, 3, 13, 12, 1)
         );
 
-        when(inventoryStockSnapshotRepository.findByProductIdAndWarehouseId(1L, 20L))
-                .thenReturn(Optional.empty());
+        when(inventoryStockSnapshotRepository.decreaseStockWithFloor(1L, 10L, new BigDecimal("2.000"), 102L))
+                .thenReturn(1);
+        when(inventoryStockSnapshotRepository.increaseStock(1L, 20L, new BigDecimal("2.000"), 103L))
+                .thenReturn(1);
 
+        inventoryStockSnapshotService.applyMovement(transferOut);
         inventoryStockSnapshotService.applyMovement(transferIn);
 
-        ArgumentCaptor<InventoryStockSnapshotEntity> captor =
-                ArgumentCaptor.forClass(InventoryStockSnapshotEntity.class);
-
-        verify(inventoryStockSnapshotRepository, times(2)).save(captor.capture());
-
-        List<InventoryStockSnapshotEntity> savedSnapshots = captor.getAllValues();
-        InventoryStockSnapshotEntity targetSaved = savedSnapshots.get(1);
-
-        assertEquals(new BigDecimal("2.000"), targetSaved.getCurrentStock());
-        assertEquals(103L, targetSaved.getLastMovementId());
-        assertEquals(warehouseTwo.getId(), targetSaved.getWarehouse().getId());
+        verify(inventoryStockSnapshotRepository).decreaseStockWithFloor(1L, 10L, new BigDecimal("2.000"), 102L);
+        verify(inventoryStockSnapshotRepository).increaseStock(1L, 20L, new BigDecimal("2.000"), 103L);
+        verify(inventoryStockSnapshotSeedService, never()).seedZeroSnapshot(any(), any());
     }
 
     @Test
-    void applyMovement_shouldAddStockForReturnIn() {
-        InventoryStockSnapshotEntity snapshot = InventoryStockSnapshotEntity.builder()
-                .id(1L)
-                .product(product)
-                .warehouse(warehouseOne)
-                .currentStock(new BigDecimal("5.000"))
-                .lastMovementId(70L)
-                .build();
-
+    void applyMovement_shouldIncreaseStockForReturnIn() {
         InventoryMovementEntity movement = buildMovement(
-                104L,
-                MovementType.RETURN_IN,
-                "1.000",
-                product,
-                warehouseOne,
+                104L, MovementType.RETURN_IN, "1.000", product, warehouseOne,
                 LocalDateTime.of(2026, 3, 13, 13, 0)
         );
 
-        when(inventoryStockSnapshotRepository.findByProductIdAndWarehouseId(1L, 10L))
-                .thenReturn(Optional.of(snapshot));
-        when(inventoryStockSnapshotRepository.save(any(InventoryStockSnapshotEntity.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(inventoryStockSnapshotRepository.increaseStock(1L, 10L, new BigDecimal("1.000"), 104L))
+                .thenReturn(1);
 
         inventoryStockSnapshotService.applyMovement(movement);
 
-        assertEquals(new BigDecimal("6.000"), snapshot.getCurrentStock());
-        assertEquals(104L, snapshot.getLastMovementId());
+        verify(inventoryStockSnapshotRepository).increaseStock(1L, 10L, new BigDecimal("1.000"), 104L);
+        verify(inventoryStockSnapshotSeedService, never()).seedZeroSnapshot(any(), any());
     }
 
     @Test
     void applyMovement_shouldThrowWhenMovementIdIsNull() {
         InventoryMovementEntity movement = buildMovement(
-                null,
-                MovementType.IN,
-                "5.000",
-                product,
-                warehouseOne,
+                null, MovementType.IN, "5.000", product, warehouseOne,
                 LocalDateTime.of(2026, 3, 13, 14, 0)
         );
 
@@ -234,35 +214,23 @@ class InventoryStockSnapshotServiceTest {
         );
 
         assertEquals("Inventory movement id cannot be null", exception.getMessage());
-        verify(inventoryStockSnapshotRepository, never()).save(any());
+        verify(inventoryStockSnapshotRepository, never()).increaseStock(any(), any(), any(), any());
+        verify(inventoryStockSnapshotRepository, never()).decreaseStockWithFloor(any(), any(), any(), any());
+        verify(inventoryStockSnapshotRepository, never()).decreaseStockWithoutFloor(any(), any(), any(), any());
     }
 
     @Test
     void rebuildSnapshots_shouldRebuildFromAllMovementsOrderedByCreatedAtAndId() {
         InventoryMovementEntity movement1 = buildMovement(
-                201L,
-                MovementType.IN,
-                "10.000",
-                product,
-                warehouseOne,
+                201L, MovementType.IN, "10.000", product, warehouseOne,
                 LocalDateTime.of(2026, 3, 13, 9, 0)
         );
-
         InventoryMovementEntity movement2 = buildMovement(
-                202L,
-                MovementType.OUT,
-                "4.000",
-                product,
-                warehouseOne,
+                202L, MovementType.OUT, "4.000", product, warehouseOne,
                 LocalDateTime.of(2026, 3, 13, 10, 0)
         );
-
         InventoryMovementEntity movement3 = buildMovement(
-                203L,
-                MovementType.TRANSFER_IN,
-                "2.000",
-                product,
-                warehouseTwo,
+                203L, MovementType.TRANSFER_IN, "2.000", product, warehouseTwo,
                 LocalDateTime.of(2026, 3, 13, 11, 0)
         );
 
@@ -290,6 +258,10 @@ class InventoryStockSnapshotServiceTest {
         verify(inventoryStockSnapshotRepository).deleteAllInBatch();
         verify(inventoryMovementRepository).findAll();
         verify(inventoryStockSnapshotRepository, times(3)).save(any(InventoryStockSnapshotEntity.class));
+        // Rebuild is a single-threaded reconstruction: it uses read-modify-write, not the atomic
+        // conditional UPDATE, and therefore never seeds via the REQUIRES_NEW collaborator.
+        verify(inventoryStockSnapshotSeedService, never()).seedZeroSnapshot(any(), any());
+        verify(inventoryStockSnapshotRepository, never()).increaseStock(any(), any(), any(), any());
     }
 
     private InventoryMovementEntity buildMovement(

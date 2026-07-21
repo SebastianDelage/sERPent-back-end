@@ -1,5 +1,6 @@
 package com.empresa.serpent.sync.service;
 
+import com.empresa.serpent.shared.exception.InsufficientStockException;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.sync.domain.entity.ClientSyncCommandEntity;
 import com.empresa.serpent.sync.domain.enums.SyncCommandStatus;
@@ -8,27 +9,19 @@ import com.empresa.serpent.sync.domain.enums.SyncResultReferenceType;
 import com.empresa.serpent.sync.repository.ClientSyncCommandRepository;
 import com.empresa.serpent.sync.web.dto.request.SyncCommandRequest;
 import com.empresa.serpent.sync.web.dto.response.SyncCommandResponse;
-import com.empresa.serpent.transactions.service.ExpenseApplicationService;
-import com.empresa.serpent.transactions.service.SaleApplicationService;
-import com.empresa.serpent.transactions.web.dto.request.CreateExpenseRequest;
-import com.empresa.serpent.transactions.web.dto.request.CreateSaleItemRequest;
-import com.empresa.serpent.transactions.web.dto.request.CreateSaleRequest;
-import com.empresa.serpent.transactions.web.dto.response.CreateExpenseResponse;
-import com.empresa.serpent.transactions.web.dto.response.CreateSaleResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,360 +34,210 @@ class SyncCommandApplicationServiceTest {
     private ClientSyncCommandPersistenceService persistenceService;
 
     @Mock
-    private SaleApplicationService saleApplicationService;
+    private SyncCommandResultService resultService;
 
-    @Mock
-    private ExpenseApplicationService expenseApplicationService;
-
-    private ObjectMapper objectMapper;
     private SyncCommandApplicationService syncCommandApplicationService;
 
     @BeforeEach
     void setUp() {
-        objectMapper = new ObjectMapper();
         syncCommandApplicationService = new SyncCommandApplicationService(
                 repository,
                 persistenceService,
-                objectMapper,
-                saleApplicationService,
-                expenseApplicationService
+                resultService
         );
     }
 
+    private SyncCommandRequest saleRequest(String operationId) {
+        return new SyncCommandRequest("device-01", operationId, SyncCommandType.CREATE_SALE, "{}");
+    }
+
+    private void stubReceivedInsert(long id) {
+        when(persistenceService.save(any(ClientSyncCommandEntity.class)))
+                .thenAnswer(invocation -> {
+                    ClientSyncCommandEntity entity = invocation.getArgument(0);
+                    if (entity.getId() == null) {
+                        entity.setId(id);
+                    }
+                    return entity;
+                });
+    }
+
     @Test
-    @DisplayName("Should process CREATE_SALE command successfully")
-    void shouldProcessCreateSaleCommandSuccessfully() throws Exception {
-        CreateSaleRequest salePayload = new CreateSaleRequest(
-                1L,
-                "Consumidor Final",
-                "12345678",
-                "SYNC-0001",
-                1L,
-                1L,
-                1L,
-                "Sale synced from offline client",
-                List.of(
-                        new CreateSaleItemRequest(
-                                1L,
-                                "Pollo entero",
-                                new BigDecimal("1.000"),
-                                new BigDecimal("4500.0000")
-                        )
-                )
-        );
-
-        String payloadJson = objectMapper.writeValueAsString(salePayload);
-
-        SyncCommandRequest request = new SyncCommandRequest(
-                "device-01",
-                "sale-0001",
-                SyncCommandType.CREATE_SALE,
-                payloadJson
-        );
+    @DisplayName("Processes a new CREATE_SALE and persists RECEIVED once (PROCESSED is written by the result service)")
+    void shouldProcessNewCreateSale() {
+        SyncCommandRequest request = saleRequest("sale-0001");
 
         when(repository.findByClientIdAndClientOperationId("device-01", "sale-0001"))
                 .thenReturn(Optional.empty());
-
-        when(persistenceService.save(any(ClientSyncCommandEntity.class)))
-                .thenAnswer(invocation -> {
-                    ClientSyncCommandEntity entity = invocation.getArgument(0);
-                    if (entity.getId() == null) {
-                        entity.setId(1L);
-                    }
-                    if (entity.getReceivedAt() == null) {
-                        entity.setReceivedAt(LocalDateTime.now());
-                    }
-                    return entity;
-                });
-
-        when(saleApplicationService.createSale(any(CreateSaleRequest.class)))
-                .thenReturn(new CreateSaleResponse(
-                        4L,
-                        2L,
-                        "CONFIRMED",
-                        "Sale created successfully"
-                ));
+        stubReceivedInsert(1L);
+        when(resultService.processCreateSale(1L))
+                .thenReturn(new SyncCommandResponse(
+                        "sale-0001", SyncCommandStatus.PROCESSED,
+                        SyncResultReferenceType.SALE, 2L, "Sale created successfully"));
 
         SyncCommandResponse response = syncCommandApplicationService.process(request);
 
-        assertThat(response).isNotNull();
-        assertThat(response.clientOperationId()).isEqualTo("sale-0001");
         assertThat(response.status()).isEqualTo(SyncCommandStatus.PROCESSED);
         assertThat(response.resultReferenceType()).isEqualTo(SyncResultReferenceType.SALE);
         assertThat(response.resultReferenceId()).isEqualTo(2L);
-        assertThat(response.message()).isEqualTo("Sale created successfully");
 
-        verify(repository).findByClientIdAndClientOperationId("device-01", "sale-0001");
-        verify(persistenceService, times(2)).save(any(ClientSyncCommandEntity.class));
-
-        ArgumentCaptor<CreateSaleRequest> payloadCaptor = ArgumentCaptor.forClass(CreateSaleRequest.class);
-        verify(saleApplicationService).createSale(payloadCaptor.capture());
-
-        CreateSaleRequest capturedPayload = payloadCaptor.getValue();
-        assertThat(capturedPayload.customerName()).isEqualTo("Consumidor Final");
-        assertThat(capturedPayload.invoiceNumber()).isEqualTo("SYNC-0001");
-        assertThat(capturedPayload.items()).hasSize(1);
-        assertThat(capturedPayload.items().get(0).productId()).isEqualTo(1L);
+        // Defect 2 made visible: RECEIVED insert is the ONLY persistenceService.save on success.
+        verify(persistenceService, times(1)).save(any(ClientSyncCommandEntity.class));
+        verify(resultService).processCreateSale(1L);
     }
 
     @Test
-    @DisplayName("Should process CREATE_EXPENSE command successfully")
-    void shouldProcessCreateExpenseCommandSuccessfully() throws Exception {
-        CreateExpenseRequest expensePayload = new CreateExpenseRequest(
-                1L,
-                1L,
-                1L,
-                1L,
-                new BigDecimal("2500.0000"),
-                "SYNC-EXP-001",
-                "Expense synced from offline client",
-                false,
-                "Offline expense"
-        );
-
-        String payloadJson = objectMapper.writeValueAsString(expensePayload);
-
-        SyncCommandRequest request = new SyncCommandRequest(
-                "device-01",
-                "expense-0001",
-                SyncCommandType.CREATE_EXPENSE,
-                payloadJson
-        );
-
-        when(repository.findByClientIdAndClientOperationId("device-01", "expense-0001"))
-                .thenReturn(Optional.empty());
-
-        when(persistenceService.save(any(ClientSyncCommandEntity.class)))
-                .thenAnswer(invocation -> {
-                    ClientSyncCommandEntity entity = invocation.getArgument(0);
-                    if (entity.getId() == null) {
-                        entity.setId(2L);
-                    }
-                    if (entity.getReceivedAt() == null) {
-                        entity.setReceivedAt(LocalDateTime.now());
-                    }
-                    return entity;
-                });
-
-        when(expenseApplicationService.createExpense(any(CreateExpenseRequest.class)))
-                .thenReturn(new CreateExpenseResponse(
-                        5L,
-                        2L,
-                        "CONFIRMED",
-                        "Expense created successfully"
-                ));
-
-        SyncCommandResponse response = syncCommandApplicationService.process(request);
-
-        assertThat(response).isNotNull();
-        assertThat(response.clientOperationId()).isEqualTo("expense-0001");
-        assertThat(response.status()).isEqualTo(SyncCommandStatus.PROCESSED);
-        assertThat(response.resultReferenceType()).isEqualTo(SyncResultReferenceType.EXPENSE);
-        assertThat(response.resultReferenceId()).isEqualTo(2L);
-        assertThat(response.message()).isEqualTo("Expense created successfully");
-
-        verify(repository).findByClientIdAndClientOperationId("device-01", "expense-0001");
-        verify(persistenceService, times(2)).save(any(ClientSyncCommandEntity.class));
-
-        ArgumentCaptor<CreateExpenseRequest> payloadCaptor = ArgumentCaptor.forClass(CreateExpenseRequest.class);
-        verify(expenseApplicationService).createExpense(payloadCaptor.capture());
-
-        CreateExpenseRequest capturedPayload = payloadCaptor.getValue();
-        assertThat(capturedPayload.receiptNumber()).isEqualTo("SYNC-EXP-001");
-        assertThat(capturedPayload.total()).isEqualByComparingTo("2500.0000");
-    }
-
-    @Test
-    @DisplayName("Should return duplicate when command already exists")
-    void shouldReturnDuplicateWhenCommandAlreadyExists() {
+    @DisplayName("Returns DUPLICATE for a terminal (PROCESSED) command without reprocessing")
+    void shouldReturnDuplicateWhenExistingIsTerminal() {
         ClientSyncCommandEntity existing = ClientSyncCommandEntity.builder()
-                .id(10L)
-                .clientId("device-01")
-                .clientOperationId("sale-0001")
+                .id(10L).clientId("device-01").clientOperationId("sale-0001")
                 .commandType(SyncCommandType.CREATE_SALE)
                 .status(SyncCommandStatus.PROCESSED)
-                .payload("{}")
-                .resultReferenceType(SyncResultReferenceType.SALE)
-                .resultReferenceId(2L)
-                .build();
-
-        SyncCommandRequest request = new SyncCommandRequest(
-                "device-01",
-                "sale-0001",
-                SyncCommandType.CREATE_SALE,
-                "{}"
-        );
+                .resultReferenceType(SyncResultReferenceType.SALE).resultReferenceId(2L)
+                .payload("{}").build();
 
         when(repository.findByClientIdAndClientOperationId("device-01", "sale-0001"))
                 .thenReturn(Optional.of(existing));
 
-        SyncCommandResponse response = syncCommandApplicationService.process(request);
+        SyncCommandResponse response = syncCommandApplicationService.process(saleRequest("sale-0001"));
 
-        assertThat(response).isNotNull();
-        assertThat(response.clientOperationId()).isEqualTo("sale-0001");
         assertThat(response.status()).isEqualTo(SyncCommandStatus.DUPLICATE);
-        assertThat(response.resultReferenceType()).isEqualTo(SyncResultReferenceType.SALE);
         assertThat(response.resultReferenceId()).isEqualTo(2L);
-        assertThat(response.message()).isEqualTo("Command already processed");
-
-        verify(repository).findByClientIdAndClientOperationId("device-01", "sale-0001");
         verifyNoInteractions(persistenceService);
-        verifyNoInteractions(saleApplicationService);
-        verifyNoInteractions(expenseApplicationService);
+        verifyNoInteractions(resultService);
     }
 
     @Test
-    @DisplayName("Should reject when payload is invalid")
-    void shouldRejectWhenPayloadIsInvalid() {
-        SyncCommandRequest request = new SyncCommandRequest(
-                "device-01",
-                "sale-bad-payload-1",
-                SyncCommandType.CREATE_SALE,
-                "{\"createdByUserId\":1,\"warehouseId\":1,\"items\":["
-        );
+    @DisplayName("Reprocesses (does not duplicate) a command left in RECEIVED, reusing the same row")
+    void shouldReprocessWhenExistingIsReceived() {
+        ClientSyncCommandEntity orphan = ClientSyncCommandEntity.builder()
+                .id(15L).clientId("device-01").clientOperationId("sale-orphan")
+                .commandType(SyncCommandType.CREATE_SALE)
+                .status(SyncCommandStatus.RECEIVED)
+                .payload("{}").build();
 
-        when(repository.findByClientIdAndClientOperationId("device-01", "sale-bad-payload-1"))
+        when(repository.findByClientIdAndClientOperationId("device-01", "sale-orphan"))
+                .thenReturn(Optional.of(orphan));
+        when(resultService.processCreateSale(15L))
+                .thenReturn(new SyncCommandResponse(
+                        "sale-orphan", SyncCommandStatus.PROCESSED,
+                        SyncResultReferenceType.SALE, 3L, "Sale created successfully"));
+
+        SyncCommandResponse response = syncCommandApplicationService.process(saleRequest("sale-orphan"));
+
+        assertThat(response.status()).isEqualTo(SyncCommandStatus.PROCESSED);
+        // Reuses the existing row: no new RECEIVED insert.
+        verify(persistenceService, never()).save(any(ClientSyncCommandEntity.class));
+        verify(resultService).processCreateSale(15L);
+    }
+
+    @Test
+    @DisplayName("Reprocesses a FAILED command (FAILED is the only retriable state)")
+    void shouldReprocessWhenExistingIsFailed() {
+        ClientSyncCommandEntity failed = ClientSyncCommandEntity.builder()
+                .id(16L).clientId("device-01").clientOperationId("sale-failed")
+                .commandType(SyncCommandType.CREATE_SALE)
+                .status(SyncCommandStatus.FAILED)
+                .payload("{}").build();
+
+        when(repository.findByClientIdAndClientOperationId("device-01", "sale-failed"))
+                .thenReturn(Optional.of(failed));
+        when(resultService.processCreateSale(16L))
+                .thenReturn(new SyncCommandResponse(
+                        "sale-failed", SyncCommandStatus.PROCESSED,
+                        SyncResultReferenceType.SALE, 4L, "Sale created successfully"));
+
+        SyncCommandResponse response = syncCommandApplicationService.process(saleRequest("sale-failed"));
+
+        assertThat(response.status()).isEqualTo(SyncCommandStatus.PROCESSED);
+        verify(resultService).processCreateSale(16L);
+    }
+
+    @Test
+    @DisplayName("Defect 1: a BusinessException (insufficient stock) is REJECTED, not FAILED")
+    void shouldRejectWhenResultServiceThrowsBusinessException() {
+        SyncCommandRequest request = saleRequest("sale-stock-error");
+
+        when(repository.findByClientIdAndClientOperationId("device-01", "sale-stock-error"))
                 .thenReturn(Optional.empty());
-
-        when(persistenceService.save(any(ClientSyncCommandEntity.class)))
-                .thenAnswer(invocation -> {
-                    ClientSyncCommandEntity entity = invocation.getArgument(0);
-                    if (entity.getId() == null) {
-                        entity.setId(11L);
-                    }
-                    return entity;
-                });
+        stubReceivedInsert(20L);
+        when(resultService.processCreateSale(20L))
+                .thenThrow(new InsufficientStockException(
+                        "No hay stock suficiente de \"Pollo entero\" en el depósito seleccionado para completar la operación."));
 
         SyncCommandResponse response = syncCommandApplicationService.process(request);
 
-        assertThat(response).isNotNull();
-        assertThat(response.clientOperationId()).isEqualTo("sale-bad-payload-1");
         assertThat(response.status()).isEqualTo(SyncCommandStatus.REJECTED);
-        assertThat(response.resultReferenceType()).isNull();
+        assertThat(response.message()).contains("No hay stock suficiente");
         assertThat(response.resultReferenceId()).isNull();
-        assertThat(response.message()).isEqualTo("Invalid payload for CreateSaleRequest");
 
-        verify(repository).findByClientIdAndClientOperationId("device-01", "sale-bad-payload-1");
-        verify(persistenceService, times(2)).save(any(ClientSyncCommandEntity.class));
-        verifyNoInteractions(saleApplicationService);
-        verifyNoInteractions(expenseApplicationService);
+        // The command is persisted terminally as REJECTED (RECEIVED insert + REJECTED marking).
+        ArgumentCaptor<ClientSyncCommandEntity> captor = ArgumentCaptor.forClass(ClientSyncCommandEntity.class);
+        verify(persistenceService, times(2)).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(SyncCommandStatus.REJECTED);
     }
 
     @Test
-    @DisplayName("Should reject when sale business validation fails")
-    void shouldRejectWhenSaleBusinessValidationFails() throws Exception {
-        CreateSaleRequest salePayload = new CreateSaleRequest(
-                1L,
-                "Consumidor Final",
-                "12345678",
-                "SYNC-0002",
-                1L,
-                1L,
-                1L,
-                "Sale synced from offline client",
-                List.of(
-                        new CreateSaleItemRequest(
-                                1L,
-                                "Pollo entero",
-                                new BigDecimal("9999.000"),
-                                new BigDecimal("4500.0000")
-                        )
-                )
-        );
+    @DisplayName("Defect 1: a NotFoundException is REJECTED")
+    void shouldRejectWhenResultServiceThrowsNotFound() {
+        SyncCommandRequest request =
+                new SyncCommandRequest("device-01", "expense-missing-cat", SyncCommandType.CREATE_EXPENSE, "{}");
 
-        String payloadJson = objectMapper.writeValueAsString(salePayload);
-
-        SyncCommandRequest request = new SyncCommandRequest(
-                "device-01",
-                "sale-stock-error-1",
-                SyncCommandType.CREATE_SALE,
-                payloadJson
-        );
-
-        when(repository.findByClientIdAndClientOperationId("device-01", "sale-stock-error-1"))
+        when(repository.findByClientIdAndClientOperationId("device-01", "expense-missing-cat"))
                 .thenReturn(Optional.empty());
-
-        when(persistenceService.save(any(ClientSyncCommandEntity.class)))
-                .thenAnswer(invocation -> {
-                    ClientSyncCommandEntity entity = invocation.getArgument(0);
-                    if (entity.getId() == null) {
-                        entity.setId(12L);
-                    }
-                    return entity;
-                });
-
-        when(saleApplicationService.createSale(any(CreateSaleRequest.class)))
-                .thenThrow(new IllegalArgumentException(
-                        "Insufficient stock for product 1 in warehouse 1. Current stock: 29.000, requested: 9999"
-                ));
-
-        SyncCommandResponse response = syncCommandApplicationService.process(request);
-
-        assertThat(response).isNotNull();
-        assertThat(response.clientOperationId()).isEqualTo("sale-stock-error-1");
-        assertThat(response.status()).isEqualTo(SyncCommandStatus.REJECTED);
-        assertThat(response.resultReferenceType()).isNull();
-        assertThat(response.resultReferenceId()).isNull();
-        assertThat(response.message())
-                .isEqualTo("Insufficient stock for product 1 in warehouse 1. Current stock: 29.000, requested: 9999");
-
-        verify(repository).findByClientIdAndClientOperationId("device-01", "sale-stock-error-1");
-        verify(persistenceService, times(2)).save(any(ClientSyncCommandEntity.class));
-        verify(saleApplicationService).createSale(any(CreateSaleRequest.class));
-        verifyNoInteractions(expenseApplicationService);
-    }
-
-    @Test
-    @DisplayName("Should reject when expense business validation fails")
-    void shouldRejectWhenExpenseBusinessValidationFails() throws Exception {
-        CreateExpenseRequest expensePayload = new CreateExpenseRequest(
-                1L,
-                1L,
-                1L,
-                999L,
-                new BigDecimal("2500.0000"),
-                "SYNC-EXP-002",
-                "Expense synced from offline client",
-                false,
-                "Offline expense"
-        );
-
-        String payloadJson = objectMapper.writeValueAsString(expensePayload);
-
-        SyncCommandRequest request = new SyncCommandRequest(
-                "device-01",
-                "expense-category-error-1",
-                SyncCommandType.CREATE_EXPENSE,
-                payloadJson
-        );
-
-        when(repository.findByClientIdAndClientOperationId("device-01", "expense-category-error-1"))
-                .thenReturn(Optional.empty());
-
-        when(persistenceService.save(any(ClientSyncCommandEntity.class)))
-                .thenAnswer(invocation -> {
-                    ClientSyncCommandEntity entity = invocation.getArgument(0);
-                    if (entity.getId() == null) {
-                        entity.setId(13L);
-                    }
-                    return entity;
-                });
-
-        when(expenseApplicationService.createExpense(any(CreateExpenseRequest.class)))
+        stubReceivedInsert(21L);
+        when(resultService.processCreateExpense(21L))
                 .thenThrow(new NotFoundException("Expense category not found: 999"));
 
         SyncCommandResponse response = syncCommandApplicationService.process(request);
 
-        assertThat(response).isNotNull();
-        assertThat(response.clientOperationId()).isEqualTo("expense-category-error-1");
         assertThat(response.status()).isEqualTo(SyncCommandStatus.REJECTED);
-        assertThat(response.resultReferenceType()).isNull();
-        assertThat(response.resultReferenceId()).isNull();
         assertThat(response.message()).isEqualTo("Expense category not found: 999");
+    }
 
-        verify(repository).findByClientIdAndClientOperationId("device-01", "expense-category-error-1");
-        verify(persistenceService, times(2)).save(any(ClientSyncCommandEntity.class));
-        verify(expenseApplicationService).createExpense(any(CreateExpenseRequest.class));
-        verifyNoInteractions(saleApplicationService);
+    @Test
+    @DisplayName("An unexpected technical exception is FAILED (the only retriable state)")
+    void shouldFailWhenResultServiceThrowsUnexpected() {
+        SyncCommandRequest request = saleRequest("sale-boom");
+
+        when(repository.findByClientIdAndClientOperationId("device-01", "sale-boom"))
+                .thenReturn(Optional.empty());
+        stubReceivedInsert(22L);
+        when(resultService.processCreateSale(22L))
+                .thenThrow(new RuntimeException("connection reset"));
+
+        SyncCommandResponse response = syncCommandApplicationService.process(request);
+
+        assertThat(response.status()).isEqualTo(SyncCommandStatus.FAILED);
+        assertThat(response.message()).isEqualTo("connection reset");
+
+        ArgumentCaptor<ClientSyncCommandEntity> captor = ArgumentCaptor.forClass(ClientSyncCommandEntity.class);
+        verify(persistenceService, times(2)).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(SyncCommandStatus.FAILED);
+    }
+
+    @Test
+    @DisplayName("A concurrent-insert constraint collision is resolved as DUPLICATE, not FAILED")
+    void shouldReturnDuplicateOnConcurrentInsertCollision() {
+        SyncCommandRequest request = saleRequest("sale-race");
+
+        ClientSyncCommandEntity concurrent = ClientSyncCommandEntity.builder()
+                .id(30L).clientId("device-01").clientOperationId("sale-race")
+                .commandType(SyncCommandType.CREATE_SALE)
+                .status(SyncCommandStatus.PROCESSED)
+                .resultReferenceType(SyncResultReferenceType.SALE).resultReferenceId(7L)
+                .payload("{}").build();
+
+        when(repository.findByClientIdAndClientOperationId("device-01", "sale-race"))
+                .thenReturn(Optional.empty())      // first lookup: not there yet
+                .thenReturn(Optional.of(concurrent)); // after collision: the winner's row
+        when(persistenceService.save(any(ClientSyncCommandEntity.class)))
+                .thenThrow(new DataIntegrityViolationException("unique constraint"));
+
+        SyncCommandResponse response = syncCommandApplicationService.process(request);
+
+        assertThat(response.status()).isEqualTo(SyncCommandStatus.DUPLICATE);
+        assertThat(response.resultReferenceId()).isEqualTo(7L);
+        verifyNoInteractions(resultService);
     }
 }
