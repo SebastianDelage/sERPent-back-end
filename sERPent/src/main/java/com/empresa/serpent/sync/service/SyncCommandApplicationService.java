@@ -96,37 +96,37 @@ public class SyncCommandApplicationService {
             };
         } catch (BusinessException ex) {
             // ValidationException / ConflictException / InsufficientStockException already carry a
-            // clean, user-facing Spanish message (verified case by case) — safe to return as-is,
-            // same guarantee GlobalExceptionHandler relies on for direct REST calls.
-            return markTerminalFailure(command, SyncCommandStatus.REJECTED, ex.getMessage());
+            // clean, user-facing Spanish message (verified case by case) — same value travels to
+            // both the client and the internal record.
+            return markTerminalFailure(command, SyncCommandStatus.REJECTED, ex.getMessage(), ex.getMessage());
         } catch (NotFoundException | IllegalArgumentException ex) {
             // These carry English text with raw technical ids (e.g. "Product not found: 5").
-            // SyncCommandResponse.message bypasses GlobalExceptionHandler entirely, so sanitize
-            // here too: clean generic message to the client, full detail to the log.
+            // SyncCommandResponse.message bypasses GlobalExceptionHandler entirely, so sanitize it:
+            // the client gets the generic Spanish message. The raw detail goes to BOTH the log and
+            // command.errorMessage — logs rotate, this row persists, so a stale rejection can still
+            // be diagnosed later with a query instead of depending on log retention.
             log.warn(
                     "Sync command rejected for client {} operation {}: {}",
                     command.getClientId(), command.getClientOperationId(), ex.getMessage()
             );
-            String message = ex instanceof NotFoundException ? NOT_FOUND_MESSAGE : INVALID_REQUEST_MESSAGE;
-            return markTerminalFailure(command, SyncCommandStatus.REJECTED, message);
+            String clientMessage = ex instanceof NotFoundException ? NOT_FOUND_MESSAGE : INVALID_REQUEST_MESSAGE;
+            return markTerminalFailure(command, SyncCommandStatus.REJECTED, clientMessage, ex.getMessage());
         } catch (Exception ex) {
             // Unexpected technical failure: FAILED is the only retriable state. Out of scope for
             // this batch — not a NotFoundException/IllegalArgumentException/BusinessException.
-            return markTerminalFailure(
-                    command,
-                    SyncCommandStatus.FAILED,
-                    ex.getMessage() != null ? ex.getMessage() : "Unexpected sync error"
-            );
+            String detail = ex.getMessage() != null ? ex.getMessage() : "Unexpected sync error";
+            return markTerminalFailure(command, SyncCommandStatus.FAILED, detail, detail);
         }
     }
 
     private SyncCommandResponse markTerminalFailure(
             ClientSyncCommandEntity command,
             SyncCommandStatus status,
-            String message
+            String clientMessage,
+            String internalDetail
     ) {
         command.setStatus(status);
-        command.setErrorMessage(message);
+        command.setErrorMessage(internalDetail);
         command.setProcessedAt(LocalDateTime.now());
         command.setResultReferenceType(null);
         command.setResultReferenceId(null);
@@ -140,7 +140,7 @@ public class SyncCommandApplicationService {
                 status,
                 null,
                 null,
-                message
+                clientMessage
         );
     }
 
