@@ -178,7 +178,7 @@ class SyncCommandApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("Defect 1: a NotFoundException is REJECTED")
+    @DisplayName("Defect 1: a NotFoundException is REJECTED, with a sanitized message (no raw id/English leak)")
     void shouldRejectWhenResultServiceThrowsNotFound() {
         SyncCommandRequest request =
                 new SyncCommandRequest("device-01", "expense-missing-cat", SyncCommandType.CREATE_EXPENSE, "{}");
@@ -192,7 +192,26 @@ class SyncCommandApplicationServiceTest {
         SyncCommandResponse response = syncCommandApplicationService.process(request);
 
         assertThat(response.status()).isEqualTo(SyncCommandStatus.REJECTED);
-        assertThat(response.message()).isEqualTo("Expense category not found: 999");
+        // SyncCommandResponse.message bypasses GlobalExceptionHandler, so the sync flow sanitizes
+        // it itself: the raw "Expense category not found: 999" only reaches the log now.
+        assertThat(response.message()).isEqualTo("No se encontró el recurso solicitado.");
+    }
+
+    @Test
+    @DisplayName("An IllegalArgumentException is REJECTED, with a sanitized message (no raw id/English leak)")
+    void shouldRejectWhenResultServiceThrowsIllegalArgument() {
+        SyncCommandRequest request = saleRequest("sale-inactive-warehouse");
+
+        when(repository.findByClientIdAndClientOperationId("device-01", "sale-inactive-warehouse"))
+                .thenReturn(Optional.empty());
+        stubReceivedInsert(23L);
+        when(resultService.processCreateSale(23L))
+                .thenThrow(new IllegalArgumentException("Source warehouse is inactive: 42"));
+
+        SyncCommandResponse response = syncCommandApplicationService.process(request);
+
+        assertThat(response.status()).isEqualTo(SyncCommandStatus.REJECTED);
+        assertThat(response.message()).isEqualTo("La solicitud no es válida.");
     }
 
     @Test

@@ -8,6 +8,8 @@ import com.empresa.serpent.sync.repository.ClientSyncCommandRepository;
 import com.empresa.serpent.sync.web.dto.request.SyncCommandRequest;
 import com.empresa.serpent.sync.web.dto.response.SyncCommandResponse;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +19,14 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class SyncCommandApplicationService {
+
+    private static final Logger log = LoggerFactory.getLogger(SyncCommandApplicationService.class);
+
+    // Same generic Spanish text GlobalExceptionHandler already uses for direct REST calls — keeps
+    // the sync response consistent with the rest of the API instead of leaking the raw, English,
+    // id-bearing exception message that only makes sense in the logs.
+    private static final String NOT_FOUND_MESSAGE = "No se encontró el recurso solicitado.";
+    private static final String INVALID_REQUEST_MESSAGE = "La solicitud no es válida.";
 
     private final ClientSyncCommandRepository repository;
     private final ClientSyncCommandPersistenceService persistenceService;
@@ -84,12 +94,24 @@ public class SyncCommandApplicationService {
                 case CREATE_SALE -> resultService.processCreateSale(command.getId());
                 case CREATE_EXPENSE -> resultService.processCreateExpense(command.getId());
             };
-        } catch (BusinessException | NotFoundException | IllegalArgumentException ex) {
-            // Expected business rejection (insufficient stock, validation, not found, bad payload):
-            // terminal REJECTED, not a retriable failure.
+        } catch (BusinessException ex) {
+            // ValidationException / ConflictException / InsufficientStockException already carry a
+            // clean, user-facing Spanish message (verified case by case) — safe to return as-is,
+            // same guarantee GlobalExceptionHandler relies on for direct REST calls.
             return markTerminalFailure(command, SyncCommandStatus.REJECTED, ex.getMessage());
+        } catch (NotFoundException | IllegalArgumentException ex) {
+            // These carry English text with raw technical ids (e.g. "Product not found: 5").
+            // SyncCommandResponse.message bypasses GlobalExceptionHandler entirely, so sanitize
+            // here too: clean generic message to the client, full detail to the log.
+            log.warn(
+                    "Sync command rejected for client {} operation {}: {}",
+                    command.getClientId(), command.getClientOperationId(), ex.getMessage()
+            );
+            String message = ex instanceof NotFoundException ? NOT_FOUND_MESSAGE : INVALID_REQUEST_MESSAGE;
+            return markTerminalFailure(command, SyncCommandStatus.REJECTED, message);
         } catch (Exception ex) {
-            // Unexpected technical failure: FAILED is the only retriable state.
+            // Unexpected technical failure: FAILED is the only retriable state. Out of scope for
+            // this batch — not a NotFoundException/IllegalArgumentException/BusinessException.
             return markTerminalFailure(
                     command,
                     SyncCommandStatus.FAILED,
