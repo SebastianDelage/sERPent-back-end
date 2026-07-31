@@ -1,4 +1,4 @@
-package com.empresa.serpent.inventory.web;
+package com.empresa.serpent.inventory.web.controller;
 
 import com.empresa.serpent.inventory.service.InventoryStockSnapshotService;
 import com.empresa.serpent.inventory.web.dto.response.InventoryReconciliationResponse;
