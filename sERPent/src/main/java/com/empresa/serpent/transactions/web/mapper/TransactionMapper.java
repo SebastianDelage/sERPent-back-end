@@ -27,6 +27,7 @@ public interface TransactionMapper {
 
     @Mapping(target = "productId", source = "product.id")
     @Mapping(target = "productName", source = "product.name")
+    @Mapping(target = "unitOfMeasure", source = "product.unitOfMeasure")
     TransactionItemResponse toItemResponse(TransactionDetailEntity detail);
 
     List<TransactionItemResponse> toItemResponseList(List<TransactionDetailEntity> details);

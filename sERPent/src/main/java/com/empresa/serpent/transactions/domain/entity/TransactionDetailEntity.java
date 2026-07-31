@@ -1,6 +1,7 @@
 package com.empresa.serpent.transactions.domain.entity;
 
 import com.empresa.serpent.catalog.domain.entity.ProductEntity;
+import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -38,11 +39,24 @@ public class TransactionDetailEntity {
     @JoinColumn(name = "transaction_id", nullable = false)
     private TransactionEntity transaction;
 
+    /**
+     * Mirror of the parent transaction's type. Denormalized so the amount-sign CHECK
+     * constraints can be scoped per type (a CHECK cannot reach into another table).
+     * Never set by hand: it is copied from the parent on persist, and the parent's
+     * type is immutable, so the copy cannot drift.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transaction_type", nullable = false, length = 30, updatable = false)
+    private TransactionType transactionType;
+
     @PrePersist
     @PreUpdate
     private void calculateSubtotal() {
         if (quantity != null && unitPrice != null) {
             this.subtotal = unitPrice.multiply(quantity);
+        }
+        if (transaction != null) {
+            this.transactionType = transaction.getType();
         }
     }
 }

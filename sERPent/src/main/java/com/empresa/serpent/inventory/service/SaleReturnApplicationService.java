@@ -27,12 +27,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class SaleReturnApplicationService {
+
+    /** Matches the NUMERIC(19,4) money columns. */
+    private static final int AMOUNT_SCALE = 4;
 
     private final TransactionRepository transactionRepository;
     private final TransactionDetailRepository transactionDetailRepository;
@@ -102,13 +107,22 @@ public class SaleReturnApplicationService {
                 ? request.reason().trim()
                 : "Devolución de la venta #" + request.saleId() + " — " + product.getName();
 
+        // Refunded at what the customer actually paid, not at today's list price.
+        BigDecimal originalUnitPrice = getOriginalUnitPrice(originalTransaction.getId(), request.productId());
+
+        // Returns are stored negative: money going out, so it subtracts in any aggregation.
+        // The detail's subtotal is derived from unitPrice * quantity by the entity itself,
+        // so carrying the sign on unitPrice keeps total == sum(subtotals).
+        BigDecimal returnUnitPrice = originalUnitPrice.negate();
+        BigDecimal returnTotal = returnUnitPrice.multiply(request.quantity());
+
         TransactionEntity transaction = TransactionEntity.builder()
                 .type(TransactionType.RETURN)
                 .status(TransactionStatus.CONFIRMED)
                 .description(description)
                 .paymentMethod(null)
                 .createdByUserEntity(createdBy)
-                .total(BigDecimal.ZERO)
+                .total(returnTotal)
                 .details(new ArrayList<>())
                 .build();
 
@@ -117,8 +131,8 @@ public class SaleReturnApplicationService {
                 .product(product)
                 .description("Devolución")
                 .quantity(request.quantity())
-                .unitPrice(BigDecimal.ZERO)
-                .subtotal(BigDecimal.ZERO)
+                .unitPrice(returnUnitPrice)
+                .subtotal(returnTotal)
                 .build();
 
         transaction.getDetails().add(detail);
@@ -170,6 +184,38 @@ public class SaleReturnApplicationService {
                                 saleReturn.getReason()
                         )))
                 .toList();
+    }
+
+    /**
+     * The price the customer actually paid for this product, taken from the original
+     * sale. When the sale carries the product across several lines at different prices,
+     * the weighted average is used so partial returns refund proportionally.
+     */
+    private BigDecimal getOriginalUnitPrice(Long saleTransactionId, Long productId) {
+        List<TransactionDetailEntity> soldLines =
+                transactionDetailRepository.findByTransactionIdAndProductId(saleTransactionId, productId);
+
+        BigDecimal totalQuantity = soldLines.stream()
+                .map(TransactionDetailEntity::getQuantity)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (totalQuantity.compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal totalAmount = soldLines.stream()
+                .map(line -> {
+                    BigDecimal unitPrice = line.getUnitPrice();
+                    BigDecimal quantity = line.getQuantity();
+                    if (unitPrice == null || quantity == null) {
+                        return BigDecimal.ZERO;
+                    }
+                    return unitPrice.multiply(quantity);
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return totalAmount.divide(totalQuantity, AMOUNT_SCALE, RoundingMode.HALF_UP);
     }
 
     private BigDecimal getSoldQuantity(Long saleTransactionId, Long productId) {

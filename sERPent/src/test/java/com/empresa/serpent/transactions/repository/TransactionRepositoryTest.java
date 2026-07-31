@@ -23,7 +23,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.BIG_DECIMAL;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -64,11 +66,45 @@ class TransactionRepositoryTest {
 
         assertThat(result.get(0).productName()).isEqualTo("Pollo entero");
         assertThat(result.get(0).quantitySold()).isEqualByComparingTo("1.000");
-        assertThat(result.get(0).totalRevenue()).isEqualByComparingTo("4500.0000");
+        assertThat(result.get(0).quantityReturned()).isEqualByComparingTo("0");
+        assertThat(result.get(0).grossRevenue()).isEqualByComparingTo("4500.0000");
+        assertThat(result.get(0).netRevenue()).isEqualByComparingTo("4500.0000");
 
         assertThat(result.get(1).productName()).isEqualTo("Pata muslo");
         assertThat(result.get(1).quantitySold()).isEqualByComparingTo("1.000");
-        assertThat(result.get(1).totalRevenue()).isEqualByComparingTo("4600.0000");
+        assertThat(result.get(1).netRevenue()).isEqualByComparingTo("4600.0000");
+    }
+
+    @Test
+    @DisplayName("Should subtract returns from the product they belong to")
+    void shouldSubtractReturnsInSalesByProductReport() {
+
+        UserEntity user = persistUser();
+        PaymentMethodEntity cash = persistPaymentMethod("Cash");
+        ProductEntity pollo = persistProduct("Pollo entero", "POLLO001");
+
+        // Sold 5 at 4500 = 22500.
+        TransactionEntity sale = persistSaleTransaction(
+                LocalDateTime.of(2026, 3, 12, 10, 0), new BigDecimal("22500.0000"), cash, user);
+        persistDetail(sale, pollo, "Pollo entero", "5.000", "4500.0000");
+
+        // Returned 2 of them: -9000, stored negative.
+        TransactionEntity returnTx = persistReturnTransaction(
+                LocalDateTime.of(2026, 3, 13, 9, 0), new BigDecimal("-9000.0000"), user);
+        persistDetail(returnTx, pollo, "Devolución", "2.000", "-4500.0000");
+
+        entityManager.flush();
+        entityManager.clear();
+
+        List<SalesByProductResponse> result = transactionRepository.getSalesByProductReport(null, null);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).productName()).isEqualTo("Pollo entero");
+        assertThat(result.get(0).quantitySold()).isEqualByComparingTo("5.000");
+        assertThat(result.get(0).quantityReturned()).isEqualByComparingTo("2.000");
+        assertThat(result.get(0).grossRevenue()).isEqualByComparingTo("22500.0000");
+        assertThat(result.get(0).returnedAmount()).isEqualByComparingTo("-9000.0000");
+        assertThat(result.get(0).netRevenue()).isEqualByComparingTo("13500.0000");
     }
 
     @Test
@@ -100,7 +136,42 @@ class TransactionRepositoryTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getDate()).isEqualTo(LocalDate.of(2026, 3, 12));
         assertThat(result.get(0).getTransactions()).isEqualTo(2L);
-        assertThat(result.get(0).getTotalRevenue()).isEqualByComparingTo("9100.0000");
+        assertThat(result.get(0).getGrossSales()).isEqualByComparingTo("9100.0000");
+        assertThat(result.get(0).getReturnsTotal()).isEqualByComparingTo("0");
+        assertThat(result.get(0).getNetSales()).isEqualByComparingTo("9100.0000");
+    }
+
+    @Test
+    @DisplayName("Should count a return on the day it was registered, not the day of the sale")
+    void shouldCountReturnOnTheDayItWasRegistered() {
+
+        UserEntity user = persistUser();
+        PaymentMethodEntity cash = persistPaymentMethod("Cash");
+
+        persistSaleTransaction(
+                LocalDateTime.of(2026, 3, 12, 10, 0), new BigDecimal("9100.0000"), cash, user);
+
+        // Registered the next day: it belongs to the 13th, not the 12th.
+        persistReturnTransaction(
+                LocalDateTime.of(2026, 3, 13, 9, 0), new BigDecimal("-9000.0000"), user);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        List<SalesDailyProjection> result = transactionRepository.getSalesDailyReportRaw(null, null);
+
+        assertThat(result).hasSize(2);
+
+        // Ordered by date DESC: the 13th first, carrying only the return.
+        assertThat(result.get(0).getDate()).isEqualTo(LocalDate.of(2026, 3, 13));
+        assertThat(result.get(0).getTransactions()).isEqualTo(0L);
+        assertThat(result.get(0).getGrossSales()).isEqualByComparingTo("0");
+        assertThat(result.get(0).getReturnsTotal()).isEqualByComparingTo("-9000.0000");
+        // A day of returns with no sales nets negative. That is correct, not a bug.
+        assertThat(result.get(0).getNetSales()).isEqualByComparingTo("-9000.0000");
+
+        assertThat(result.get(1).getDate()).isEqualTo(LocalDate.of(2026, 3, 12));
+        assertThat(result.get(1).getNetSales()).isEqualByComparingTo("9100.0000");
     }
 
     @Test
@@ -169,8 +240,70 @@ class TransactionRepositoryTest {
 
         assertThat(result).isNotNull();
         assertThat(result.getTransactions()).isEqualTo(2L);
-        assertThat(result.getTotalRevenue()).isEqualByComparingTo("12100.0000");
+        assertThat(result.getGrossSales()).isEqualByComparingTo("12100.0000");
+        assertThat(result.getReturnsTotal()).isEqualByComparingTo("0");
+        assertThat(result.getNetSales()).isEqualByComparingTo("12100.0000");
         assertThat(result.getAverageTicket()).isEqualByComparingTo("6050.0000");
+    }
+
+    @Test
+    @DisplayName("Should split the summary into gross, returns and net")
+    void shouldSplitSummaryIntoGrossReturnsAndNet() {
+
+        UserEntity user = persistUser();
+        PaymentMethodEntity cash = persistPaymentMethod("Cash");
+
+        persistSaleTransaction(
+                LocalDateTime.of(2026, 3, 12, 10, 0), new BigDecimal("22500.0000"), cash, user);
+
+        TransactionEntity returnTx = persistReturnTransaction(
+                LocalDateTime.of(2026, 3, 13, 9, 0), new BigDecimal("-9000.0000"), user);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // The negative total survives the round trip to the database.
+        assertThat(transactionRepository.findById(returnTx.getId()))
+                .get()
+                .extracting(TransactionEntity::getTotal, as(BIG_DECIMAL))
+                .isEqualByComparingTo("-9000.0000");
+
+        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null);
+
+        // The return is not a sale, so it does not inflate the transaction count
+        // nor the average ticket.
+        assertThat(result.getTransactions()).isEqualTo(1L);
+        assertThat(result.getGrossSales()).isEqualByComparingTo("22500.0000");
+        assertThat(result.getReturnsTotal()).isEqualByComparingTo("-9000.0000");
+        assertThat(result.getNetSales()).isEqualByComparingTo("13500.0000");
+        assertThat(result.getAverageTicket()).isEqualByComparingTo("22500.0000");
+    }
+
+    @Test
+    @DisplayName("Should keep the parent transaction type mirrored on each detail row")
+    void shouldMirrorTransactionTypeOnDetails() {
+
+        UserEntity user = persistUser();
+        PaymentMethodEntity cash = persistPaymentMethod("Cash");
+        ProductEntity pollo = persistProduct("Pollo entero", "POLLO001");
+
+        TransactionEntity sale = persistSaleTransaction(
+                LocalDateTime.of(2026, 3, 12, 10, 0), new BigDecimal("22500.0000"), cash, user);
+        TransactionDetailEntity saleLine =
+                persistDetail(sale, pollo, "Pollo entero", "5.000", "4500.0000");
+
+        TransactionEntity returnTx = persistReturnTransaction(
+                LocalDateTime.of(2026, 3, 13, 9, 0), new BigDecimal("-9000.0000"), user);
+        TransactionDetailEntity returnLine =
+                persistDetail(returnTx, pollo, "Devolución", "2.000", "-4500.0000");
+
+        entityManager.flush();
+
+        // The mirror column is what lets the sign CHECKs be scoped per type.
+        assertThat(saleLine.getTransactionType()).isEqualTo(TransactionType.SALE);
+        assertThat(returnLine.getTransactionType()).isEqualTo(TransactionType.RETURN);
+        // Subtotal is derived, so the sign carried on unitPrice flows through.
+        assertThat(returnLine.getSubtotal()).isEqualByComparingTo("-9000.0000");
     }
 
     private UserEntity persistUser() {
@@ -218,6 +351,27 @@ class TransactionRepositoryTest {
                 .paymentMethod(paymentMethod)
                 .createdByUserEntity(user)
                 .description("Test sale")
+                .build();
+
+        transaction = entityManager.persistAndFlush(transaction);
+
+        transaction.setDate(date);
+        transaction = entityManager.persistAndFlush(transaction);
+
+        return transaction;
+    }
+
+    /** A confirmed RETURN. Its total is negative: money going out. */
+    private TransactionEntity persistReturnTransaction(LocalDateTime date,
+                                                       BigDecimal total,
+                                                       UserEntity user) {
+        TransactionEntity transaction = TransactionEntity.builder()
+                .type(TransactionType.RETURN)
+                .status(TransactionStatus.CONFIRMED)
+                .total(total)
+                .paymentMethod(null)
+                .createdByUserEntity(user)
+                .description("Test return")
                 .build();
 
         transaction = entityManager.persistAndFlush(transaction);

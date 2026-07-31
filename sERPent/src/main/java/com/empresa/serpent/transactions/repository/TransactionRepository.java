@@ -31,30 +31,45 @@ public interface TransactionRepository extends
            SELECT new com.empresa.serpent.reports.web.dto.response.SalesByProductResponse(
                d.product.id,
                d.product.name,
-               SUM(d.quantity),
-               SUM(d.subtotal)
+               COALESCE(SUM(CASE WHEN t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.SALE
+                                 THEN d.quantity ELSE 0 END), 0),
+               COALESCE(SUM(CASE WHEN t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.RETURN
+                                 THEN d.quantity ELSE 0 END), 0),
+               COALESCE(SUM(CASE WHEN t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.SALE
+                                 THEN d.subtotal ELSE 0 END), 0),
+               COALESCE(SUM(CASE WHEN t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.RETURN
+                                 THEN d.subtotal ELSE 0 END), 0),
+               COALESCE(SUM(d.subtotal), 0),
+               COALESCE(SUM(d.subtotal), 0)
            )
            FROM TransactionEntity t
            JOIN t.details d
-           WHERE t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.SALE
+           WHERE t.type IN (
+                     com.empresa.serpent.transactions.domain.enums.TransactionType.SALE,
+                     com.empresa.serpent.transactions.domain.enums.TransactionType.RETURN
+                 )
              AND d.product IS NOT NULL
              AND (:dateFrom IS NULL OR t.date >= :dateFrom)
              AND (:dateTo IS NULL OR t.date <= :dateTo)
            GROUP BY d.product.id, d.product.name
-           ORDER BY SUM(d.quantity) DESC
+           ORDER BY COALESCE(SUM(CASE WHEN t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.SALE
+                                      THEN d.quantity ELSE 0 END), 0) DESC
            """)
     List<SalesByProductResponse> getSalesByProductReport(
             @Param("dateFrom") LocalDateTime dateFrom,
             @Param("dateTo") LocalDateTime dateTo
     );
 
+    /** A return lands on the day it was registered, not the day of the original sale. */
     @Query(value = """
            SELECT
                CAST(t.date AS DATE) AS date,
-               COUNT(DISTINCT t.transaction_id) AS transactions,
-               SUM(t.total) AS totalRevenue
+               COUNT(DISTINCT CASE WHEN t.type = 'SALE' THEN t.transaction_id END) AS transactions,
+               COALESCE(SUM(CASE WHEN t.type = 'SALE' THEN t.total END), 0) AS grossSales,
+               COALESCE(SUM(CASE WHEN t.type = 'RETURN' THEN t.total END), 0) AS returnsTotal,
+               COALESCE(SUM(t.total), 0) AS netSales
            FROM transactions t
-           WHERE t.type = 'SALE'
+           WHERE t.type IN ('SALE', 'RETURN')
              AND (:dateFrom IS NULL OR t.date >= :dateFrom)
              AND (:dateTo IS NULL OR t.date <= :dateTo)
            GROUP BY CAST(t.date AS DATE)
@@ -65,6 +80,12 @@ public interface TransactionRepository extends
             @Param("dateTo") LocalDateTime dateTo
     );
 
+    /**
+     * Gross sales per payment method: returns are deliberately excluded. A return is
+     * recorded without a payment method (refunding cash for a card sale is a real
+     * case), so attributing it to the original sale's method would assert something
+     * the system does not know.
+     */
     @Query("""
            SELECT new com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodResponse(
                pm.id,
@@ -87,11 +108,13 @@ public interface TransactionRepository extends
 
     @Query(value = """
        SELECT
-           COUNT(t.transaction_id) AS transactions,
-           COALESCE(SUM(t.total), 0) AS totalRevenue,
-           COALESCE(AVG(t.total), 0) AS averageTicket
+           COUNT(CASE WHEN t.type = 'SALE' THEN 1 END) AS transactions,
+           COALESCE(SUM(CASE WHEN t.type = 'SALE' THEN t.total END), 0) AS grossSales,
+           COALESCE(SUM(CASE WHEN t.type = 'RETURN' THEN t.total END), 0) AS returnsTotal,
+           COALESCE(SUM(t.total), 0) AS netSales,
+           COALESCE(AVG(CASE WHEN t.type = 'SALE' THEN t.total END), 0) AS averageTicket
        FROM transactions t
-       WHERE t.type = 'SALE'
+       WHERE t.type IN ('SALE', 'RETURN')
          AND (:dateFrom IS NULL OR t.date >= :dateFrom)
          AND (:dateTo IS NULL OR t.date <= :dateTo)
        """, nativeQuery = true)

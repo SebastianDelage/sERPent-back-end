@@ -35,6 +35,12 @@ public class SalesReportController {
         return salesReportService.getSalesDaily(dateFrom, dateTo);
     }
 
+    /**
+     * Gross sales per payment method. Returns are not reflected here: a return is
+     * recorded without a payment method, and assuming it was refunded through the
+     * original sale's method would be asserting a fact the system does not have.
+     * Use /summary for figures net of returns.
+     */
     @GetMapping("/by-payment-method")
     public List<SalesByPaymentMethodResponse> getSalesByPaymentMethod(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,

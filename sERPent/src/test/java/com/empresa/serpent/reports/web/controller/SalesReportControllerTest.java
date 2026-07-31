@@ -47,8 +47,14 @@ class SalesReportControllerTest {
     void shouldReturnSalesByProductReport() throws Exception {
 
         List<SalesByProductResponse> response = List.of(
-                new SalesByProductResponse(1L, "Pollo entero", new BigDecimal("1.000"), new BigDecimal("4500.0000")),
-                new SalesByProductResponse(2L, "Pata muslo", new BigDecimal("1.000"), new BigDecimal("4600.0000"))
+                new SalesByProductResponse(1L, "Pollo entero",
+                        new BigDecimal("2.000"), new BigDecimal("1.000"),
+                        new BigDecimal("9000.0000"), new BigDecimal("-4500.0000"),
+                        new BigDecimal("4500.0000"), new BigDecimal("4500.0000")),
+                new SalesByProductResponse(2L, "Pata muslo",
+                        new BigDecimal("1.000"), BigDecimal.ZERO,
+                        new BigDecimal("4600.0000"), BigDecimal.ZERO,
+                        new BigDecimal("4600.0000"), new BigDecimal("4600.0000"))
         );
 
         given(salesReportService.getSalesByProduct(any(), any())).willReturn(response);
@@ -58,12 +64,15 @@ class SalesReportControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$[0].productId").value(1))
                 .andExpect(jsonPath("$[0].productName").value("Pollo entero"))
-                .andExpect(jsonPath("$[0].quantitySold").value(1.000))
-                .andExpect(jsonPath("$[0].totalRevenue").value(4500.0000))
+                .andExpect(jsonPath("$[0].quantitySold").value(2.000))
+                .andExpect(jsonPath("$[0].quantityReturned").value(1.000))
+                .andExpect(jsonPath("$[0].grossRevenue").value(9000.0000))
+                .andExpect(jsonPath("$[0].returnedAmount").value(-4500.0000))
+                .andExpect(jsonPath("$[0].netRevenue").value(4500.0000))
                 .andExpect(jsonPath("$[1].productId").value(2))
                 .andExpect(jsonPath("$[1].productName").value("Pata muslo"))
                 .andExpect(jsonPath("$[1].quantitySold").value(1.000))
-                .andExpect(jsonPath("$[1].totalRevenue").value(4600.0000));
+                .andExpect(jsonPath("$[1].netRevenue").value(4600.0000));
     }
 
     @Test
@@ -71,7 +80,9 @@ class SalesReportControllerTest {
     void shouldReturnDailySalesReport() throws Exception {
 
         List<SalesDailyResponse> response = List.of(
-                new SalesDailyResponse(LocalDate.of(2026, 3, 12), 1L, new BigDecimal("9100.0000"))
+                new SalesDailyResponse(LocalDate.of(2026, 3, 12), 1L,
+                        new BigDecimal("9100.0000"), new BigDecimal("-1000.0000"),
+                        new BigDecimal("8100.0000"), new BigDecimal("8100.0000"))
         );
 
         given(salesReportService.getSalesDaily(any(), any())).willReturn(response);
@@ -81,7 +92,10 @@ class SalesReportControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$[0].date").value("2026-03-12"))
                 .andExpect(jsonPath("$[0].transactions").value(1))
-                .andExpect(jsonPath("$[0].totalRevenue").value(9100.0000));
+                .andExpect(jsonPath("$[0].grossSales").value(9100.0000))
+                .andExpect(jsonPath("$[0].returns").value(-1000.0000))
+                .andExpect(jsonPath("$[0].netSales").value(8100.0000))
+                .andExpect(jsonPath("$[0].totalRevenue").value(8100.0000));
     }
 
     @Test
@@ -110,6 +124,9 @@ class SalesReportControllerTest {
         SalesSummaryResponse response = new SalesSummaryResponse(
                 1L,
                 new BigDecimal("9100.0000"),
+                new BigDecimal("-1000.0000"),
+                new BigDecimal("8100.0000"),
+                new BigDecimal("8100.0000"),
                 new BigDecimal("9100.0000")
         );
 
@@ -119,7 +136,10 @@ class SalesReportControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.transactions").value(1))
-                .andExpect(jsonPath("$.totalRevenue").value(9100.0000))
+                .andExpect(jsonPath("$.grossSales").value(9100.0000))
+                .andExpect(jsonPath("$.returns").value(-1000.0000))
+                .andExpect(jsonPath("$.netSales").value(8100.0000))
+                .andExpect(jsonPath("$.totalRevenue").value(8100.0000))
                 .andExpect(jsonPath("$.averageTicket").value(9100.0000));
     }
 }

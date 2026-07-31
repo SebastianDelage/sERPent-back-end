@@ -24,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -31,6 +32,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -60,6 +62,12 @@ class SaleReturnApplicationServiceTest {
     private static final Long SALE_ID = 5L;
     private static final Long SALE_TX_ID = 100L;
 
+    /** What the customer paid at the time of the sale. */
+    private static final BigDecimal SALE_UNIT_PRICE = new BigDecimal("4500.0000");
+
+    /** Today's list price, deliberately different: refunds must not use it. */
+    private static final BigDecimal CURRENT_PRODUCT_PRICE = new BigDecimal("7000.0000");
+
     @BeforeEach
     void setUp() {
         service = new SaleReturnApplicationService(
@@ -83,7 +91,12 @@ class SaleReturnApplicationServiceTest {
     }
 
     private ProductEntity product() {
-        return ProductEntity.builder().id(PRODUCT_ID).name("Pollo entero").active(true).build();
+        return ProductEntity.builder()
+                .id(PRODUCT_ID)
+                .name("Pollo entero")
+                .price(CURRENT_PRODUCT_PRICE)
+                .active(true)
+                .build();
     }
 
     private WarehouseEntity warehouse(boolean active) {
@@ -101,8 +114,24 @@ class SaleReturnApplicationServiceTest {
         return sale;
     }
 
+    /** A line of the original sale. Carries a unit price: refunds are priced off it. */
     private TransactionDetailEntity soldLine(BigDecimal qty) {
-        return TransactionDetailEntity.builder().product(product()).quantity(qty).build();
+        return soldLine(qty, SALE_UNIT_PRICE);
+    }
+
+    private TransactionDetailEntity soldLine(BigDecimal qty, BigDecimal unitPrice) {
+        return TransactionDetailEntity.builder()
+                .product(product())
+                .quantity(qty)
+                .unitPrice(unitPrice)
+                .build();
+    }
+
+    /** The RETURN transaction handed to the repository. */
+    private TransactionEntity savedReturn() {
+        ArgumentCaptor<TransactionEntity> captor = ArgumentCaptor.forClass(TransactionEntity.class);
+        verify(transactionRepository).save(captor.capture());
+        return captor.getValue();
     }
 
     /** Wires the happy-path lookups shared by most tests. */
@@ -143,6 +172,83 @@ class SaleReturnApplicationServiceTest {
                 eq(new BigDecimal("2")),
                 any(String.class)
         );
+    }
+
+    // --- refunded amount ---
+
+    @Test
+    @DisplayName("Should price the refund off the original sale, not the current product price")
+    void shouldRefundAtOriginalSalePrice() {
+        stubCommonLookups(true);
+        when(saleRepository.findById(SALE_ID)).thenReturn(Optional.of(confirmedSale()));
+        // Sold 5 at 4500; the product now lists at 7000.
+        when(transactionDetailRepository.findByTransactionIdAndProductId(SALE_TX_ID, PRODUCT_ID))
+                .thenReturn(List.of(soldLine(new BigDecimal("5"))));
+        when(saleReturnRepository.findByOriginalSaleId(SALE_ID)).thenReturn(List.of());
+        when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createReturn(request(new BigDecimal("2")));
+
+        TransactionDetailEntity detail = savedReturn().getDetails().getFirst();
+        // 2 x 4500 = 9000, refunded — not 2 x 7000.
+        assertThat(detail.getUnitPrice()).isEqualByComparingTo("-4500.0000");
+        assertThat(detail.getSubtotal()).isEqualByComparingTo("-9000.0000");
+    }
+
+    @Test
+    @DisplayName("Should store the return total as a negative amount")
+    void shouldStoreReturnTotalAsNegative() {
+        stubCommonLookups(true);
+        when(saleRepository.findById(SALE_ID)).thenReturn(Optional.of(confirmedSale()));
+        when(transactionDetailRepository.findByTransactionIdAndProductId(SALE_TX_ID, PRODUCT_ID))
+                .thenReturn(List.of(soldLine(new BigDecimal("5"))));
+        when(saleReturnRepository.findByOriginalSaleId(SALE_ID)).thenReturn(List.of());
+        when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createReturn(request(new BigDecimal("2")));
+
+        TransactionEntity saved = savedReturn();
+        assertThat(saved.getType()).isEqualTo(TransactionType.RETURN);
+        assertThat(saved.getTotal()).isNegative();
+        assertThat(saved.getTotal()).isEqualByComparingTo("-9000.0000");
+        // The quantity stays a positive magnitude; only the money carries the sign.
+        assertThat(saved.getDetails().getFirst().getQuantity()).isEqualByComparingTo("2");
+    }
+
+    @Test
+    @DisplayName("Should refund proportionally on a partial return")
+    void shouldRefundProportionallyOnPartialReturn() {
+        stubCommonLookups(true);
+        when(saleRepository.findById(SALE_ID)).thenReturn(Optional.of(confirmedSale()));
+        // Sold 5 at 4500 = 22500 total.
+        when(transactionDetailRepository.findByTransactionIdAndProductId(SALE_TX_ID, PRODUCT_ID))
+                .thenReturn(List.of(soldLine(new BigDecimal("5"))));
+        when(saleReturnRepository.findByOriginalSaleId(SALE_ID)).thenReturn(List.of());
+        when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createReturn(request(new BigDecimal("2")));
+
+        // Returning 2 of 5 refunds 9000, not the whole 22500.
+        assertThat(savedReturn().getTotal()).isEqualByComparingTo("-9000.0000");
+    }
+
+    @Test
+    @DisplayName("Should use the weighted average when the sale priced the product on several lines")
+    void shouldUseWeightedAverageAcrossSaleLines() {
+        stubCommonLookups(true);
+        when(saleRepository.findById(SALE_ID)).thenReturn(Optional.of(confirmedSale()));
+        // 2 at 4000 and 3 at 5000 -> 23000 over 5 units = 4600 each.
+        when(transactionDetailRepository.findByTransactionIdAndProductId(SALE_TX_ID, PRODUCT_ID))
+                .thenReturn(List.of(
+                        soldLine(new BigDecimal("2"), new BigDecimal("4000.0000")),
+                        soldLine(new BigDecimal("3"), new BigDecimal("5000.0000"))
+                ));
+        when(saleReturnRepository.findByOriginalSaleId(SALE_ID)).thenReturn(List.of());
+        when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createReturn(request(new BigDecimal("2")));
+
+        assertThat(savedReturn().getTotal()).isEqualByComparingTo("-9200.0000");
     }
 
     // --- lookups / not found ---

@@ -30,7 +30,11 @@ public class SalesReportService {
                 .map(row -> new SalesDailyResponse(
                         row.getDate(),
                         row.getTransactions(),
-                        row.getTotalRevenue()
+                        row.getGrossSales(),
+                        row.getReturnsTotal(),
+                        row.getNetSales(),
+                        // totalRevenue is an alias of netSales, kept for existing consumers.
+                        row.getNetSales()
                 ))
                 .toList();
     }
@@ -45,7 +49,11 @@ public class SalesReportService {
 
         return new SalesSummaryResponse(
                 row.getTransactions(),
-                row.getTotalRevenue(),
+                row.getGrossSales(),
+                row.getReturnsTotal(),
+                row.getNetSales(),
+                // totalRevenue is an alias of netSales, kept for existing consumers.
+                row.getNetSales(),
                 row.getAverageTicket() == null
                         ? null
                         : row.getAverageTicket().setScale(4, RoundingMode.HALF_UP)
