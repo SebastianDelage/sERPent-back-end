@@ -107,13 +107,15 @@ public class SaleReturnApplicationService {
                 ? request.reason().trim()
                 : "Devolución de la venta #" + request.saleId() + " — " + product.getName();
 
-        // Refunded at what the customer actually paid, not at today's list price.
+        // Refunded at what the customer actually paid: the original line price, prorated
+        // by any manual adjustment on the sale (a 10% discount refunds 90% of the line).
         BigDecimal originalUnitPrice = getOriginalUnitPrice(originalTransaction.getId(), request.productId());
+        BigDecimal adjustedUnitPrice = applySaleAdjustment(originalUnitPrice, originalSale, originalTransaction);
 
         // Returns are stored negative: money going out, so it subtracts in any aggregation.
         // The detail's subtotal is derived from unitPrice * quantity by the entity itself,
         // so carrying the sign on unitPrice keeps total == sum(subtotals).
-        BigDecimal returnUnitPrice = originalUnitPrice.negate();
+        BigDecimal returnUnitPrice = adjustedUnitPrice.negate();
         BigDecimal returnTotal = returnUnitPrice.multiply(request.quantity());
 
         TransactionEntity transaction = TransactionEntity.builder()
@@ -216,6 +218,34 @@ public class SaleReturnApplicationService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return totalAmount.divide(totalQuantity, AMOUNT_SCALE, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Scales a line's unit price by the sale's manual adjustment, so a return refunds
+     * what the customer actually paid: {@code unitPrice * saleTotal / saleSubtotal}.
+     *
+     * <p>The subtotal is derived from the frozen adjustment rather than re-summing the
+     * lines, and the division is done in one step at money scale. Rounding an
+     * intermediate factor first would leak error proportional to the sale size — on a
+     * three-million-peso sale that reached a full peso.
+     */
+    private BigDecimal applySaleAdjustment(BigDecimal unitPrice,
+                                           SaleEntity originalSale,
+                                           TransactionEntity originalTransaction) {
+
+        BigDecimal adjustmentAmount = originalSale.getAdjustmentAmount();
+        if (adjustmentAmount == null || adjustmentAmount.compareTo(BigDecimal.ZERO) == 0) {
+            return unitPrice;
+        }
+
+        BigDecimal saleTotal = originalTransaction.getTotal();
+        BigDecimal saleSubtotal = saleTotal.subtract(adjustmentAmount);
+
+        if (saleSubtotal.compareTo(BigDecimal.ZERO) == 0) {
+            return unitPrice;
+        }
+
+        return unitPrice.multiply(saleTotal).divide(saleSubtotal, AMOUNT_SCALE, RoundingMode.HALF_UP);
     }
 
     private BigDecimal getSoldQuantity(Long saleTransactionId, Long productId) {

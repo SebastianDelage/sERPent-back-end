@@ -13,6 +13,7 @@ import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
+import com.empresa.serpent.transactions.domain.enums.AdjustmentType;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import com.empresa.serpent.transactions.repository.PaymentMethodRepository;
@@ -561,6 +562,187 @@ class SaleApplicationServiceTest {
         assertThat(capturedTransaction.getId()).isEqualTo(108L);
         assertThat(capturedTransaction.getDetails()).hasSize(1);
         assertThat(capturedTransaction.getDetails().get(0).getProduct().getId()).isEqualTo(10L);
+    }
+
+    @Nested
+    class Adjustments {
+
+        /** One line of 2 x 5000 = 10000 subtotal, so the adjustment maths are easy to read. */
+        private CreateSaleRequest requestWith(AdjustmentType type, BigDecimal value) {
+            return new CreateSaleRequest(
+                    100L, "Consumidor Final", "12345678", null, null, 1L, 1L, "Venta con ajuste",
+                    List.of(new CreateSaleItemRequest(
+                            10L, null, new BigDecimal("2.000"), new BigDecimal("5000.0000"))),
+                    type, value
+            );
+        }
+
+        private void stubHappyPath() {
+            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
+            given(transactionRepository.save(any(TransactionEntity.class)))
+                    .willAnswer(inv -> inv.getArgument(0));
+            given(saleRepository.save(any(SaleEntity.class))).willAnswer(inv -> inv.getArgument(0));
+        }
+
+        private TransactionEntity savedTransaction() {
+            ArgumentCaptor<TransactionEntity> captor = ArgumentCaptor.forClass(TransactionEntity.class);
+            verify(transactionRepository).save(captor.capture());
+            return captor.getValue();
+        }
+
+        private SaleEntity savedSale() {
+            ArgumentCaptor<SaleEntity> captor = ArgumentCaptor.forClass(SaleEntity.class);
+            verify(saleRepository).save(captor.capture());
+            return captor.getValue();
+        }
+
+        @Test
+        @DisplayName("PERCENTAGE discount resolves to a negative amount and lowers the total")
+        void percentageDiscount() {
+            stubHappyPath();
+
+            saleApplicationService.createSale(requestWith(AdjustmentType.PERCENTAGE, new BigDecimal("-10")));
+
+            // 10000 - 10% = 9000
+            assertThat(savedTransaction().getTotal()).isEqualByComparingTo("9000.0000");
+
+            SaleEntity sale = savedSale();
+            assertThat(sale.getAdjustmentType()).isEqualTo(AdjustmentType.PERCENTAGE);
+            assertThat(sale.getAdjustmentValue()).isEqualByComparingTo("-10");
+            assertThat(sale.getAdjustmentAmount()).isEqualByComparingTo("-1000.0000");
+        }
+
+        @Test
+        @DisplayName("PERCENTAGE surcharge resolves to a positive amount and raises the total")
+        void percentageSurcharge() {
+            stubHappyPath();
+
+            saleApplicationService.createSale(requestWith(AdjustmentType.PERCENTAGE, new BigDecimal("10")));
+
+            assertThat(savedTransaction().getTotal()).isEqualByComparingTo("11000.0000");
+            assertThat(savedSale().getAdjustmentAmount()).isEqualByComparingTo("1000.0000");
+        }
+
+        @Test
+        @DisplayName("FIXED discount is taken as-is and lowers the total")
+        void fixedDiscount() {
+            stubHappyPath();
+
+            saleApplicationService.createSale(requestWith(AdjustmentType.FIXED, new BigDecimal("-500.0000")));
+
+            assertThat(savedTransaction().getTotal()).isEqualByComparingTo("9500.0000");
+
+            SaleEntity sale = savedSale();
+            assertThat(sale.getAdjustmentType()).isEqualTo(AdjustmentType.FIXED);
+            assertThat(sale.getAdjustmentAmount()).isEqualByComparingTo("-500.0000");
+        }
+
+        @Test
+        @DisplayName("FIXED surcharge is taken as-is and raises the total")
+        void fixedSurcharge() {
+            stubHappyPath();
+
+            saleApplicationService.createSale(requestWith(AdjustmentType.FIXED, new BigDecimal("500.0000")));
+
+            assertThat(savedTransaction().getTotal()).isEqualByComparingTo("10500.0000");
+            assertThat(savedSale().getAdjustmentAmount()).isEqualByComparingTo("500.0000");
+        }
+
+        @Test
+        @DisplayName("A sale with no adjustment freezes NONE and a zero amount")
+        void noAdjustment() {
+            stubHappyPath();
+
+            saleApplicationService.createSale(requestWith(AdjustmentType.NONE, null));
+
+            assertThat(savedTransaction().getTotal()).isEqualByComparingTo("10000.0000");
+
+            SaleEntity sale = savedSale();
+            assertThat(sale.getAdjustmentType()).isEqualTo(AdjustmentType.NONE);
+            assertThat(sale.getAdjustmentValue()).isEqualByComparingTo("0");
+            assertThat(sale.getAdjustmentAmount()).isEqualByComparingTo("0");
+        }
+
+        @Test
+        @DisplayName("Omitting the adjustment entirely behaves like NONE")
+        void omittedAdjustmentBehavesAsNone() {
+            stubHappyPath();
+
+            saleApplicationService.createSale(requestWith(null, null));
+
+            assertThat(savedTransaction().getTotal()).isEqualByComparingTo("10000.0000");
+            assertThat(savedSale().getAdjustmentType()).isEqualTo(AdjustmentType.NONE);
+        }
+
+        @Test
+        @DisplayName("A FIXED discount larger than the subtotal is rejected")
+        void fixedDiscountBeyondSubtotalIsRejected() {
+            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
+
+            // Discounting 15000 off a 10000 sale.
+            assertThatThrownBy(() -> saleApplicationService.createSale(
+                    requestWith(AdjustmentType.FIXED, new BigDecimal("-15000.0000"))))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("El descuento aplicado no puede dejar el total de la venta en negativo.");
+
+            verify(transactionRepository, never()).save(any());
+            verify(saleRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("An absurd percentage discount (over 100%) is caught by the same guard")
+        void percentageDiscountOverOneHundredIsRejected() {
+            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
+
+            // -150% of 10000 is -15000, so the total would land at -5000.
+            assertThatThrownBy(() -> saleApplicationService.createSale(
+                    requestWith(AdjustmentType.PERCENTAGE, new BigDecimal("-150"))))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("El descuento aplicado no puede dejar el total de la venta en negativo.");
+
+            verify(transactionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("A discount that lands the total exactly at zero is allowed")
+        void discountToExactlyZeroIsAllowed() {
+            stubHappyPath();
+
+            saleApplicationService.createSale(requestWith(AdjustmentType.FIXED, new BigDecimal("-10000.0000")));
+
+            assertThat(savedTransaction().getTotal()).isEqualByComparingTo("0");
+        }
+
+        @Test
+        @DisplayName("A surcharge has no upper bound")
+        void surchargeHasNoCap() {
+            stubHappyPath();
+
+            saleApplicationService.createSale(requestWith(AdjustmentType.PERCENTAGE, new BigDecimal("500")));
+
+            assertThat(savedTransaction().getTotal()).isEqualByComparingTo("60000.0000");
+        }
+
+        @Test
+        @DisplayName("Choosing an adjustment type without a value is rejected")
+        void typeWithoutValueIsRejected() {
+            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
+
+            assertThatThrownBy(() -> saleApplicationService.createSale(
+                    requestWith(AdjustmentType.PERCENTAGE, null)))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Elegiste un tipo de ajuste pero no indicaste el valor.");
+
+            verify(transactionRepository, never()).save(any());
+        }
     }
 
     @Nested

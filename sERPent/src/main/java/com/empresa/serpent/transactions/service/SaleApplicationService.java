@@ -14,6 +14,7 @@ import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
+import com.empresa.serpent.transactions.domain.enums.AdjustmentType;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import com.empresa.serpent.transactions.repository.PaymentMethodRepository;
@@ -29,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +40,11 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class SaleApplicationService {
+
+    /** Matches the NUMERIC(19,4) money columns. */
+    private static final int AMOUNT_SCALE = 4;
+
+    private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
     private final TransactionRepository transactionRepository;
     private final SaleRepository saleRepository;
@@ -105,7 +112,7 @@ public class SaleApplicationService {
                 .details(new ArrayList<>())
                 .build();
 
-        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal subtotal = BigDecimal.ZERO;
 
         for (CreateSaleItemRequest item : request.items()) {
 
@@ -122,7 +129,7 @@ public class SaleApplicationService {
                 throw new ValidationException("El precio de un ítem no puede ser negativo.");
             }
 
-            BigDecimal subtotal = item.unitPrice().multiply(item.quantity());
+            BigDecimal lineSubtotal = item.unitPrice().multiply(item.quantity());
 
             TransactionDetailEntity detail = TransactionDetailEntity.builder()
                     .transaction(transaction)
@@ -134,11 +141,36 @@ public class SaleApplicationService {
                     )
                     .quantity(item.quantity())
                     .unitPrice(item.unitPrice())
-                    .subtotal(subtotal)
+                    .subtotal(lineSubtotal)
                     .build();
 
             transaction.getDetails().add(detail);
-            total = total.add(subtotal);
+            subtotal = subtotal.add(lineSubtotal);
+        }
+
+        AdjustmentType adjustmentType = request.adjustmentType() != null
+                ? request.adjustmentType()
+                : AdjustmentType.NONE;
+
+        if (adjustmentType != AdjustmentType.NONE && request.adjustmentValue() == null) {
+            throw new ValidationException("Elegiste un tipo de ajuste pero no indicaste el valor.");
+        }
+
+        BigDecimal adjustmentValue = adjustmentType == AdjustmentType.NONE
+                ? BigDecimal.ZERO
+                : request.adjustmentValue();
+
+        BigDecimal adjustmentAmount = switch (adjustmentType) {
+            case PERCENTAGE -> subtotal.multiply(adjustmentValue)
+                    .divide(ONE_HUNDRED, AMOUNT_SCALE, RoundingMode.HALF_UP);
+            case FIXED -> adjustmentValue;
+            case NONE -> BigDecimal.ZERO;
+        };
+
+        BigDecimal total = subtotal.add(adjustmentAmount);
+
+        if (total.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ValidationException("El descuento aplicado no puede dejar el total de la venta en negativo.");
         }
 
         transaction.setTotal(total);
@@ -153,6 +185,9 @@ public class SaleApplicationService {
                 .customerDocument(request.customerDocument())
                 .invoiceNumber(request.invoiceNumber())
                 .taxTotal(BigDecimal.ZERO)
+                .adjustmentType(adjustmentType)
+                .adjustmentValue(adjustmentValue)
+                .adjustmentAmount(adjustmentAmount)
                 .build();
 
         SaleEntity savedSale = saleRepository.save(sale);

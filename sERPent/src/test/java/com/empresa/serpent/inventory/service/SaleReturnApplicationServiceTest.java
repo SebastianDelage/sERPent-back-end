@@ -13,6 +13,7 @@ import com.empresa.serpent.transactions.domain.entity.SaleEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleReturnEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
+import com.empresa.serpent.transactions.domain.enums.AdjustmentType;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import com.empresa.serpent.transactions.repository.SaleRepository;
 import com.empresa.serpent.transactions.repository.SaleReturnRepository;
@@ -38,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -110,6 +112,26 @@ class SaleReturnApplicationServiceTest {
                 .type(TransactionType.SALE)
                 .build();
         SaleEntity sale = SaleEntity.builder().id(SALE_ID).transaction(tx).build();
+        tx.setSale(sale);
+        return sale;
+    }
+
+    /**
+     * A sale carrying a manual adjustment. The total is the post-adjustment figure, so
+     * {@code subtotal = total - adjustmentAmount} is what the proration divides by.
+     */
+    private SaleEntity adjustedSale(String total, String adjustmentAmount) {
+        TransactionEntity tx = TransactionEntity.builder()
+                .id(SALE_TX_ID)
+                .type(TransactionType.SALE)
+                .total(new BigDecimal(total))
+                .build();
+        SaleEntity sale = SaleEntity.builder()
+                .id(SALE_ID)
+                .transaction(tx)
+                .adjustmentType(AdjustmentType.FIXED)
+                .adjustmentAmount(new BigDecimal(adjustmentAmount))
+                .build();
         tx.setSale(sale);
         return sale;
     }
@@ -249,6 +271,110 @@ class SaleReturnApplicationServiceTest {
         service.createReturn(request(new BigDecimal("2")));
 
         assertThat(savedReturn().getTotal()).isEqualByComparingTo("-9200.0000");
+    }
+
+    // --- refunds on a sale carrying an adjustment ---
+
+    @Test
+    @DisplayName("Should refund the discounted price, not the list price, on a discounted sale")
+    void shouldRefundProratedByDiscount() {
+        stubCommonLookups(true);
+        // Subtotal 3000, 10% discount frozen as -300, so the customer paid 2700.
+        when(saleRepository.findById(SALE_ID))
+                .thenReturn(Optional.of(adjustedSale("2700.0000", "-300.0000")));
+        when(transactionDetailRepository.findByTransactionIdAndProductId(SALE_TX_ID, PRODUCT_ID))
+                .thenReturn(List.of(soldLine(new BigDecimal("1"), new BigDecimal("3000.0000"))));
+        when(saleReturnRepository.findByOriginalSaleId(SALE_ID)).thenReturn(List.of());
+        when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createReturn(request(new BigDecimal("1")));
+
+        // The 3000 line refunds 2700: what was actually paid for it.
+        assertThat(savedReturn().getTotal()).isEqualByComparingTo("-2700.0000");
+    }
+
+    @Test
+    @DisplayName("Should refund above list price on a surcharged sale")
+    void shouldRefundProratedBySurcharge() {
+        stubCommonLookups(true);
+        // Subtotal 3000, 10% surcharge frozen as +300, so the customer paid 3300.
+        when(saleRepository.findById(SALE_ID))
+                .thenReturn(Optional.of(adjustedSale("3300.0000", "300.0000")));
+        when(transactionDetailRepository.findByTransactionIdAndProductId(SALE_TX_ID, PRODUCT_ID))
+                .thenReturn(List.of(soldLine(new BigDecimal("1"), new BigDecimal("3000.0000"))));
+        when(saleReturnRepository.findByOriginalSaleId(SALE_ID)).thenReturn(List.of());
+        when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createReturn(request(new BigDecimal("1")));
+
+        assertThat(savedReturn().getTotal()).isEqualByComparingTo("-3300.0000");
+    }
+
+    @Test
+    @DisplayName("Should refund the plain line price when the sale carries no adjustment")
+    void shouldRefundUnproratedWhenSaleHasNoAdjustment() {
+        stubCommonLookups(true);
+        // Adjustment amount zero: the proration is a no-op, factor 1.0.
+        when(saleRepository.findById(SALE_ID))
+                .thenReturn(Optional.of(adjustedSale("3000.0000", "0.0000")));
+        when(transactionDetailRepository.findByTransactionIdAndProductId(SALE_TX_ID, PRODUCT_ID))
+                .thenReturn(List.of(soldLine(new BigDecimal("1"), new BigDecimal("3000.0000"))));
+        when(saleReturnRepository.findByOriginalSaleId(SALE_ID)).thenReturn(List.of());
+        when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createReturn(request(new BigDecimal("1")));
+
+        assertThat(savedReturn().getTotal()).isEqualByComparingTo("-3000.0000");
+    }
+
+    @Test
+    @DisplayName("Returning a whole discounted sale refunds what the customer paid, within a cent")
+    void shouldRefundWholeDiscountedSaleWithoutStrayCents() {
+        // Three products, 1 unit at 1000 each: subtotal 3000, fixed discount -1000, paid 2000.
+        // The factor (2/3) does not terminate, so this is the worst case for rounding.
+        BigDecimal saleTotal = new BigDecimal("2000.0000");
+        SaleEntity sale = adjustedSale("2000.0000", "-1000.0000");
+
+        List<Long> productIds = List.of(10L, 20L, 30L);
+
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user()));
+        when(warehouseRepository.findById(WAREHOUSE_ID)).thenReturn(Optional.of(warehouse(true)));
+        when(saleRepository.findById(SALE_ID)).thenReturn(Optional.of(sale));
+        when(saleReturnRepository.findByOriginalSaleId(SALE_ID)).thenReturn(List.of());
+        when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        for (Long productId : productIds) {
+            ProductEntity p = ProductEntity.builder()
+                    .id(productId).name("Producto " + productId).price(CURRENT_PRODUCT_PRICE).active(true).build();
+            when(productRepository.findById(productId)).thenReturn(Optional.of(p));
+            when(transactionDetailRepository.findByTransactionIdAndProductId(SALE_TX_ID, productId))
+                    .thenReturn(List.of(TransactionDetailEntity.builder()
+                            .product(p)
+                            .quantity(new BigDecimal("1"))
+                            .unitPrice(new BigDecimal("1000.0000"))
+                            .build()));
+        }
+
+        // Return every product in full, one call per product: that is the whole sale back.
+        for (Long productId : productIds) {
+            service.createReturn(new CreateSaleReturnRequest(
+                    SALE_ID, productId, WAREHOUSE_ID, new BigDecimal("1"), "Fallado", USER_ID));
+        }
+
+        ArgumentCaptor<TransactionEntity> captor = ArgumentCaptor.forClass(TransactionEntity.class);
+        verify(transactionRepository, times(productIds.size())).save(captor.capture());
+
+        BigDecimal totalRefunded = captor.getAllValues().stream()
+                .map(TransactionEntity::getTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .abs();
+
+        // Prorating a non-terminating factor across lines cannot land on the exact total:
+        // each line is rounded to the money scale independently. What matters is that the
+        // residue stays far below one cent, so no real money is created or lost.
+        BigDecimal residue = totalRefunded.subtract(saleTotal).abs();
+        assertThat(residue).isLessThan(new BigDecimal("0.01"));
+        assertThat(totalRefunded).isEqualByComparingTo("2000.0001");
     }
 
     // --- lookups / not found ---
