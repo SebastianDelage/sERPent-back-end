@@ -9,9 +9,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -57,20 +57,26 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void notFoundException_isSanitizedToGenericSpanishMessage() throws Exception {
+        // Scoped to $.message, not the whole body: the body also carries a raw epoch
+        // timestamp, whose digits can coincidentally contain "999" and fail this for
+        // reasons that have nothing to do with sanitization.
         mockMvc.perform(get("/probe/not-found"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("No se encontró el recurso solicitado."))
-                .andExpect(content().string(not(org.hamcrest.Matchers.containsString("999"))))
-                .andExpect(content().string(not(org.hamcrest.Matchers.containsString("Product not found"))));
+                .andExpect(jsonPath("$.message", not(containsString("999"))))
+                .andExpect(jsonPath("$.message", not(containsString("Product not found"))));
     }
 
     @Test
     void illegalArgumentException_isSanitizedToGenericSpanishMessage() throws Exception {
+        // Scoped to $.message, not the whole body: the body also carries a raw epoch
+        // timestamp, whose digits can coincidentally contain "42" and fail this for
+        // reasons that have nothing to do with sanitization.
         mockMvc.perform(get("/probe/illegal-argument"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("La solicitud no es válida."))
-                .andExpect(content().string(not(org.hamcrest.Matchers.containsString("42"))))
-                .andExpect(content().string(not(org.hamcrest.Matchers.containsString("inactive"))));
+                .andExpect(jsonPath("$.message", not(containsString("42"))))
+                .andExpect(jsonPath("$.message", not(containsString("inactive"))));
     }
 
     @Test
