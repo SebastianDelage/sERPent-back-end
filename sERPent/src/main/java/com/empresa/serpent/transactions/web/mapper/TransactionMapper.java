@@ -23,6 +23,9 @@ public interface TransactionMapper {
     @Mapping(target = "saleId", source = "sale.id")
     @Mapping(target = "warehouseId", source = "sale.warehouse.id")
     @Mapping(target = "warehouseName", source = "sale.warehouse.name")
+    @Mapping(target = "adjustmentType", source = "sale.adjustmentType")
+    @Mapping(target = "adjustmentValue", source = "sale.adjustmentValue")
+    @Mapping(target = "adjustmentAmount", source = "sale.adjustmentAmount")
     TransactionDetailResponse toDetailResponse(TransactionEntity entity);
 
     @Mapping(target = "productId", source = "product.id")

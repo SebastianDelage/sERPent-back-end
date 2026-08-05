@@ -1,5 +1,6 @@
 package com.empresa.serpent.transactions.web.dto.response;
 
+import com.empresa.serpent.transactions.domain.enums.AdjustmentType;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
 
@@ -21,6 +22,12 @@ public record TransactionDetailResponse(
         Long saleId,
         Long warehouseId,
         String warehouseName,
+        /** Sale-only, null for every other transaction type. */
+        AdjustmentType adjustmentType,
+        /** Sale-only: the cashier's raw input, signed. */
+        BigDecimal adjustmentValue,
+        /** Sale-only: the resolved, frozen adjustment amount. */
+        BigDecimal adjustmentAmount,
         List<TransactionItemResponse> details
 ) {
 }
