@@ -377,6 +377,25 @@ class SaleReturnApplicationServiceTest {
         assertThat(totalRefunded).isEqualByComparingTo("2000.0001");
     }
 
+    @Test
+    @DisplayName("Should refund the surcharged price on a sale whose product carried a payment-method rule")
+    void shouldRefundSurchargedPriceFromProductRule() {
+        stubCommonLookups(true);
+        // Cigarettes at 1000 with a +10% card rule were stored at 1100 a unit: the
+        // surcharge rides on the line's unit price, so nothing here needs to know
+        // about the rule — the existing formula reads what was actually charged.
+        when(saleRepository.findById(SALE_ID)).thenReturn(Optional.of(confirmedSale()));
+        when(transactionDetailRepository.findByTransactionIdAndProductId(SALE_TX_ID, PRODUCT_ID))
+                .thenReturn(List.of(soldLine(new BigDecimal("2"), new BigDecimal("1100.0000"))));
+        when(saleReturnRepository.findByOriginalSaleId(SALE_ID)).thenReturn(List.of());
+        when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createReturn(request(new BigDecimal("1")));
+
+        // One unit back refunds 1100, the surcharged price — not the 1000 list price.
+        assertThat(savedReturn().getTotal()).isEqualByComparingTo("-1100.0000");
+    }
+
     // --- lookups / not found ---
 
     @Test

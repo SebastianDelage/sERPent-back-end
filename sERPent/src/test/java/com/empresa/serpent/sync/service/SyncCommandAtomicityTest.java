@@ -15,6 +15,8 @@ import com.empresa.serpent.sync.repository.ClientSyncCommandRepository;
 import com.empresa.serpent.sync.web.dto.request.SyncCommandRequest;
 import com.empresa.serpent.sync.web.dto.response.SyncCommandResponse;
 import com.empresa.serpent.transactions.domain.entity.SaleEntity;
+import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
+import com.empresa.serpent.transactions.repository.PaymentMethodRepository;
 import com.empresa.serpent.transactions.repository.SaleRepository;
 import com.empresa.serpent.transactions.repository.TransactionRepository;
 import com.empresa.serpent.transactions.web.dto.request.CreateSaleItemRequest;
@@ -76,6 +78,8 @@ class SyncCommandAtomicityTest {
     private SaleRepository saleRepository;
     @Autowired
     private TransactionRepository transactionRepository;
+    @Autowired
+    private PaymentMethodRepository paymentMethodRepository;
 
     private static final String INVOICE = "SYNC-IT-1";
     private static final String CLIENT_ID = "device-IT";
@@ -84,6 +88,7 @@ class SyncCommandAtomicityTest {
     private Long userId;
     private Long warehouseId;
     private Long productId;
+    private Long paymentMethodId;
 
     @BeforeEach
     void setUp() {
@@ -96,9 +101,14 @@ class SyncCommandAtomicityTest {
         ProductEntity product = productRepository.save(ProductEntity.builder()
                 .name("Pollo entero").price(new BigDecimal("4500")).sku("IT_POLLO").active(true).build());
 
+        // A sale now requires a payment method, offline path included.
+        PaymentMethodEntity paymentMethod = paymentMethodRepository.save(PaymentMethodEntity.builder()
+                .name("IT cash").active(true).build());
+
         userId = user.getId();
         warehouseId = warehouse.getId();
         productId = product.getId();
+        paymentMethodId = paymentMethod.getId();
 
         snapshotRepository.save(InventoryStockSnapshotEntity.builder()
                 .product(product).warehouse(warehouse)
@@ -119,12 +129,14 @@ class SyncCommandAtomicityTest {
         snapshotRepository.deleteAll();
         productRepository.deleteAll();
         warehouseRepository.deleteAll();
+        // After transactions: they reference the payment method.
+        paymentMethodRepository.deleteAll();
         userRepository.deleteAll();
     }
 
     private SyncCommandRequest saleCommand() throws Exception {
         CreateSaleRequest sale = new CreateSaleRequest(
-                null, "Consumidor Final", null, INVOICE, null, userId, warehouseId, "Offline sale",
+                null, "Consumidor Final", null, INVOICE, paymentMethodId, userId, warehouseId, "Offline sale",
                 List.of(new CreateSaleItemRequest(productId, "Pollo entero",
                         new BigDecimal("5.000"), new BigDecimal("4500.0000"))));
         return new SyncCommandRequest(CLIENT_ID, OPERATION_ID,

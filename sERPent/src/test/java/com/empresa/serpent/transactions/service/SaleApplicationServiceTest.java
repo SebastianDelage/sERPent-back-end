@@ -10,6 +10,7 @@ import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
+import com.empresa.serpent.transactions.domain.entity.ProductPaymentAdjustmentEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
@@ -17,6 +18,7 @@ import com.empresa.serpent.transactions.domain.enums.AdjustmentType;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import com.empresa.serpent.transactions.repository.PaymentMethodRepository;
+import com.empresa.serpent.transactions.repository.ProductPaymentAdjustmentRepository;
 import com.empresa.serpent.transactions.repository.SaleRepository;
 import com.empresa.serpent.transactions.repository.TransactionRepository;
 import com.empresa.serpent.transactions.web.dto.request.CreateSaleItemRequest;
@@ -68,6 +70,13 @@ class SaleApplicationServiceTest {
 
     @Mock
     private PaymentMethodRepository paymentMethodRepository;
+
+    /**
+     * Returns an empty list by default, so a sale whose products carry no
+     * payment-method rule needs no stubbing here.
+     */
+    @Mock
+    private ProductPaymentAdjustmentRepository productPaymentAdjustmentRepository;
 
     @Mock
     private WarehouseRepository warehouseRepository;
@@ -139,13 +148,16 @@ class SaleApplicationServiceTest {
         verify(inventoryMovementService).registerSaleMovements(any(TransactionEntity.class), eq(warehouse));
     }
 
+    /**
+     * Inverted deliberately: a sale without a payment method used to be a supported
+     * case, but a payment method is now required — the per-product surcharge rules key
+     * off it, so a sale with no method cannot be priced. Checked inside the service
+     * rather than only via {@code @NotNull}, because the offline sync path bypasses
+     * Bean Validation.
+     */
     @Test
-    @DisplayName("Should create sale successfully without payment method")
-    void shouldCreateSaleSuccessfullyWithoutPaymentMethod() {
-        UserEntity createdBy = user(1L);
-        WarehouseEntity warehouse = warehouse(1L, "Main Warehouse", true);
-        ProductEntity product = product(10L, "Pollo entero");
-
+    @DisplayName("Should reject a sale with no payment method")
+    void shouldRejectSaleWithoutPaymentMethod() {
         CreateSaleRequest request = new CreateSaleRequest(
                 100L,
                 "Consumidor Final",
@@ -165,35 +177,17 @@ class SaleApplicationServiceTest {
                 )
         );
 
-        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
-        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
-        given(saleRepository.existsByInvoiceNumber("A-0001-00000001")).willReturn(false);
-        given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
+        given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
 
-        given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
-            TransactionEntity tx = invocation.getArgument(0);
-            tx.setId(101L);
-            return tx;
-        });
+        assertThatThrownBy(() -> saleApplicationService.createSale(request))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Tenés que indicar el método de pago de la venta.");
 
-        given(saleRepository.save(any(SaleEntity.class))).willAnswer(invocation -> {
-            SaleEntity sale = invocation.getArgument(0);
-            sale.setId(201L);
-            return sale;
-        });
-
-        CreateSaleResponse response = saleApplicationService.createSale(request);
-
-        assertThat(response.transactionId()).isEqualTo(101L);
-        assertThat(response.saleId()).isEqualTo(201L);
-
-        ArgumentCaptor<TransactionEntity> transactionCaptor = ArgumentCaptor.forClass(TransactionEntity.class);
-        verify(transactionRepository).save(transactionCaptor.capture());
-
-        TransactionEntity savedTransaction = transactionCaptor.getValue();
-        assertThat(savedTransaction.getPaymentMethod()).isNull();
-
+        // Rejected before the lookup, so nothing is read or written.
         verify(paymentMethodRepository, never()).findById(any());
+        verify(transactionRepository, never()).save(any());
+        verify(saleRepository, never()).save(any());
+        verify(inventoryMovementService, never()).registerSaleMovements(any(), any());
     }
 
     @Test
@@ -276,7 +270,7 @@ class SaleApplicationServiceTest {
                 "Consumidor Final",
                 "12345678",
                 null,
-                null,
+                1L,
                 1L,
                 1L,
                 "Venta simple",
@@ -291,6 +285,7 @@ class SaleApplicationServiceTest {
         );
 
         given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
         given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
         given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
 
@@ -328,7 +323,7 @@ class SaleApplicationServiceTest {
                 "Consumidor Final",
                 "12345678",
                 null,
-                null,
+                1L,
                 1L,
                 1L,
                 "Venta con descripción custom",
@@ -343,6 +338,7 @@ class SaleApplicationServiceTest {
         );
 
         given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
         given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
         given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
 
@@ -380,7 +376,7 @@ class SaleApplicationServiceTest {
                 "Consumidor Final",
                 "12345678",
                 null,
-                null,
+                1L,
                 1L,
                 1L,
                 "Venta sin factura",
@@ -395,6 +391,7 @@ class SaleApplicationServiceTest {
         );
 
         given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
         given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
         given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
 
@@ -428,7 +425,7 @@ class SaleApplicationServiceTest {
                 "Consumidor Final",
                 "12345678",
                 null,
-                null,
+                1L,
                 1L,
                 1L,
                 "Venta decimal",
@@ -449,6 +446,7 @@ class SaleApplicationServiceTest {
         );
 
         given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
         given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
         given(productRepository.findByIdIn(List.of(10L, 20L))).willReturn(List.of(product1, product2));
 
@@ -570,7 +568,7 @@ class SaleApplicationServiceTest {
         /** One line of 2 x 5000 = 10000 subtotal, so the adjustment maths are easy to read. */
         private CreateSaleRequest requestWith(AdjustmentType type, BigDecimal value) {
             return new CreateSaleRequest(
-                    100L, "Consumidor Final", "12345678", null, null, 1L, 1L, "Venta con ajuste",
+                    100L, "Consumidor Final", "12345678", null, 1L, 1L, 1L, "Venta con ajuste",
                     List.of(new CreateSaleItemRequest(
                             10L, null, new BigDecimal("2.000"), new BigDecimal("5000.0000"))),
                     type, value
@@ -579,6 +577,8 @@ class SaleApplicationServiceTest {
 
         private void stubHappyPath() {
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(paymentMethodRepository.findById(1L))
+                    .willReturn(Optional.of(paymentMethod(1L, "Cash")));
             given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
             given(transactionRepository.save(any(TransactionEntity.class)))
@@ -680,6 +680,8 @@ class SaleApplicationServiceTest {
         @DisplayName("A FIXED discount larger than the subtotal is rejected")
         void fixedDiscountBeyondSubtotalIsRejected() {
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(paymentMethodRepository.findById(1L))
+                    .willReturn(Optional.of(paymentMethod(1L, "Cash")));
             given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
 
@@ -697,6 +699,8 @@ class SaleApplicationServiceTest {
         @DisplayName("An absurd percentage discount (over 100%) is caught by the same guard")
         void percentageDiscountOverOneHundredIsRejected() {
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(paymentMethodRepository.findById(1L))
+                    .willReturn(Optional.of(paymentMethod(1L, "Cash")));
             given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
 
@@ -733,6 +737,8 @@ class SaleApplicationServiceTest {
         @DisplayName("Choosing an adjustment type without a value is rejected")
         void typeWithoutValueIsRejected() {
             given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(paymentMethodRepository.findById(1L))
+                    .willReturn(Optional.of(paymentMethod(1L, "Cash")));
             given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
 
@@ -742,6 +748,160 @@ class SaleApplicationServiceTest {
                     .hasMessage("Elegiste un tipo de ajuste pero no indicaste el valor.");
 
             verify(transactionRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    class ProductPaymentRules {
+
+        private static final Long CARD_ID = 1L;
+
+        /** A cart of one product, so the per-line maths stay readable. */
+        private CreateSaleRequest requestFor(Long productId, String quantity, String unitPrice) {
+            return new CreateSaleRequest(
+                    100L, "Consumidor Final", "12345678", null, CARD_ID, 1L, 1L, "Venta con tarjeta",
+                    List.of(new CreateSaleItemRequest(
+                            productId, null, new BigDecimal(quantity), new BigDecimal(unitPrice)))
+            );
+        }
+
+        private ProductPaymentAdjustmentEntity rule(ProductEntity product, String percentage) {
+            return ProductPaymentAdjustmentEntity.builder()
+                    .product(product)
+                    .paymentMethod(paymentMethod(CARD_ID, "Tarjeta"))
+                    .adjustmentPercentage(new BigDecimal(percentage))
+                    .active(true)
+                    .build();
+        }
+
+        private void stubLookups(List<ProductEntity> products) {
+            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(paymentMethodRepository.findById(CARD_ID))
+                    .willReturn(Optional.of(paymentMethod(CARD_ID, "Tarjeta")));
+            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(productRepository.findByIdIn(anyList())).willReturn(products);
+            given(transactionRepository.save(any(TransactionEntity.class)))
+                    .willAnswer(inv -> inv.getArgument(0));
+            given(saleRepository.save(any(SaleEntity.class))).willAnswer(inv -> inv.getArgument(0));
+        }
+
+        private TransactionEntity savedTransaction() {
+            ArgumentCaptor<TransactionEntity> captor = ArgumentCaptor.forClass(TransactionEntity.class);
+            verify(transactionRepository).save(captor.capture());
+            return captor.getValue();
+        }
+
+        @Test
+        @DisplayName("A product surcharged for this payment method has its line marked up")
+        void surchargeIsAppliedToTheLine() {
+            ProductEntity cigarettes = product(10L, "Cigarrillos");
+            stubLookups(List.of(cigarettes));
+            given(productPaymentAdjustmentRepository
+                    .findByPaymentMethodIdAndProductIdInAndActiveTrue(CARD_ID, List.of(10L)))
+                    .willReturn(List.of(rule(cigarettes, "10")));
+
+            saleApplicationService.createSale(requestFor(10L, "2.000", "1000.0000"));
+
+            TransactionDetailEntity detail = savedTransaction().getDetails().getFirst();
+            // The surcharge rides on the unit price, so the derived subtotal carries it too.
+            assertThat(detail.getUnitPrice()).isEqualByComparingTo("1100.0000");
+            assertThat(detail.getSubtotal()).isEqualByComparingTo("2200.0000");
+            assertThat(savedTransaction().getTotal()).isEqualByComparingTo("2200.0000");
+        }
+
+        @Test
+        @DisplayName("The same product is untouched when paid with a method it has no rule for")
+        void noRuleForThisMethodLeavesThePriceAlone() {
+            ProductEntity cigarettes = product(10L, "Cigarrillos");
+            stubLookups(List.of(cigarettes));
+            // Paid in cash: the card rule is simply not returned for this method.
+            given(productPaymentAdjustmentRepository
+                    .findByPaymentMethodIdAndProductIdInAndActiveTrue(CARD_ID, List.of(10L)))
+                    .willReturn(List.of());
+
+            saleApplicationService.createSale(requestFor(10L, "2.000", "1000.0000"));
+
+            TransactionDetailEntity detail = savedTransaction().getDetails().getFirst();
+            assertThat(detail.getUnitPrice()).isEqualByComparingTo("1000.0000");
+            assertThat(detail.getSubtotal()).isEqualByComparingTo("2000.0000");
+        }
+
+        @Test
+        @DisplayName("A negative percentage discounts the line instead of surcharging it")
+        void negativePercentageDiscountsTheLine() {
+            ProductEntity milk = product(10L, "Leche");
+            stubLookups(List.of(milk));
+            given(productPaymentAdjustmentRepository
+                    .findByPaymentMethodIdAndProductIdInAndActiveTrue(CARD_ID, List.of(10L)))
+                    .willReturn(List.of(rule(milk, "-5")));
+
+            saleApplicationService.createSale(requestFor(10L, "2.000", "1000.0000"));
+
+            TransactionDetailEntity detail = savedTransaction().getDetails().getFirst();
+            assertThat(detail.getUnitPrice()).isEqualByComparingTo("950.0000");
+            assertThat(detail.getSubtotal()).isEqualByComparingTo("1900.0000");
+        }
+
+        @Test
+        @DisplayName("A rule touches only its own product, not the line next to it")
+        void ruleDoesNotLeakToOtherLines() {
+            ProductEntity cigarettes = product(10L, "Cigarrillos");
+            ProductEntity bread = product(20L, "Pan");
+            stubLookups(List.of(cigarettes, bread));
+            given(productPaymentAdjustmentRepository
+                    .findByPaymentMethodIdAndProductIdInAndActiveTrue(CARD_ID, List.of(10L, 20L)))
+                    .willReturn(List.of(rule(cigarettes, "10")));
+
+            CreateSaleRequest request = new CreateSaleRequest(
+                    100L, "Consumidor Final", "12345678", null, CARD_ID, 1L, 1L, "Venta mixta",
+                    List.of(
+                            new CreateSaleItemRequest(10L, null, new BigDecimal("1.000"), new BigDecimal("1000.0000")),
+                            new CreateSaleItemRequest(20L, null, new BigDecimal("2.000"), new BigDecimal("500.0000"))
+                    )
+            );
+
+            saleApplicationService.createSale(request);
+
+            TransactionEntity saved = savedTransaction();
+            // Cigarettes surcharged to 1100; bread stays at 2 x 500.
+            assertThat(saved.getDetails().get(0).getSubtotal()).isEqualByComparingTo("1100.0000");
+            assertThat(saved.getDetails().get(1).getSubtotal()).isEqualByComparingTo("1000.0000");
+            assertThat(saved.getTotal()).isEqualByComparingTo("2100.0000");
+        }
+
+        /**
+         * The two adjustment layers must compose in order: the product rule marks the
+         * line up first, then the sale-wide manual adjustment acts on that already
+         * marked-up sum. A fixed global discount makes the order observable — inverting
+         * it would give 1650 instead of 1700.
+         */
+        @Test
+        @DisplayName("The product rule applies before the sale-wide manual adjustment")
+        void productRuleAppliesBeforeTheSaleWideAdjustment() {
+            ProductEntity cigarettes = product(10L, "Cigarrillos");
+            stubLookups(List.of(cigarettes));
+            given(productPaymentAdjustmentRepository
+                    .findByPaymentMethodIdAndProductIdInAndActiveTrue(CARD_ID, List.of(10L)))
+                    .willReturn(List.of(rule(cigarettes, "10")));
+
+            CreateSaleRequest request = new CreateSaleRequest(
+                    100L, "Consumidor Final", "12345678", null, CARD_ID, 1L, 1L, "Venta con ambas capas",
+                    List.of(new CreateSaleItemRequest(
+                            10L, null, new BigDecimal("2.000"), new BigDecimal("1000.0000"))),
+                    AdjustmentType.FIXED, new BigDecimal("-500.0000")
+            );
+
+            saleApplicationService.createSale(request);
+
+            TransactionEntity saved = savedTransaction();
+            // Layer 1: 2 x 1000 +10% = 2200 stored on the line.
+            assertThat(saved.getDetails().getFirst().getSubtotal()).isEqualByComparingTo("2200.0000");
+            // Layer 2: -500 off the marked-up 2200 = 1700 (not 1650, which is the inverted order).
+            assertThat(saved.getTotal()).isEqualByComparingTo("1700.0000");
+
+            ArgumentCaptor<SaleEntity> saleCaptor = ArgumentCaptor.forClass(SaleEntity.class);
+            verify(saleRepository).save(saleCaptor.capture());
+            assertThat(saleCaptor.getValue().getAdjustmentAmount()).isEqualByComparingTo("-500.0000");
         }
     }
 

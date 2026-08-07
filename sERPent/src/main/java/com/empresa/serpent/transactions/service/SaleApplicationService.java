@@ -11,6 +11,7 @@ import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
+import com.empresa.serpent.transactions.domain.entity.ProductPaymentAdjustmentEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
@@ -18,6 +19,7 @@ import com.empresa.serpent.transactions.domain.enums.AdjustmentType;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import com.empresa.serpent.transactions.repository.PaymentMethodRepository;
+import com.empresa.serpent.transactions.repository.ProductPaymentAdjustmentRepository;
 import com.empresa.serpent.transactions.repository.SaleRepository;
 import com.empresa.serpent.transactions.repository.TransactionRepository;
 import com.empresa.serpent.transactions.web.dto.request.CreateSaleItemRequest;
@@ -51,6 +53,7 @@ public class SaleApplicationService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final PaymentMethodRepository paymentMethodRepository;
+    private final ProductPaymentAdjustmentRepository productPaymentAdjustmentRepository;
     private final WarehouseRepository warehouseRepository;
     private final StockValidationService stockValidationService;
     private final InventoryMovementService inventoryMovementService;
@@ -62,12 +65,18 @@ public class SaleApplicationService {
                 .orElseThrow(() ->
                         new NotFoundException("User not found: " + request.createdByUserId()));
 
-        PaymentMethodEntity paymentMethod = null;
-        if (request.paymentMethodId() != null) {
-            paymentMethod = paymentMethodRepository.findById(request.paymentMethodId())
-                    .orElseThrow(() ->
-                            new NotFoundException("Payment method not found: " + request.paymentMethodId()));
+        /*
+         Checked here and not only via @NotNull on the request: the offline sync path
+         (SyncCommandResultService.processCreateSale) deserializes the payload with
+         Jackson and calls this method directly, bypassing Bean Validation entirely.
+         */
+        if (request.paymentMethodId() == null) {
+            throw new ValidationException("Tenés que indicar el método de pago de la venta.");
         }
+
+        PaymentMethodEntity paymentMethod = paymentMethodRepository.findById(request.paymentMethodId())
+                .orElseThrow(() ->
+                        new NotFoundException("Payment method not found: " + request.paymentMethodId()));
 
         WarehouseEntity warehouse = warehouseRepository.findById(request.warehouseId())
                 .orElseThrow(() ->
@@ -102,6 +111,17 @@ public class SaleApplicationService {
         Map<Long, ProductEntity> productMap = products.stream()
                 .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
 
+        /*
+         Per-product surcharge/discount for this sale's payment method, in one query
+         for the whole cart. Products without a rule are simply absent from the map.
+         */
+        Map<Long, BigDecimal> percentageByProduct = productPaymentAdjustmentRepository
+                .findByPaymentMethodIdAndProductIdInAndActiveTrue(paymentMethod.getId(), productIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        rule -> rule.getProduct().getId(),
+                        ProductPaymentAdjustmentEntity::getAdjustmentPercentage));
+
         TransactionEntity transaction = TransactionEntity.builder()
                 .type(TransactionType.SALE)
                 .status(TransactionStatus.CONFIRMED)
@@ -129,7 +149,25 @@ public class SaleApplicationService {
                 throw new ValidationException("El precio de un ítem no puede ser negativo.");
             }
 
-            BigDecimal lineSubtotal = item.unitPrice().multiply(item.quantity());
+            /*
+             Layer 1 of 2: the product's own rule for this payment method rides on the
+             unit price, because TransactionDetailEntity derives subtotal from
+             unitPrice * quantity on persist — a surcharged subtotal set by hand would
+             be overwritten. One multiply and one divide, so no intermediate rounding
+             leaks error the way a pre-rounded factor would.
+             Layer 2 (the sale-wide manual adjustment) then acts on the sum of these
+             already-adjusted lines, further down.
+             */
+            BigDecimal effectiveUnitPrice = item.unitPrice();
+            BigDecimal productPercentage = percentageByProduct.get(item.productId());
+
+            if (productPercentage != null && productPercentage.signum() != 0) {
+                effectiveUnitPrice = item.unitPrice()
+                        .multiply(ONE_HUNDRED.add(productPercentage))
+                        .divide(ONE_HUNDRED, AMOUNT_SCALE, RoundingMode.HALF_UP);
+            }
+
+            BigDecimal lineSubtotal = effectiveUnitPrice.multiply(item.quantity());
 
             TransactionDetailEntity detail = TransactionDetailEntity.builder()
                     .transaction(transaction)
@@ -140,7 +178,7 @@ public class SaleApplicationService {
                                     : product.getName()
                     )
                     .quantity(item.quantity())
-                    .unitPrice(item.unitPrice())
+                    .unitPrice(effectiveUnitPrice)
                     .subtotal(lineSubtotal)
                     .build();
 

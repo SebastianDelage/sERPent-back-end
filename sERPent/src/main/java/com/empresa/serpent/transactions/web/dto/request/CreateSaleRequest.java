@@ -15,6 +15,7 @@ public record CreateSaleRequest(
         String customerDocument,
         String invoiceNumber,
 
+        @NotNull(message = "Payment method id cannot be null")
         Long paymentMethodId,
 
         @NotNull(message = "Created by user id cannot be null")
