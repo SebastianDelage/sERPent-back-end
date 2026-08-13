@@ -84,6 +84,20 @@ public class ProductPaymentAdjustmentService {
         return mapper.toResponseList(repository.findByProductId(productId));
     }
 
+    /**
+     * The active rules that apply to a cart: same query {@link SaleApplicationService}
+     * runs at confirmation time, exposed read-only so the sale screen can preview the
+     * same prices before the customer pays. No existence check on the ids — a stale or
+     * bogus one simply yields no rule for that product, which is a safe, uneventful
+     * outcome for a preview.
+     */
+    @Transactional(readOnly = true)
+    public List<ProductPaymentAdjustmentResponse> findByPaymentMethodAndProducts(
+            Long paymentMethodId, List<Long> productIds) {
+        return mapper.toResponseList(
+                repository.findByPaymentMethodIdAndProductIdInAndActiveTrue(paymentMethodId, productIds));
+    }
+
     @Transactional
     public void delete(Long id) {
         if (!repository.existsById(id)) {

@@ -38,6 +38,20 @@ public class ProductPaymentAdjustmentController {
         return service.findByProduct(productId);
     }
 
+    /**
+     * The active rules for a cart: one payment method against several products in a
+     * single call, so the sale screen can preview surcharged prices without one
+     * request per line. Backs the live preview only — confirming a sale still prices
+     * it server-side.
+     */
+    @GetMapping("/for-sale")
+    public List<ProductPaymentAdjustmentResponse> findForSale(
+            @RequestParam Long paymentMethodId,
+            @RequestParam List<Long> productIds
+    ) {
+        return service.findByPaymentMethodAndProducts(paymentMethodId, productIds);
+    }
+
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id) {
         service.delete(id);
