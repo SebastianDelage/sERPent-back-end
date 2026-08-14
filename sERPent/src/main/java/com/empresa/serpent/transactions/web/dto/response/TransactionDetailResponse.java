@@ -22,6 +22,11 @@ public record TransactionDetailResponse(
         Long saleId,
         Long warehouseId,
         String warehouseName,
+        /*
+         The sale-wide manual adjustment: one figure for the whole sale. Distinct from
+         the per-line payment-method surcharge, which each TransactionItemResponse
+         carries in its own base/applied fields.
+         */
         /** Sale-only, null for every other transaction type. */
         AdjustmentType adjustmentType,
         /** Sale-only: the cashier's raw input, signed. */

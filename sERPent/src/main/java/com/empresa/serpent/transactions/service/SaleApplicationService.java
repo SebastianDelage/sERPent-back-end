@@ -160,8 +160,9 @@ public class SaleApplicationService {
              */
             BigDecimal effectiveUnitPrice = item.unitPrice();
             BigDecimal productPercentage = percentageByProduct.get(item.productId());
+            boolean ruleApplied = productPercentage != null && productPercentage.signum() != 0;
 
-            if (productPercentage != null && productPercentage.signum() != 0) {
+            if (ruleApplied) {
                 effectiveUnitPrice = item.unitPrice()
                         .multiply(ONE_HUNDRED.add(productPercentage))
                         .divide(ONE_HUNDRED, AMOUNT_SCALE, RoundingMode.HALF_UP);
@@ -180,6 +181,11 @@ public class SaleApplicationService {
                     .quantity(item.quantity())
                     .unitPrice(effectiveUnitPrice)
                     .subtotal(lineSubtotal)
+                    // Frozen only when a rule actually moved the price: all three together,
+                    // so the detail screen can later explain this line's unit price.
+                    .baseUnitPrice(ruleApplied ? item.unitPrice() : null)
+                    .appliedPercentage(ruleApplied ? productPercentage : null)
+                    .appliedMethodName(ruleApplied ? paymentMethod.getName() : null)
                     .build();
 
             transaction.getDetails().add(detail);

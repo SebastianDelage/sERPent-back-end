@@ -39,6 +39,33 @@ public class TransactionDetailEntity {
     @JoinColumn(name = "transaction_id", nullable = false)
     private TransactionEntity transaction;
 
+    /*
+     Frozen breakdown of this line's payment-method surcharge (mechanism 2), so the
+     sale detail can explain where unitPrice came from long after the catalog price
+     or the rule changed. All three are null together when no rule applied — the
+     ordinary case — and unitPrice alone tells the whole story.
+
+     Not to be confused with the sale-wide manual adjustment (adjustmentType /
+     adjustmentValue / adjustmentAmount), which lives on SaleEntity: that one is a
+     single figure for the whole sale, this one is per line.
+     */
+
+    /** What the line was priced at before the rule. Null when no rule applied. */
+    @Column(name = "base_unit_price", precision = 19, scale = 4)
+    private BigDecimal baseUnitPrice;
+
+    /** Signed rule percentage: positive surcharges, negative discounts. */
+    @Column(name = "applied_percentage", precision = 9, scale = 4)
+    private BigDecimal appliedPercentage;
+
+    /**
+     * The payment method's name as it read when the sale was made. Frozen rather than
+     * read from the transaction's method, which would show today's name on an old sale
+     * if the method was later renamed.
+     */
+    @Column(name = "applied_method_name", length = 80)
+    private String appliedMethodName;
+
     /**
      * Mirror of the parent transaction's type. Denormalized so the amount-sign CHECK
      * constraints can be scoped per type (a CHECK cannot reach into another table).
