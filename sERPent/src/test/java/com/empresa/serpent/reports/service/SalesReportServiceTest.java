@@ -117,7 +117,7 @@ class SalesReportServiceTest {
     @DisplayName("Should map sales summary projection and normalize average ticket scale")
     void shouldMapSalesSummaryProjectionAndNormalizeAverageTicketScale() {
 
-        SalesSummaryProjection row = summaryRow(3L, "100.0", "0", "100.0", "33.33333");
+        SalesSummaryProjection row = summaryRow(3L, "100.0", "0", "0", "0", "100.0", "33.33333");
 
         given(transactionRepository.getSalesSummaryReportRaw(any(), any())).willReturn(row);
 
@@ -132,29 +132,41 @@ class SalesReportServiceTest {
     }
 
     @Test
-    @DisplayName("Should break the summary into gross, returns and net")
-    void shouldBreakSummaryIntoGrossReturnsAndNet() {
+    @DisplayName("Should carry every part of the breakdown through to the response")
+    void shouldMapTheWholeBreakdown() {
 
-        // Sold 22500, returned 9000 of it.
-        SalesSummaryProjection row = summaryRow(2L, "22500.0000", "-9000.0000", "13500.0000", "11250.0000");
+        // 22500 at list price, +1500 surcharged by method, -2000 discounted manually,
+        // 9000 returned: 22500 + 1500 - 2000 - 9000 = 13000.
+        SalesSummaryProjection row = summaryRow(
+                2L, "22500.0000", "1500.0000", "-2000.0000", "-9000.0000", "13000.0000", "11250.0000");
 
         given(transactionRepository.getSalesSummaryReportRaw(any(), any())).willReturn(row);
 
         SalesSummaryResponse result = salesReportService.getSalesSummary(null, null);
 
-        assertThat(result.grossSales()).isEqualByComparingTo("22500.0000");
-        // Returns come through negative so the arithmetic is plain addition.
-        assertThat(result.returns()).isNegative();
+        assertThat(result.listPriceSales()).isEqualByComparingTo("22500.0000");
+        assertThat(result.paymentMethodSurcharges()).isEqualByComparingTo("1500.0000");
+        assertThat(result.manualAdjustments()).isEqualByComparingTo("-2000.0000");
         assertThat(result.returns()).isEqualByComparingTo("-9000.0000");
-        assertThat(result.netSales()).isEqualByComparingTo("13500.0000");
-        assertThat(result.grossSales().add(result.returns())).isEqualByComparingTo(result.netSales());
-        // totalRevenue mirrors netSales; averageTicket stays over gross sales.
-        assertThat(result.totalRevenue()).isEqualByComparingTo("13500.0000");
+        assertThat(result.netSales()).isEqualByComparingTo("13000.0000");
+
+        // The parts add up, so the four lines explain the net rather than just sitting beside it.
+        assertThat(
+                result.listPriceSales()
+                        .add(result.paymentMethodSurcharges())
+                        .add(result.manualAdjustments())
+                        .add(result.returns())
+        ).isEqualByComparingTo(result.netSales());
+
+        // totalRevenue mirrors netSales; averageTicket stays over sale totals.
+        assertThat(result.totalRevenue()).isEqualByComparingTo("13000.0000");
         assertThat(result.averageTicket()).isEqualByComparingTo("11250.0000");
     }
 
     private static SalesSummaryProjection summaryRow(Long transactions,
-                                                     String gross,
+                                                     String listPrice,
+                                                     String surcharges,
+                                                     String manualAdjustments,
                                                      String returns,
                                                      String net,
                                                      String averageTicket) {
@@ -165,8 +177,18 @@ class SalesReportServiceTest {
             }
 
             @Override
-            public BigDecimal getGrossSales() {
-                return new BigDecimal(gross);
+            public BigDecimal getListPriceSales() {
+                return new BigDecimal(listPrice);
+            }
+
+            @Override
+            public BigDecimal getPaymentMethodSurcharges() {
+                return new BigDecimal(surcharges);
+            }
+
+            @Override
+            public BigDecimal getManualAdjustments() {
+                return new BigDecimal(manualAdjustments);
             }
 
             @Override

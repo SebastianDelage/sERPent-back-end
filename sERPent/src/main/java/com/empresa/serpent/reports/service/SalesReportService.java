@@ -49,7 +49,9 @@ public class SalesReportService {
 
         return new SalesSummaryResponse(
                 row.getTransactions(),
-                row.getGrossSales(),
+                row.getListPriceSales(),
+                row.getPaymentMethodSurcharges(),
+                row.getManualAdjustments(),
                 row.getReturnsTotal(),
                 row.getNetSales(),
                 // totalRevenue is an alias of netSales, kept for existing consumers.

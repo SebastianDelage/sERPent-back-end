@@ -121,9 +121,12 @@ class SalesReportControllerTest {
     @DisplayName("Should return sales summary report")
     void shouldReturnSalesSummaryReport() throws Exception {
 
+        // 9100 at list price, +500 by method, -500 manual, -1000 returned = 8100.
         SalesSummaryResponse response = new SalesSummaryResponse(
                 1L,
                 new BigDecimal("9100.0000"),
+                new BigDecimal("500.0000"),
+                new BigDecimal("-500.0000"),
                 new BigDecimal("-1000.0000"),
                 new BigDecimal("8100.0000"),
                 new BigDecimal("8100.0000"),
@@ -136,7 +139,9 @@ class SalesReportControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.transactions").value(1))
-                .andExpect(jsonPath("$.grossSales").value(9100.0000))
+                .andExpect(jsonPath("$.listPriceSales").value(9100.0000))
+                .andExpect(jsonPath("$.paymentMethodSurcharges").value(500.0000))
+                .andExpect(jsonPath("$.manualAdjustments").value(-500.0000))
                 .andExpect(jsonPath("$.returns").value(-1000.0000))
                 .andExpect(jsonPath("$.netSales").value(8100.0000))
                 .andExpect(jsonPath("$.totalRevenue").value(8100.0000))

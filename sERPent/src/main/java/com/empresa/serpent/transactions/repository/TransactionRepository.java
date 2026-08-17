@@ -106,14 +106,54 @@ public interface TransactionRepository extends
             @Param("dateTo") LocalDateTime dateTo
     );
 
+    /**
+     * The summary, split into the parts that add up to it:
+     * {@code listPriceSales + paymentMethodSurcharges + manualAdjustments + returnsTotal
+     * == netSales}.
+     *
+     * <p>One query on purpose. Splitting it in three would let a sale committed between
+     * them land in some parts and not others, so the identity would fail intermittently
+     * under concurrency — a single statement sees a single snapshot.
+     *
+     * <p>The line-level figures come from scalar subqueries rather than a join: joining
+     * transactions to its details is 1:N and would fan out SUM(t.total). They are anchored
+     * on the stored {@code d.subtotal}, so a line's list-price part and its surcharge part
+     * sum back to it exactly, by algebra rather than by rounding. They are also restricted
+     * to SALE lines: a return's lines carry a negative subtotal and no base price, and
+     * would otherwise be counted a second time on top of returnsTotal.
+     *
+     * <p>The join to {@code sales} is safe — one row per transaction, enforced by
+     * ux_sales_transaction — and returns have no sales row, so SUM skips their NULL.
+     */
     @Query(value = """
        SELECT
            COUNT(CASE WHEN t.type = 'SALE' THEN 1 END) AS transactions,
-           COALESCE(SUM(CASE WHEN t.type = 'SALE' THEN t.total END), 0) AS grossSales,
            COALESCE(SUM(CASE WHEN t.type = 'RETURN' THEN t.total END), 0) AS returnsTotal,
            COALESCE(SUM(t.total), 0) AS netSales,
-           COALESCE(AVG(CASE WHEN t.type = 'SALE' THEN t.total END), 0) AS averageTicket
+           COALESCE(AVG(CASE WHEN t.type = 'SALE' THEN t.total END), 0) AS averageTicket,
+           COALESCE(SUM(s.adjustment_amount), 0) AS manualAdjustments,
+           COALESCE((
+               SELECT SUM(CASE WHEN d.base_unit_price IS NOT NULL
+                               THEN d.base_unit_price * d.quantity
+                               ELSE d.subtotal END)
+               FROM transaction_details d
+               JOIN transactions td ON td.transaction_id = d.transaction_id
+               WHERE d.transaction_type = 'SALE'
+                 AND (:dateFrom IS NULL OR td.date >= :dateFrom)
+                 AND (:dateTo IS NULL OR td.date <= :dateTo)
+           ), 0) AS listPriceSales,
+           COALESCE((
+               SELECT SUM(CASE WHEN d.base_unit_price IS NOT NULL
+                               THEN d.subtotal - (d.base_unit_price * d.quantity)
+                               ELSE 0 END)
+               FROM transaction_details d
+               JOIN transactions td ON td.transaction_id = d.transaction_id
+               WHERE d.transaction_type = 'SALE'
+                 AND (:dateFrom IS NULL OR td.date >= :dateFrom)
+                 AND (:dateTo IS NULL OR td.date <= :dateTo)
+           ), 0) AS paymentMethodSurcharges
        FROM transactions t
+       LEFT JOIN sales s ON s.transaction_id = t.transaction_id
        WHERE t.type IN ('SALE', 'RETURN')
          AND (:dateFrom IS NULL OR t.date >= :dateFrom)
          AND (:dateTo IS NULL OR t.date <= :dateTo)
