@@ -59,26 +59,10 @@ public class WarehouseService {
     }
 
     @Transactional(readOnly = true)
-    public List<WarehouseResponse> findAllActive() {
-        return warehouseRepository.findByActiveTrue().stream()
+    public List<WarehouseResponse> search(boolean includeInactive) {
+        return warehouseRepository.search(includeInactive).stream()
                 .map(warehouseMapper::toResponse)
                 .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<WarehouseResponse> findAll() {
-        return warehouseRepository.findAll().stream()
-                .map(warehouseMapper::toResponse)
-                .toList();
-    }
-
-    @Transactional
-    public void deactivate(Long id) {
-        WarehouseEntity entity = warehouseRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Warehouse not found: " + id));
-
-        entity.setActive(false);
-        warehouseRepository.save(entity);
     }
 
     private void validateName(String name, Long currentWarehouseId) {

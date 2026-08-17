@@ -36,17 +36,9 @@ public class WarehouseController {
     }
 
     @GetMapping
-    public List<WarehouseResponse> findAllActive() {
-        return warehouseService.findAllActive();
-    }
-
-    @GetMapping("/all")
-    public List<WarehouseResponse> findAll() {
-        return warehouseService.findAll();
-    }
-
-    @PatchMapping("/{id}/deactivate")
-    public void deactivate(@PathVariable Long id) {
-        warehouseService.deactivate(id);
+    public List<WarehouseResponse> search(
+            @RequestParam(defaultValue = "false") boolean includeInactive
+    ) {
+        return warehouseService.search(includeInactive);
     }
 }
