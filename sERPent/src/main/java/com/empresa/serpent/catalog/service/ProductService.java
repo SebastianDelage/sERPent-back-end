@@ -27,6 +27,7 @@ public class ProductService {
     public ProductResponse create(ProductCreateRequest request) {
         validatePrice(request.price());
         validateSku(request.sku(), null);
+        validateBarcode(request.barcode(), null);
         validateInventoryConfiguration(
                 request.minimumStock(),
                 request.reorderPoint(),
@@ -49,6 +50,7 @@ public class ProductService {
     public ProductResponse update(Long id, ProductUpdateRequest request) {
         validatePrice(request.price());
         validateSku(request.sku(), id);
+        validateBarcode(request.barcode(), id);
         validateInventoryConfiguration(
                 request.minimumStock(),
                 request.reorderPoint(),
@@ -99,6 +101,20 @@ public class ProductService {
                 .ifPresent(existing -> {
                     if (currentProductId == null || !existing.getId().equals(currentProductId)) {
                         throw new ConflictException("Ya existe un producto con el código SKU \"" + sku.trim() + "\".");
+                    }
+                });
+    }
+
+    private void validateBarcode(String barcode, Long currentProductId) {
+        if (barcode == null || barcode.isBlank()) {
+            return;
+        }
+        productRepository.findByBarcode(barcode.trim())
+                .ifPresent(existing -> {
+                    if (currentProductId == null || !existing.getId().equals(currentProductId)) {
+                        throw new ConflictException(
+                                "El código de barras \"" + barcode.trim() + "\" ya lo usa el producto \""
+                                        + existing.getName() + "\".");
                     }
                 });
     }

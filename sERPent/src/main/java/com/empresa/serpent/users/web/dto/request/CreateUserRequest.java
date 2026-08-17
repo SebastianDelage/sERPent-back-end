@@ -9,6 +9,7 @@ public record CreateUserRequest(
         @NotBlank(message = "Name cannot be blank")
         String name,
 
+        @Size(max = 100, message = "Last name cannot be longer than 100 characters")
         String lastName,
 
         @NotBlank(message = "Username cannot be blank")

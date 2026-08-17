@@ -7,6 +7,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -15,7 +16,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -81,6 +84,35 @@ public class GlobalExceptionHandler {
         HttpStatus status = HttpStatus.valueOf(ex.getStatusCode().value());
         String message = ex.getReason() != null ? ex.getReason() : "No se pudo procesar la solicitud.";
         return build(status, message, req, Map.of());
+    }
+
+    // No controller/static resource matches the request path (e.g. a removed or misspelled endpoint).
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoResourceFound(NoResourceFoundException ex, HttpServletRequest req) {
+        return build(HttpStatus.NOT_FOUND, "No se encontró el recurso solicitado.", req, Map.of());
+    }
+
+    // A DB constraint rejected the write. Never leak the raw SQL/constraint name to the client.
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException ex, HttpServletRequest req) {
+        log.warn("Data integrity violation at {}: {}", req.getRequestURI(), ex.getMessage());
+
+        if ("23505".equals(sqlState(ex))) {
+            return build(HttpStatus.CONFLICT, "Ya existe un registro con esos datos.", req, Map.of());
+        }
+        return build(HttpStatus.BAD_REQUEST, "Los datos ingresados no se pudieron guardar.", req, Map.of());
+    }
+
+    /** Walks the cause chain for the underlying SQLState (Postgres: 23505 = unique_violation). */
+    private String sqlState(Throwable ex) {
+        Throwable cause = ex;
+        while (cause != null) {
+            if (cause instanceof SQLException sqlException) {
+                return sqlException.getSQLState();
+            }
+            cause = cause.getCause();
+        }
+        return null;
     }
 
     // Anything unexpected: never leak internals to the client.

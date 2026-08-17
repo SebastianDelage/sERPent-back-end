@@ -33,6 +33,9 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
             @Param("includeInactive") boolean includeInactive
     );
 
-    /** Barcodes aren't unique by design, so the first active match wins. */
+    /** Active-only lookup, used when scanning a barcode at sale time. */
     Optional<ProductEntity> findFirstByBarcodeAndActiveTrue(String barcode);
+
+    /** Used to enforce barcode uniqueness across active and inactive products alike. */
+    Optional<ProductEntity> findByBarcode(String barcode);
 }
