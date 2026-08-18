@@ -8,11 +8,17 @@ import java.util.List;
 
 public record CreateProductTransformationRequest(
 
-        @NotNull(message = "Created by user id cannot be null")
+        /**
+         * Legacy field. The acting user now comes from the authenticated session; sending a
+         * different id here is rejected rather than silently honoured. Newer clients omit it.
+         */
         Long createdByUserId,
 
-        @NotNull(message = "Warehouse id cannot be null")
+        /** Ignored when {@code terminalId} is set: the terminal decides the warehouse. */
         Long warehouseId,
+
+        /** Optional registered point of sale. When present it supplies the warehouse. */
+        Long terminalId,
 
         String description,
 
@@ -24,4 +30,14 @@ public record CreateProductTransformationRequest(
         @NotEmpty(message = "Outputs cannot be empty")
         List<@Valid CreateProductTransformationOutputRequest> outputs
 ) {
+
+    /** Convenience overload for callers that do not go through a terminal. */
+    public CreateProductTransformationRequest(Long createdByUserId,
+                                              Long warehouseId,
+                                              String description,
+                                              String notes,
+                                              List<CreateProductTransformationInputRequest> inputs,
+                                              List<CreateProductTransformationOutputRequest> outputs) {
+        this(createdByUserId, warehouseId, null, description, notes, inputs, outputs);
+    }
 }

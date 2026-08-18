@@ -69,7 +69,7 @@ class SyncCommandResultServiceTest {
                 .build();
 
         when(repository.findById(1L)).thenReturn(Optional.of(command));
-        when(saleApplicationService.createSale(any(CreateSaleRequest.class)))
+        when(saleApplicationService.createSaleFromSync(any(CreateSaleRequest.class)))
                 .thenReturn(new CreateSaleResponse(4L, 2L, "CONFIRMED", "Sale created successfully"));
 
         SyncCommandResponse response = resultService.processCreateSale(1L);
@@ -101,7 +101,7 @@ class SyncCommandResultServiceTest {
                 .build();
 
         when(repository.findById(2L)).thenReturn(Optional.of(command));
-        when(expenseApplicationService.createExpense(any(CreateExpenseRequest.class)))
+        when(expenseApplicationService.createExpenseFromSync(any(CreateExpenseRequest.class)))
                 .thenReturn(new CreateExpenseResponse(5L, 3L, "CONFIRMED", "Expense created successfully"));
 
         SyncCommandResponse response = resultService.processCreateExpense(2L);

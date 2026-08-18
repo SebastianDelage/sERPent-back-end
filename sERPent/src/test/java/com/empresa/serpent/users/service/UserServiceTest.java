@@ -19,7 +19,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,6 +31,14 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
+import com.empresa.serpent.inventory.repository.WarehouseRepository;
+import com.empresa.serpent.inventory.web.mapper.WarehouseMapper;
+import com.empresa.serpent.shared.exception.ValidationException;
+import com.empresa.serpent.shared.security.AuthenticatedUserService;
+
+import java.util.List;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UserService")
@@ -40,21 +50,46 @@ class UserServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private WarehouseRepository warehouseRepository;
+
+    @Mock
+    private AuthenticatedUserService authenticatedUserService;
+
     private final UserMapper userMapper = Mappers.getMapper(UserMapper.class);
+    private final WarehouseMapper warehouseMapper = Mappers.getMapper(WarehouseMapper.class);
+
+    /** Every create/update in these tests assigns this warehouse unless the case says otherwise. */
+    private static final Long WAREHOUSE_ID = 7L;
+
+    private WarehouseEntity activeWarehouse() {
+        return WarehouseEntity.builder().id(WAREHOUSE_ID).name("Central").active(true).build();
+    }
+
+    private void givenWarehouseExists() {
+        when(warehouseRepository.findById(WAREHOUSE_ID)).thenReturn(Optional.of(activeWarehouse()));
+    }
 
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, userMapper, passwordEncoder);
+        userService = new UserService(
+                userRepository,
+                userMapper,
+                passwordEncoder,
+                warehouseRepository,
+                warehouseMapper,
+                authenticatedUserService
+        );
     }
 
     private CreateUserRequest createRequest(String username, String password, String email, Boolean active) {
-        return new CreateUserRequest("Juan", "Pérez", username, password, email, active);
+        return new CreateUserRequest("Juan", "Pérez", username, password, email, active, List.of(WAREHOUSE_ID));
     }
 
     private UpdateUserRequest updateRequest(String username, String password, String email, Boolean active) {
-        return new UpdateUserRequest("Juan", "Pérez", username, password, email, active);
+        return new UpdateUserRequest("Juan", "Pérez", username, password, email, active, null);
     }
 
     // --- create ---
@@ -67,6 +102,7 @@ class UserServiceTest {
         when(userRepository.findByUsername("jperez")).thenReturn(Optional.empty());
         when(userRepository.findByEmail("juan@test.com")).thenReturn(Optional.empty());
         when(passwordEncoder.encode("secret123")).thenReturn("HASHED");
+        givenWarehouseExists();
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         userService.create(request);
@@ -85,6 +121,7 @@ class UserServiceTest {
 
         when(userRepository.findByUsername("jperez")).thenReturn(Optional.empty());
         when(passwordEncoder.encode(anyString())).thenReturn("HASHED");
+        givenWarehouseExists();
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         userService.create(request);
@@ -263,5 +300,74 @@ class UserServiceTest {
         assertEquals("ana", result.get(0).username());
         assertEquals("beto", result.get(1).username());
         verify(userRepository).search(true);
+    }
+
+    // --- warehouse assignment ---
+
+    @Test
+    @DisplayName("Should reject creating a user with no warehouses")
+    void shouldRejectCreateWithoutWarehouses() {
+        CreateUserRequest request = new CreateUserRequest(
+                "Juan", "Pérez", "jperez", "secret123", null, true, List.of());
+
+        when(userRepository.findByUsername("jperez")).thenReturn(Optional.empty());
+
+        ValidationException ex = assertThrows(
+                ValidationException.class, () -> userService.create(request));
+
+        assertEquals("El usuario tiene que tener al menos un depósito asignado.", ex.getMessage());
+        verify(userRepository, never()).save(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("Should reject creating a user whose only warehouse is inactive")
+    void shouldRejectCreateWithInactiveWarehouse() {
+        CreateUserRequest request = createRequest("jperez", "secret123", null, true);
+
+        when(userRepository.findByUsername("jperez")).thenReturn(Optional.empty());
+        when(warehouseRepository.findById(WAREHOUSE_ID)).thenReturn(Optional.of(
+                WarehouseEntity.builder().id(WAREHOUSE_ID).name("Central").active(false).build()));
+
+        ValidationException ex = assertThrows(
+                ValidationException.class, () -> userService.create(request));
+
+        assertEquals("No podés asignar el depósito \"Central\" porque está inactivo.", ex.getMessage());
+        verify(userRepository, never()).save(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("Should reject emptying a user's warehouse assignment")
+    void shouldRejectReplacingWarehousesWithAnEmptyList() {
+        UserEntity existing = UserEntity.builder()
+                .id(5L).name("Juan").username("jperez").active(true).build();
+        when(userRepository.findById(5L)).thenReturn(Optional.of(existing));
+
+        ValidationException ex = assertThrows(
+                ValidationException.class, () -> userService.replaceWarehouses(5L, List.of()));
+
+        assertEquals("El usuario tiene que tener al menos un depósito asignado.", ex.getMessage());
+        verify(userRepository, never()).save(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("Should leave the assignment untouched when the update omits warehouseIds")
+    void shouldKeepWarehousesWhenUpdateOmitsThem() {
+        UserEntity existing = UserEntity.builder()
+                .id(5L).name("Juan").username("jperez").active(true)
+                .warehouses(new LinkedHashSet<>(Set.of(
+                        WarehouseEntity.builder().id(WAREHOUSE_ID).name("Central").active(true).build())))
+                .build();
+
+        when(userRepository.findByUsername("jperez")).thenReturn(Optional.empty());
+        when(userRepository.findById(5L)).thenReturn(Optional.of(existing));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.update(5L, updateRequest("jperez", null, null, true));
+
+        ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
+        verify(userRepository).save(captor.capture());
+        assertEquals(1, captor.getValue().getWarehouses().size());
+        // No warehouse lookup happened at all: the field was absent from the request.
+        verify(warehouseRepository, never()).findById(any());
     }
 }

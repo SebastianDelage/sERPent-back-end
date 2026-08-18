@@ -22,7 +22,10 @@ public record CreateWarehouseTransferRequest(
 
         String reason,
 
-        @NotNull(message = "Created by user id cannot be null")
+        /**
+         * Legacy field. The acting user now comes from the authenticated session; sending a
+         * different id here is rejected rather than silently honoured. Newer clients omit it.
+         */
         Long createdByUserId
 
 ) {

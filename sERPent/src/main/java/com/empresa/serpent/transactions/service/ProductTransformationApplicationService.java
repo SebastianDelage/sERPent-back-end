@@ -3,7 +3,6 @@ package com.empresa.serpent.transactions.service;
 import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
-import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import com.empresa.serpent.inventory.service.InventoryMovementService;
 import com.empresa.serpent.inventory.service.StockValidationService;
 import com.empresa.serpent.shared.exception.NotFoundException;
@@ -19,8 +18,9 @@ import com.empresa.serpent.transactions.web.dto.request.CreateProductTransformat
 import com.empresa.serpent.transactions.web.dto.request.CreateProductTransformationOutputRequest;
 import com.empresa.serpent.transactions.web.dto.request.CreateProductTransformationRequest;
 import com.empresa.serpent.transactions.web.dto.response.CreateProductTransformationResponse;
+import com.empresa.serpent.inventory.service.WarehouseAccessService;
+import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.users.domain.entity.UserEntity;
-import com.empresa.serpent.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,25 +37,21 @@ public class ProductTransformationApplicationService {
     private final TransactionRepository transactionRepository;
     private final ProductTransformationRepository productTransformationRepository;
     private final ProductRepository productRepository;
-    private final UserRepository userRepository;
-    private final WarehouseRepository warehouseRepository;
+    private final AuthenticatedUserService authenticatedUserService;
+    private final WarehouseAccessService warehouseAccessService;
     private final StockValidationService stockValidationService;
     private final InventoryMovementService inventoryMovementService;
 
     @Transactional
     public CreateProductTransformationResponse createTransformation(CreateProductTransformationRequest request) {
 
-        UserEntity createdBy = userRepository.findById(request.createdByUserId())
-                .orElseThrow(() ->
-                        new NotFoundException("User not found: " + request.createdByUserId()));
+        UserEntity createdBy = authenticatedUserService.requireCurrentUser();
+        authenticatedUserService.requireMatchingCreatedByUserId(request.createdByUserId(), createdBy);
 
-        WarehouseEntity warehouse = warehouseRepository.findById(request.warehouseId())
-                .orElseThrow(() ->
-                        new NotFoundException("Warehouse not found: " + request.warehouseId()));
-
-        if (!Boolean.TRUE.equals(warehouse.getActive())) {
-            throw new IllegalArgumentException("Warehouse is inactive: " + request.warehouseId());
-        }
+        // Resolves the warehouse (from the terminal when one is named), and checks that it
+        // exists, is active, and is assigned to the acting user.
+        WarehouseEntity warehouse = warehouseAccessService.resolveForOperation(
+                request.terminalId(), request.warehouseId(), createdBy);
 
         if (request.inputs() == null || request.inputs().isEmpty()) {
             throw new IllegalArgumentException("Transformation must contain at least one input");

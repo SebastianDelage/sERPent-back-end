@@ -4,6 +4,8 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import java.util.List;
+
 public record UpdateUserRequest(
 
         @NotBlank(message = "Name cannot be blank")
@@ -21,6 +23,13 @@ public record UpdateUserRequest(
         @Email(message = "Email must be a valid email address")
         String email,
 
-        Boolean active
+        Boolean active,
+
+        /**
+         * Warehouses this user may operate in. Omit (null) to leave the current assignment
+         * untouched; when present it replaces the assignment and must name at least one
+         * active warehouse.
+         */
+        List<Long> warehouseIds
 ) {
 }

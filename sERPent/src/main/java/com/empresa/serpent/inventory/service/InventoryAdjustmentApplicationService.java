@@ -4,7 +4,6 @@ import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.domain.enums.MovementType;
-import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import com.empresa.serpent.inventory.web.dto.request.CreateInventoryAdjustmentRequest;
 import com.empresa.serpent.inventory.web.dto.response.CreateInventoryAdjustmentResponse;
 import com.empresa.serpent.shared.exception.NotFoundException;
@@ -14,8 +13,8 @@ import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import com.empresa.serpent.transactions.repository.TransactionRepository;
+import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.users.domain.entity.UserEntity;
-import com.empresa.serpent.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,33 +28,29 @@ public class InventoryAdjustmentApplicationService {
 
     private final TransactionRepository transactionRepository;
     private final ProductRepository productRepository;
-    private final WarehouseRepository warehouseRepository;
-    private final UserRepository userRepository;
+    private final AuthenticatedUserService authenticatedUserService;
+    private final WarehouseAccessService warehouseAccessService;
     private final StockQueryService stockQueryService;
     private final InventoryMovementService inventoryMovementService;
 
     @Transactional
     public CreateInventoryAdjustmentResponse createAdjustment(CreateInventoryAdjustmentRequest request) {
 
-        UserEntity createdBy = userRepository.findById(request.createdByUserId())
-                .orElseThrow(() ->
-                        new NotFoundException("User not found: " + request.createdByUserId()));
+        UserEntity createdBy = authenticatedUserService.requireCurrentUser();
+        authenticatedUserService.requireMatchingCreatedByUserId(request.createdByUserId(), createdBy);
 
         ProductEntity product = productRepository.findById(request.productId())
                 .orElseThrow(() ->
                         new NotFoundException("Product not found: " + request.productId()));
 
-        WarehouseEntity warehouse = warehouseRepository.findById(request.warehouseId())
-                .orElseThrow(() ->
-                        new NotFoundException("Warehouse not found: " + request.warehouseId()));
-
-        if (!Boolean.TRUE.equals(warehouse.getActive())) {
-            throw new ValidationException("El depósito seleccionado está inactivo.");
-        }
+        // Resolves the warehouse (from the terminal when one is named), and checks that it
+        // exists, is active, and is assigned to the acting user.
+        WarehouseEntity warehouse = warehouseAccessService.resolveForOperation(
+                request.terminalId(), request.warehouseId(), createdBy);
 
         BigDecimal previousStock = stockQueryService.getStockByProductAndWarehouse(
                 request.productId(),
-                request.warehouseId()
+                warehouse.getId()
         );
 
         if (request.countedQuantity().compareTo(previousStock) == 0) {

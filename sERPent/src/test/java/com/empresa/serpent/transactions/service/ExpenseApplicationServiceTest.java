@@ -2,7 +2,9 @@ package com.empresa.serpent.transactions.service;
 
 import com.empresa.serpent.catalog.domain.entity.SupplierEntity;
 import com.empresa.serpent.catalog.repository.SupplierRepository;
+import com.empresa.serpent.shared.exception.ForbiddenException;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.transactions.domain.entity.ExpenseCategoryEntity;
 import com.empresa.serpent.transactions.domain.entity.ExpenseEntity;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
@@ -45,6 +47,9 @@ class ExpenseApplicationServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private AuthenticatedUserService authenticatedUserService;
+
+    @Mock
     private PaymentMethodRepository paymentMethodRepository;
 
     @Mock
@@ -76,7 +81,7 @@ class ExpenseApplicationServiceTest {
         SupplierEntity supplier = SupplierEntity.builder().id(1L).name("Proveedor Central").active(true).build();
         ExpenseCategoryEntity category = ExpenseCategoryEntity.builder().id(1L).name("Insumos").active(true).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(paymentMethodRepository.findById(1L)).thenReturn(Optional.of(paymentMethod));
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
         when(expenseCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
@@ -143,7 +148,7 @@ class ExpenseApplicationServiceTest {
         SupplierEntity supplier = SupplierEntity.builder().id(1L).active(true).build();
         ExpenseCategoryEntity category = ExpenseCategoryEntity.builder().id(1L).active(true).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
         when(expenseCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
         when(expenseRepository.findByReceiptNumberIgnoreCase("REC-003")).thenReturn(Optional.empty());
@@ -188,7 +193,7 @@ class ExpenseApplicationServiceTest {
         UserEntity user = UserEntity.builder().id(1L).build();
         ExpenseCategoryEntity category = ExpenseCategoryEntity.builder().id(1L).active(true).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(expenseCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
 
         when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(invocation -> {
@@ -211,18 +216,19 @@ class ExpenseApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("Should throw when user does not exist")
+    @DisplayName("Should throw when there is no authenticated user")
     void shouldThrowWhenUserDoesNotExist() {
         CreateExpenseRequest request = baseRequest();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+        when(authenticatedUserService.requireCurrentUser())
+                .thenThrow(new ForbiddenException("Tenés que iniciar sesión para realizar esta acción."));
 
-        NotFoundException ex = assertThrows(
-                NotFoundException.class,
+        ForbiddenException ex = assertThrows(
+                ForbiddenException.class,
                 () -> expenseApplicationService.createExpense(request)
         );
 
-        assertEquals("User not found: 1", ex.getMessage());
+        assertEquals("Tenés que iniciar sesión para realizar esta acción.", ex.getMessage());
         verify(transactionRepository, never()).save(any());
         verify(expenseRepository, never()).save(any());
     }
@@ -234,7 +240,7 @@ class ExpenseApplicationServiceTest {
 
         UserEntity user = UserEntity.builder().id(1L).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(paymentMethodRepository.findById(1L)).thenReturn(Optional.empty());
 
         NotFoundException ex = assertThrows(
@@ -255,7 +261,7 @@ class ExpenseApplicationServiceTest {
         UserEntity user = UserEntity.builder().id(1L).build();
         PaymentMethodEntity paymentMethod = PaymentMethodEntity.builder().id(1L).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(paymentMethodRepository.findById(1L)).thenReturn(Optional.of(paymentMethod));
         when(supplierRepository.findById(1L)).thenReturn(Optional.empty());
 
@@ -278,7 +284,7 @@ class ExpenseApplicationServiceTest {
         PaymentMethodEntity paymentMethod = PaymentMethodEntity.builder().id(1L).build();
         SupplierEntity supplier = SupplierEntity.builder().id(1L).active(false).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(paymentMethodRepository.findById(1L)).thenReturn(Optional.of(paymentMethod));
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
 
@@ -301,7 +307,7 @@ class ExpenseApplicationServiceTest {
         PaymentMethodEntity paymentMethod = PaymentMethodEntity.builder().id(1L).build();
         SupplierEntity supplier = SupplierEntity.builder().id(1L).active(true).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(paymentMethodRepository.findById(1L)).thenReturn(Optional.of(paymentMethod));
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
         when(expenseCategoryRepository.findById(1L)).thenReturn(Optional.empty());
@@ -326,7 +332,7 @@ class ExpenseApplicationServiceTest {
         SupplierEntity supplier = SupplierEntity.builder().id(1L).active(true).build();
         ExpenseCategoryEntity category = ExpenseCategoryEntity.builder().id(1L).active(false).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(paymentMethodRepository.findById(1L)).thenReturn(Optional.of(paymentMethod));
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
         when(expenseCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
@@ -359,7 +365,7 @@ class ExpenseApplicationServiceTest {
         UserEntity user = UserEntity.builder().id(1L).build();
         ExpenseCategoryEntity category = ExpenseCategoryEntity.builder().id(1L).active(true).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(expenseCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
 
         IllegalArgumentException ex = assertThrows(
@@ -389,7 +395,7 @@ class ExpenseApplicationServiceTest {
 
         UserEntity user = UserEntity.builder().id(1L).build();
         ExpenseCategoryEntity category = ExpenseCategoryEntity.builder().id(1L).active(true).build();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(expenseCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
 
         IllegalArgumentException ex = assertThrows(
@@ -413,7 +419,7 @@ class ExpenseApplicationServiceTest {
         ExpenseCategoryEntity category = ExpenseCategoryEntity.builder().id(1L).active(true).build();
         ExpenseEntity existingExpense = ExpenseEntity.builder().id(99L).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(paymentMethodRepository.findById(1L)).thenReturn(Optional.of(paymentMethod));
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
         when(expenseCategoryRepository.findById(1L)).thenReturn(Optional.of(category));

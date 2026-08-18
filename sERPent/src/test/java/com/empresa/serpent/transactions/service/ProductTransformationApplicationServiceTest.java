@@ -7,7 +7,11 @@ import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import com.empresa.serpent.inventory.service.InventoryMovementService;
 import com.empresa.serpent.inventory.service.StockValidationService;
+import com.empresa.serpent.shared.exception.ForbiddenException;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
+import com.empresa.serpent.inventory.service.WarehouseAccessService;
+import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.transactions.domain.entity.ProductTransformationEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
@@ -52,7 +56,10 @@ class ProductTransformationApplicationServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private WarehouseRepository warehouseRepository;
+    private AuthenticatedUserService authenticatedUserService;
+
+    @Mock
+    private WarehouseAccessService warehouseAccessService;
 
     @Mock
     private StockValidationService stockValidationService;
@@ -136,8 +143,8 @@ class ProductTransformationApplicationServiceTest {
                 )
         );
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(warehouseRepository.findById(1L)).thenReturn(Optional.of(warehouse));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
+        when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse);
         when(productRepository.findByIdIn(any())).thenReturn(List.of(inputProduct, outputProduct1, outputProduct2));
 
         when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(invocation -> {
@@ -203,11 +210,12 @@ class ProductTransformationApplicationServiceTest {
                 List.of(new CreateProductTransformationOutputRequest(2L, null, BigDecimal.ONE))
         );
 
-        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+        when(authenticatedUserService.requireCurrentUser())
+                .thenThrow(new ForbiddenException("Tenés que iniciar sesión para realizar esta acción."));
 
         assertThatThrownBy(() -> productTransformationApplicationService.createTransformation(request))
-                .isInstanceOf(NotFoundException.class)
-                .hasMessage("User not found: 99");
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("Tenés que iniciar sesión para realizar esta acción.");
 
         verify(transactionRepository, never()).save(any());
         verify(productTransformationRepository, never()).save(any());
@@ -225,8 +233,9 @@ class ProductTransformationApplicationServiceTest {
                 List.of(new CreateProductTransformationOutputRequest(2L, null, BigDecimal.ONE))
         );
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(warehouseRepository.findById(99L)).thenReturn(Optional.empty());
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
+        when(warehouseAccessService.resolveForOperation(any(), any(), any()))
+                .thenThrow(new NotFoundException("Warehouse not found: 99"));
 
         assertThatThrownBy(() -> productTransformationApplicationService.createTransformation(request))
                 .isInstanceOf(NotFoundException.class)
@@ -254,12 +263,13 @@ class ProductTransformationApplicationServiceTest {
                 List.of(new CreateProductTransformationOutputRequest(2L, null, BigDecimal.ONE))
         );
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(warehouseRepository.findById(3L)).thenReturn(Optional.of(inactiveWarehouse));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
+        when(warehouseAccessService.resolveForOperation(any(), any(), any()))
+                .thenThrow(new ValidationException("El depósito seleccionado está inactivo."));
 
         assertThatThrownBy(() -> productTransformationApplicationService.createTransformation(request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Warehouse is inactive: 3");
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("El depósito seleccionado está inactivo.");
 
         verify(transactionRepository, never()).save(any());
         verify(productTransformationRepository, never()).save(any());
@@ -277,8 +287,8 @@ class ProductTransformationApplicationServiceTest {
                 List.of(new CreateProductTransformationOutputRequest(2L, null, BigDecimal.ONE))
         );
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(warehouseRepository.findById(1L)).thenReturn(Optional.of(warehouse));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
+        when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse);
         when(productRepository.findByIdIn(any())).thenReturn(List.of(outputProduct1));
 
         assertThatThrownBy(() -> productTransformationApplicationService.createTransformation(request))
@@ -301,8 +311,8 @@ class ProductTransformationApplicationServiceTest {
                 List.of(new CreateProductTransformationOutputRequest(999L, null, BigDecimal.ONE))
         );
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(warehouseRepository.findById(1L)).thenReturn(Optional.of(warehouse));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
+        when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse);
         when(productRepository.findByIdIn(any())).thenReturn(List.of(inputProduct));
 
         assertThatThrownBy(() -> productTransformationApplicationService.createTransformation(request))
@@ -330,8 +340,8 @@ class ProductTransformationApplicationServiceTest {
                 )
         );
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(warehouseRepository.findById(1L)).thenReturn(Optional.of(warehouse));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
+        when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse);
         when(productRepository.findByIdIn(any())).thenReturn(List.of(inputProduct, outputProduct1, outputProduct2));
 
         when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(invocation -> {
@@ -368,8 +378,8 @@ class ProductTransformationApplicationServiceTest {
                 )
         );
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(warehouseRepository.findById(1L)).thenReturn(Optional.of(warehouse));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
+        when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse);
         when(productRepository.findByIdIn(any())).thenReturn(List.of(inputProduct, outputProduct1));
 
         when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(invocation -> {

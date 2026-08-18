@@ -36,6 +36,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Optional;
 
@@ -94,10 +96,13 @@ class SyncCommandAtomicityTest {
     void setUp() {
         cleanUp();
 
-        UserEntity user = userRepository.save(UserEntity.builder()
-                .name("Admin").username("admin_it").passwordHash("hash").active(true).build());
         WarehouseEntity warehouse = warehouseRepository.save(WarehouseEntity.builder()
                 .name("IT warehouse").active(true).build());
+        // The sync path validates the warehouse against the acting user's assignment, so the
+        // user has to actually be assigned to the warehouse the offline sale registers in.
+        UserEntity user = userRepository.save(UserEntity.builder()
+                .name("Admin").username("admin_it").passwordHash("hash").active(true)
+                .warehouses(new LinkedHashSet<>(Set.of(warehouse))).build());
         ProductEntity product = productRepository.save(ProductEntity.builder()
                 .name("Pollo entero").price(new BigDecimal("4500")).sku("IT_POLLO").active(true).build());
 
@@ -128,10 +133,12 @@ class SyncCommandAtomicityTest {
         transactionRepository.deleteAll();
         snapshotRepository.deleteAll();
         productRepository.deleteAll();
+        // Before warehouses: user_warehouses rows reference them, and the cascade only runs
+        // from the user side.
+        userRepository.deleteAll();
         warehouseRepository.deleteAll();
         // After transactions: they reference the payment method.
         paymentMethodRepository.deleteAll();
-        userRepository.deleteAll();
     }
 
     private SyncCommandRequest saleCommand() throws Exception {

@@ -25,11 +25,20 @@ public record CreateSaleRequest(
         @NotNull(message = "Payment method id cannot be null")
         Long paymentMethodId,
 
-        @NotNull(message = "Created by user id cannot be null")
+        /**
+         * Legacy field. The acting user now comes from the authenticated session; sending a
+         * different id here is rejected rather than silently honoured. Newer clients omit it.
+         *
+         * <p>The offline sync path is the one exception: it keeps honouring this field, so a
+         * sale made by one cashier and synced by another stays attributed to whoever made it.
+         */
         Long createdByUserId,
 
-        @NotNull(message = "Warehouse id cannot be null")
+        /** Ignored when {@code terminalId} is set: the terminal decides the warehouse. */
         Long warehouseId,
+
+        /** Optional registered point of sale. When present it supplies the warehouse. */
+        Long terminalId,
 
         String description,
 
@@ -47,7 +56,23 @@ public record CreateSaleRequest(
 
 ) {
 
-    /** Convenience overload for callers that do not apply an adjustment. */
+    /** Convenience overload for callers that do not go through a terminal. */
+    public CreateSaleRequest(Long customerId,
+                             String customerName,
+                             String customerDocument,
+                             String invoiceNumber,
+                             Long paymentMethodId,
+                             Long createdByUserId,
+                             Long warehouseId,
+                             String description,
+                             List<CreateSaleItemRequest> items,
+                             AdjustmentType adjustmentType,
+                             BigDecimal adjustmentValue) {
+        this(customerId, customerName, customerDocument, invoiceNumber, paymentMethodId,
+                createdByUserId, warehouseId, null, description, items, adjustmentType, adjustmentValue);
+    }
+
+    /** Convenience overload for callers that do not apply an adjustment nor use a terminal. */
     public CreateSaleRequest(Long customerId,
                              String customerName,
                              String customerDocument,
@@ -58,6 +83,6 @@ public record CreateSaleRequest(
                              String description,
                              List<CreateSaleItemRequest> items) {
         this(customerId, customerName, customerDocument, invoiceNumber, paymentMethodId,
-                createdByUserId, warehouseId, description, items, null, null);
+                createdByUserId, warehouseId, null, description, items, null, null);
     }
 }

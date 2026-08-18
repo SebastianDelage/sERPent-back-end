@@ -3,6 +3,8 @@ package com.empresa.serpent.transactions.service;
 import com.empresa.serpent.catalog.domain.entity.SupplierEntity;
 import com.empresa.serpent.catalog.repository.SupplierRepository;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
+import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.transactions.domain.entity.ExpenseCategoryEntity;
 import com.empresa.serpent.transactions.domain.entity.ExpenseEntity;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
@@ -33,13 +35,39 @@ public class ExpenseApplicationService {
     private final PaymentMethodRepository paymentMethodRepository;
     private final SupplierRepository supplierRepository;
     private final ExpenseCategoryRepository expenseCategoryRepository;
+    private final AuthenticatedUserService authenticatedUserService;
 
+    /** Online path: the acting user is whoever is holding the session. */
     @Transactional
     public CreateExpenseResponse createExpense(CreateExpenseRequest request) {
+        UserEntity createdBy = authenticatedUserService.requireCurrentUser();
+        authenticatedUserService.requireMatchingCreatedByUserId(request.createdByUserId(), createdBy);
+
+        return createExpense(request, createdBy);
+    }
+
+    /**
+     * Offline sync path: the acting user is the one named in the queued payload, not whoever
+     * happens to be uploading it — attribution belongs to whoever recorded the expense.
+     *
+     * <p>Knowingly the weaker of the two paths: the payload is client-supplied and therefore
+     * forgeable. Accepted because the alternative — attributing the expense to whoever syncs —
+     * corrupts the data itself, which is worse than the residual risk.
+     */
+    @Transactional
+    public CreateExpenseResponse createExpenseFromSync(CreateExpenseRequest request) {
+        if (request.createdByUserId() == null) {
+            throw new ValidationException("La operación no indica el usuario que la registró.");
+        }
 
         UserEntity createdBy = userRepository.findById(request.createdByUserId())
                 .orElseThrow(() ->
                         new NotFoundException("User not found: " + request.createdByUserId()));
+
+        return createExpense(request, createdBy);
+    }
+
+    private CreateExpenseResponse createExpense(CreateExpenseRequest request, UserEntity createdBy) {
 
         PaymentMethodEntity paymentMethod = null;
         if (request.paymentMethodId() != null) {

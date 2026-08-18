@@ -47,7 +47,7 @@ public class SyncCommandResultService {
         ClientSyncCommandEntity command = loadCommand(commandId);
 
         CreateSaleRequest payload = readPayload(command.getPayload(), CreateSaleRequest.class);
-        CreateSaleResponse result = saleApplicationService.createSale(payload);
+        CreateSaleResponse result = saleApplicationService.createSaleFromSync(payload);
 
         markProcessed(command, SyncResultReferenceType.SALE, result.saleId());
 
@@ -65,7 +65,7 @@ public class SyncCommandResultService {
         ClientSyncCommandEntity command = loadCommand(commandId);
 
         CreateExpenseRequest payload = readPayload(command.getPayload(), CreateExpenseRequest.class);
-        CreateExpenseResponse result = expenseApplicationService.createExpense(payload);
+        CreateExpenseResponse result = expenseApplicationService.createExpenseFromSync(payload);
 
         markProcessed(command, SyncResultReferenceType.EXPENSE, result.expenseId());
 

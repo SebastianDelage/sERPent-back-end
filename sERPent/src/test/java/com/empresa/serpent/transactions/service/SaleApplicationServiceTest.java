@@ -7,7 +7,10 @@ import com.empresa.serpent.inventory.service.InventoryMovementService;
 import com.empresa.serpent.inventory.service.StockValidationService;
 import com.empresa.serpent.inventory.web.dto.request.StockCheckItemRequest;
 import com.empresa.serpent.shared.exception.ConflictException;
+import com.empresa.serpent.shared.exception.ForbiddenException;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.inventory.service.WarehouseAccessService;
+import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.ProductPaymentAdjustmentEntity;
@@ -69,6 +72,9 @@ class SaleApplicationServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private AuthenticatedUserService authenticatedUserService;
+
+    @Mock
     private PaymentMethodRepository paymentMethodRepository;
 
     /**
@@ -79,7 +85,7 @@ class SaleApplicationServiceTest {
     private ProductPaymentAdjustmentRepository productPaymentAdjustmentRepository;
 
     @Mock
-    private WarehouseRepository warehouseRepository;
+    private WarehouseAccessService warehouseAccessService;
 
     @Mock
     private StockValidationService stockValidationService;
@@ -100,9 +106,9 @@ class SaleApplicationServiceTest {
 
         CreateSaleRequest request = createSaleRequestOneItem();
 
-        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(authenticatedUserService.requireCurrentUser()).willReturn(createdBy);
         given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod));
-        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse);
         given(saleRepository.existsByInvoiceNumber("A-0001-00000001")).willReturn(false);
         given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
 
@@ -177,7 +183,7 @@ class SaleApplicationServiceTest {
                 )
         );
 
-        given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+        given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
 
         assertThatThrownBy(() -> saleApplicationService.createSale(request))
                 .isInstanceOf(ValidationException.class)
@@ -224,9 +230,9 @@ class SaleApplicationServiceTest {
                 )
         );
 
-        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(authenticatedUserService.requireCurrentUser()).willReturn(createdBy);
         given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod));
-        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse);
         given(saleRepository.existsByInvoiceNumber("A-0001-00000002")).willReturn(false);
         given(productRepository.findByIdIn(List.of(10L, 20L))).willReturn(List.of(product1, product2));
 
@@ -284,9 +290,9 @@ class SaleApplicationServiceTest {
                 )
         );
 
-        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(authenticatedUserService.requireCurrentUser()).willReturn(createdBy);
         given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
-        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse);
         given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
 
         given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
@@ -337,9 +343,9 @@ class SaleApplicationServiceTest {
                 )
         );
 
-        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(authenticatedUserService.requireCurrentUser()).willReturn(createdBy);
         given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
-        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse);
         given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
 
         given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
@@ -390,9 +396,9 @@ class SaleApplicationServiceTest {
                 )
         );
 
-        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(authenticatedUserService.requireCurrentUser()).willReturn(createdBy);
         given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
-        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse);
         given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
 
         given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
@@ -445,9 +451,9 @@ class SaleApplicationServiceTest {
                 )
         );
 
-        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(authenticatedUserService.requireCurrentUser()).willReturn(createdBy);
         given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
-        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse);
         given(productRepository.findByIdIn(List.of(10L, 20L))).willReturn(List.of(product1, product2));
 
         given(transactionRepository.save(any(TransactionEntity.class))).willAnswer(invocation -> {
@@ -485,9 +491,9 @@ class SaleApplicationServiceTest {
 
         CreateSaleRequest request = createSaleRequestOneItem();
 
-        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(authenticatedUserService.requireCurrentUser()).willReturn(createdBy);
         given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod));
-        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse);
         given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
         given(saleRepository.existsByInvoiceNumber("A-0001-00000001")).willReturn(false);
 
@@ -529,9 +535,9 @@ class SaleApplicationServiceTest {
 
         CreateSaleRequest request = createSaleRequestOneItem();
 
-        given(userRepository.findById(1L)).willReturn(Optional.of(createdBy));
+        given(authenticatedUserService.requireCurrentUser()).willReturn(createdBy);
         given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod));
-        given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse));
+        given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse);
         given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
         given(saleRepository.existsByInvoiceNumber("A-0001-00000001")).willReturn(false);
 
@@ -576,10 +582,10 @@ class SaleApplicationServiceTest {
         }
 
         private void stubHappyPath() {
-            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
             given(paymentMethodRepository.findById(1L))
                     .willReturn(Optional.of(paymentMethod(1L, "Cash")));
-            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse(1L, "Central", true));
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
             given(transactionRepository.save(any(TransactionEntity.class)))
                     .willAnswer(inv -> inv.getArgument(0));
@@ -679,10 +685,10 @@ class SaleApplicationServiceTest {
         @Test
         @DisplayName("A FIXED discount larger than the subtotal is rejected")
         void fixedDiscountBeyondSubtotalIsRejected() {
-            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
             given(paymentMethodRepository.findById(1L))
                     .willReturn(Optional.of(paymentMethod(1L, "Cash")));
-            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse(1L, "Central", true));
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
 
             // Discounting 15000 off a 10000 sale.
@@ -698,10 +704,10 @@ class SaleApplicationServiceTest {
         @Test
         @DisplayName("An absurd percentage discount (over 100%) is caught by the same guard")
         void percentageDiscountOverOneHundredIsRejected() {
-            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
             given(paymentMethodRepository.findById(1L))
                     .willReturn(Optional.of(paymentMethod(1L, "Cash")));
-            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse(1L, "Central", true));
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
 
             // -150% of 10000 is -15000, so the total would land at -5000.
@@ -736,10 +742,10 @@ class SaleApplicationServiceTest {
         @Test
         @DisplayName("Choosing an adjustment type without a value is rejected")
         void typeWithoutValueIsRejected() {
-            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
             given(paymentMethodRepository.findById(1L))
                     .willReturn(Optional.of(paymentMethod(1L, "Cash")));
-            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse(1L, "Central", true));
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
 
             assertThatThrownBy(() -> saleApplicationService.createSale(
@@ -775,10 +781,10 @@ class SaleApplicationServiceTest {
         }
 
         private void stubLookups(List<ProductEntity> products) {
-            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
             given(paymentMethodRepository.findById(CARD_ID))
                     .willReturn(Optional.of(paymentMethod(CARD_ID, "Tarjeta")));
-            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse(1L, "Central", true));
             given(productRepository.findByIdIn(anyList())).willReturn(products);
             given(transactionRepository.save(any(TransactionEntity.class)))
                     .willAnswer(inv -> inv.getArgument(0));
@@ -909,15 +915,16 @@ class SaleApplicationServiceTest {
     class ErrorCases {
 
         @Test
-        @DisplayName("Should throw when user is not found")
+        @DisplayName("Should throw when there is no authenticated user")
         void shouldThrowWhenUserIsNotFound() {
             CreateSaleRequest request = createSaleRequestOneItem();
 
-            given(userRepository.findById(1L)).willReturn(Optional.empty());
+            given(authenticatedUserService.requireCurrentUser())
+                    .willThrow(new ForbiddenException("Tenés que iniciar sesión para realizar esta acción."));
 
             assertThatThrownBy(() -> saleApplicationService.createSale(request))
-                    .isInstanceOf(NotFoundException.class)
-                    .hasMessage("User not found: 1");
+                    .isInstanceOf(ForbiddenException.class)
+                    .hasMessage("Tenés que iniciar sesión para realizar esta acción.");
 
             verify(transactionRepository, never()).save(any());
             verify(saleRepository, never()).save(any());
@@ -929,7 +936,7 @@ class SaleApplicationServiceTest {
         void shouldThrowWhenPaymentMethodIsNotFound() {
             CreateSaleRequest request = createSaleRequestOneItem();
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
             given(paymentMethodRepository.findById(1L)).willReturn(Optional.empty());
 
             assertThatThrownBy(() -> saleApplicationService.createSale(request))
@@ -945,9 +952,10 @@ class SaleApplicationServiceTest {
         void shouldThrowWhenWarehouseIsNotFound() {
             CreateSaleRequest request = createSaleRequestOneItem();
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
             given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
-            given(warehouseRepository.findById(1L)).willReturn(Optional.empty());
+            given(warehouseAccessService.resolveForOperation(any(), any(), any()))
+                    .willThrow(new NotFoundException("Warehouse not found: 1"));
 
             assertThatThrownBy(() -> saleApplicationService.createSale(request))
                     .isInstanceOf(NotFoundException.class)
@@ -962,9 +970,10 @@ class SaleApplicationServiceTest {
         void shouldThrowWhenWarehouseIsInactive() {
             CreateSaleRequest request = createSaleRequestOneItem();
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
             given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
-            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", false)));
+            given(warehouseAccessService.resolveForOperation(any(), any(), any()))
+                    .willThrow(new ValidationException("El depósito seleccionado está inactivo."));
 
             assertThatThrownBy(() -> saleApplicationService.createSale(request))
                     .isInstanceOf(ValidationException.class)
@@ -979,9 +988,9 @@ class SaleApplicationServiceTest {
         void shouldThrowWhenInvoiceNumberAlreadyExists() {
             CreateSaleRequest request = createSaleRequestOneItem();
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
             given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
-            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse(1L, "Central", true));
             given(saleRepository.existsByInvoiceNumber("A-0001-00000001")).willReturn(true);
 
             assertThatThrownBy(() -> saleApplicationService.createSale(request))
@@ -997,9 +1006,9 @@ class SaleApplicationServiceTest {
         void shouldThrowWhenProductIsNotFound() {
             CreateSaleRequest request = createSaleRequestOneItem();
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
             given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
-            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse(1L, "Central", true));
             given(saleRepository.existsByInvoiceNumber("A-0001-00000001")).willReturn(false);
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of());
 
@@ -1035,9 +1044,9 @@ class SaleApplicationServiceTest {
 
             ProductEntity product = product(10L, "Pollo entero");
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
             given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
-            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse(1L, "Central", true));
             given(saleRepository.existsByInvoiceNumber("A-0001-00000001")).willReturn(false);
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
 
@@ -1073,9 +1082,9 @@ class SaleApplicationServiceTest {
 
             ProductEntity product = product(10L, "Pollo entero");
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
             given(paymentMethodRepository.findById(1L)).willReturn(Optional.of(paymentMethod(1L, "Cash")));
-            given(warehouseRepository.findById(1L)).willReturn(Optional.of(warehouse(1L, "Central", true)));
+            given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse(1L, "Central", true));
             given(saleRepository.existsByInvoiceNumber("A-0001-00000001")).willReturn(false);
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product));
 

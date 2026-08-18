@@ -7,7 +7,11 @@ import com.empresa.serpent.catalog.repository.SupplierRepository;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import com.empresa.serpent.inventory.service.InventoryMovementService;
+import com.empresa.serpent.shared.exception.ForbiddenException;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
+import com.empresa.serpent.inventory.service.WarehouseAccessService;
+import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.PurchaseEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
@@ -52,13 +56,16 @@ class PurchaseApplicationServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private AuthenticatedUserService authenticatedUserService;
+
+    @Mock
     private PaymentMethodRepository paymentMethodRepository;
 
     @Mock
     private SupplierRepository supplierRepository;
 
     @Mock
-    private WarehouseRepository warehouseRepository;
+    private WarehouseAccessService warehouseAccessService;
 
     @Mock
     private InventoryMovementService inventoryMovementService;
@@ -90,10 +97,10 @@ class PurchaseApplicationServiceTest {
         ProductEntity product1 = ProductEntity.builder().id(1L).name("Pollo entero").price(new BigDecimal("2500")).active(true).build();
         ProductEntity product2 = ProductEntity.builder().id(2L).name("Pata muslo").price(new BigDecimal("1800")).active(true).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(paymentMethodRepository.findById(1L)).thenReturn(Optional.of(paymentMethod));
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
-        when(warehouseRepository.findById(1L)).thenReturn(Optional.of(warehouse));
+        when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse);
         when(purchaseRepository.existsByReceiptNumberIgnoreCase("PUR-002")).thenReturn(false);
         when(productRepository.findByIdIn(List.of(1L, 2L))).thenReturn(List.of(product1, product2));
 
@@ -133,17 +140,18 @@ class PurchaseApplicationServiceTest {
     }
 
     @Test
-    void createPurchase_shouldThrowWhenUserDoesNotExist() {
+    void createPurchase_shouldThrowWhenThereIsNoAuthenticatedUser() {
         CreatePurchaseRequest request = baseRequest();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+        when(authenticatedUserService.requireCurrentUser())
+                .thenThrow(new ForbiddenException("Tenés que iniciar sesión para realizar esta acción."));
 
-        NotFoundException ex = assertThrows(
-                NotFoundException.class,
+        ForbiddenException ex = assertThrows(
+                ForbiddenException.class,
                 () -> purchaseApplicationService.createPurchase(request)
         );
 
-        assertEquals("User not found: 1", ex.getMessage());
+        assertEquals("Tenés que iniciar sesión para realizar esta acción.", ex.getMessage());
         verify(transactionRepository, never()).save(any());
         verify(purchaseRepository, never()).save(any());
         verify(inventoryMovementService, never()).registerPurchaseMovements(any(), any());
@@ -156,7 +164,7 @@ class PurchaseApplicationServiceTest {
         UserEntity user = UserEntity.builder().id(1L).build();
         SupplierEntity supplier = SupplierEntity.builder().id(1L).active(false).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
 
         IllegalArgumentException ex = assertThrows(
@@ -175,18 +183,18 @@ class PurchaseApplicationServiceTest {
 
         UserEntity user = UserEntity.builder().id(1L).build();
         SupplierEntity supplier = SupplierEntity.builder().id(1L).active(true).build();
-        WarehouseEntity warehouse = WarehouseEntity.builder().id(1L).active(false).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
-        when(warehouseRepository.findById(1L)).thenReturn(Optional.of(warehouse));
+        when(warehouseAccessService.resolveForOperation(any(), any(), any()))
+                .thenThrow(new ValidationException("El depósito seleccionado está inactivo."));
 
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
+        ValidationException ex = assertThrows(
+                ValidationException.class,
                 () -> purchaseApplicationService.createPurchase(request)
         );
 
-        assertEquals("Warehouse is inactive: 1", ex.getMessage());
+        assertEquals("El depósito seleccionado está inactivo.", ex.getMessage());
         verify(transactionRepository, never()).save(any());
         verify(purchaseRepository, never()).save(any());
     }
@@ -199,9 +207,9 @@ class PurchaseApplicationServiceTest {
         SupplierEntity supplier = SupplierEntity.builder().id(1L).active(true).build();
         WarehouseEntity warehouse = WarehouseEntity.builder().id(1L).active(true).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
-        when(warehouseRepository.findById(1L)).thenReturn(Optional.of(warehouse));
+        when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse);
         when(purchaseRepository.existsByReceiptNumberIgnoreCase("PUR-002")).thenReturn(true);
 
         IllegalArgumentException ex = assertThrows(
@@ -222,9 +230,9 @@ class PurchaseApplicationServiceTest {
         SupplierEntity supplier = SupplierEntity.builder().id(1L).active(true).build();
         WarehouseEntity warehouse = WarehouseEntity.builder().id(1L).active(true).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
-        when(warehouseRepository.findById(1L)).thenReturn(Optional.of(warehouse));
+        when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse);
         when(purchaseRepository.existsByReceiptNumberIgnoreCase("PUR-002")).thenReturn(false);
         when(productRepository.findByIdIn(List.of(1L))).thenReturn(List.of());
 
@@ -258,9 +266,9 @@ class PurchaseApplicationServiceTest {
         WarehouseEntity warehouse = WarehouseEntity.builder().id(1L).active(true).build();
         ProductEntity product = ProductEntity.builder().id(1L).name("Pollo entero").build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
-        when(warehouseRepository.findById(1L)).thenReturn(Optional.of(warehouse));
+        when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse);
         when(purchaseRepository.existsByReceiptNumberIgnoreCase("PUR-005")).thenReturn(false);
         when(productRepository.findByIdIn(List.of(1L))).thenReturn(List.of(product));
 
@@ -294,9 +302,9 @@ class PurchaseApplicationServiceTest {
         WarehouseEntity warehouse = WarehouseEntity.builder().id(1L).active(true).build();
         ProductEntity product = ProductEntity.builder().id(1L).name("Pollo entero").build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
-        when(warehouseRepository.findById(1L)).thenReturn(Optional.of(warehouse));
+        when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse);
         when(productRepository.findByIdIn(List.of(1L))).thenReturn(List.of(product));
 
         when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(invocation -> {

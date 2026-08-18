@@ -13,8 +13,11 @@ public record CreateSaleReturnRequest(
         @NotNull(message = "Product id cannot be null")
         Long productId,
 
-        @NotNull(message = "Warehouse id cannot be null")
+        /** Ignored when {@code terminalId} is set: the terminal decides the warehouse. */
         Long warehouseId,
+
+        /** Optional registered point of sale. When present it supplies the warehouse. */
+        Long terminalId,
 
         @NotNull(message = "Quantity cannot be null")
         @Positive(message = "Quantity must be greater than zero")
@@ -22,8 +25,21 @@ public record CreateSaleReturnRequest(
 
         String reason,
 
-        @NotNull(message = "Created by user id cannot be null")
+        /**
+         * Legacy field. The acting user now comes from the authenticated session; sending a
+         * different id here is rejected rather than silently honoured. Newer clients omit it.
+         */
         Long createdByUserId
 
 ) {
+
+    /** Convenience overload for callers that do not go through a terminal. */
+    public CreateSaleReturnRequest(Long saleId,
+                                   Long productId,
+                                   Long warehouseId,
+                                   BigDecimal quantity,
+                                   String reason,
+                                   Long createdByUserId) {
+        this(saleId, productId, warehouseId, null, quantity, reason, createdByUserId);
+    }
 }

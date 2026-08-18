@@ -12,9 +12,12 @@ import org.mapstruct.MappingTarget;
 @Mapper(config = MapStructConfig.class)
 public interface UserMapper {
 
+    // Warehouse assignment is resolved from ids by UserService, not copied from the request:
+    // the DTO carries warehouseIds, the entity holds WarehouseEntity references.
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "passwordHash", ignore = true)
+    @Mapping(target = "warehouses", ignore = true)
     UserEntity toEntity(CreateUserRequest request);
 
     UserResponse toResponse(UserEntity entity);
@@ -22,5 +25,6 @@ public interface UserMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "passwordHash", ignore = true)
+    @Mapping(target = "warehouses", ignore = true)
     void updateEntityFromRequest(UpdateUserRequest request, @MappingTarget UserEntity entity);
 }

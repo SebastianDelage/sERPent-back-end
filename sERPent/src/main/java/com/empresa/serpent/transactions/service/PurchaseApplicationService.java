@@ -5,8 +5,9 @@ import com.empresa.serpent.catalog.domain.entity.SupplierEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.catalog.repository.SupplierRepository;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
-import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import com.empresa.serpent.inventory.service.InventoryMovementService;
+import com.empresa.serpent.inventory.service.WarehouseAccessService;
+import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.PurchaseEntity;
@@ -21,7 +22,6 @@ import com.empresa.serpent.transactions.web.dto.request.CreatePurchaseItemReques
 import com.empresa.serpent.transactions.web.dto.request.CreatePurchaseRequest;
 import com.empresa.serpent.transactions.web.dto.response.CreatePurchaseResponse;
 import com.empresa.serpent.users.domain.entity.UserEntity;
-import com.empresa.serpent.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,18 +40,17 @@ public class PurchaseApplicationService {
     private final TransactionRepository transactionRepository;
     private final PurchaseRepository purchaseRepository;
     private final ProductRepository productRepository;
-    private final UserRepository userRepository;
     private final PaymentMethodRepository paymentMethodRepository;
     private final SupplierRepository supplierRepository;
-    private final WarehouseRepository warehouseRepository;
     private final InventoryMovementService inventoryMovementService;
+    private final AuthenticatedUserService authenticatedUserService;
+    private final WarehouseAccessService warehouseAccessService;
 
     @Transactional
     public CreatePurchaseResponse createPurchase(CreatePurchaseRequest request) {
 
-        UserEntity createdBy = userRepository.findById(request.createdByUserId())
-                .orElseThrow(() ->
-                        new NotFoundException("User not found: " + request.createdByUserId()));
+        UserEntity createdBy = authenticatedUserService.requireCurrentUser();
+        authenticatedUserService.requireMatchingCreatedByUserId(request.createdByUserId(), createdBy);
 
         PaymentMethodEntity paymentMethod = null;
         if (request.paymentMethodId() != null) {
@@ -71,13 +70,10 @@ public class PurchaseApplicationService {
             }
         }
 
-        WarehouseEntity warehouse = warehouseRepository.findById(request.warehouseId())
-                .orElseThrow(() ->
-                        new NotFoundException("Warehouse not found: " + request.warehouseId()));
-
-        if (!Boolean.TRUE.equals(warehouse.getActive())) {
-            throw new IllegalArgumentException("Warehouse is inactive: " + request.warehouseId());
-        }
+        // Resolves the warehouse (from the terminal when one is named), and checks that it
+        // exists, is active, and is assigned to the acting user.
+        WarehouseEntity warehouse = warehouseAccessService.resolveForOperation(
+                request.terminalId(), request.warehouseId(), createdBy);
 
         validateReceiptNumber(request.receiptNumber());
 

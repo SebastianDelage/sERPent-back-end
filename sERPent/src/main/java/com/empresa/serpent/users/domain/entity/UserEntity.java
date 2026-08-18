@@ -1,9 +1,13 @@
 package com.empresa.serpent.users.domain.entity;
 
+import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -41,4 +45,18 @@ public class UserEntity {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    /**
+     * Warehouses this user may operate in. EAGER because every stock operation checks it
+     * on the acting user, so a lazy set would just be a guaranteed second query (and a
+     * LazyInitializationException risk outside a transaction).
+     */
+    @Builder.Default
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "user_warehouses",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "warehouse_id")
+    )
+    private Set<WarehouseEntity> warehouses = new LinkedHashSet<>();
 }

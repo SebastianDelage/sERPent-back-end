@@ -7,6 +7,7 @@ import com.empresa.serpent.inventory.domain.enums.MovementType;
 import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import com.empresa.serpent.inventory.web.dto.request.CreateSaleReturnRequest;
 import com.empresa.serpent.inventory.web.dto.response.CreateSaleReturnResponse;
+import com.empresa.serpent.shared.exception.ForbiddenException;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.transactions.domain.entity.SaleEntity;
@@ -19,6 +20,7 @@ import com.empresa.serpent.transactions.repository.SaleRepository;
 import com.empresa.serpent.transactions.repository.SaleReturnRepository;
 import com.empresa.serpent.transactions.repository.TransactionDetailRepository;
 import com.empresa.serpent.transactions.repository.TransactionRepository;
+import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.users.domain.entity.UserEntity;
 import com.empresa.serpent.users.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,8 +54,8 @@ class SaleReturnApplicationServiceTest {
     @Mock private SaleRepository saleRepository;
     @Mock private SaleReturnRepository saleReturnRepository;
     @Mock private ProductRepository productRepository;
-    @Mock private WarehouseRepository warehouseRepository;
-    @Mock private UserRepository userRepository;
+    @Mock private WarehouseAccessService warehouseAccessService;
+    @Mock private AuthenticatedUserService authenticatedUserService;
     @Mock private InventoryMovementService inventoryMovementService;
 
     private SaleReturnApplicationService service;
@@ -78,8 +80,8 @@ class SaleReturnApplicationServiceTest {
                 saleRepository,
                 saleReturnRepository,
                 productRepository,
-                warehouseRepository,
-                userRepository,
+                authenticatedUserService,
+                warehouseAccessService,
                 inventoryMovementService
         );
     }
@@ -158,9 +160,9 @@ class SaleReturnApplicationServiceTest {
 
     /** Wires the happy-path lookups shared by most tests. */
     private void stubCommonLookups(boolean warehouseActive) {
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user()));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user());
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product()));
-        when(warehouseRepository.findById(WAREHOUSE_ID)).thenReturn(Optional.of(warehouse(warehouseActive)));
+        when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse(warehouseActive));
     }
 
     // --- happy path ---
@@ -337,8 +339,8 @@ class SaleReturnApplicationServiceTest {
 
         List<Long> productIds = List.of(10L, 20L, 30L);
 
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user()));
-        when(warehouseRepository.findById(WAREHOUSE_ID)).thenReturn(Optional.of(warehouse(true)));
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(user());
+        when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse(true));
         when(saleRepository.findById(SALE_ID)).thenReturn(Optional.of(sale));
         when(saleReturnRepository.findByOriginalSaleId(SALE_ID)).thenReturn(List.of());
         when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -399,11 +401,12 @@ class SaleReturnApplicationServiceTest {
     // --- lookups / not found ---
 
     @Test
-    @DisplayName("Should throw when the user is not found")
+    @DisplayName("Should throw when there is no authenticated user")
     void shouldThrowWhenUserNotFound() {
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+        when(authenticatedUserService.requireCurrentUser())
+                .thenThrow(new ForbiddenException("Tenés que iniciar sesión para realizar esta acción."));
 
-        assertThrows(NotFoundException.class, () -> service.createReturn(request(BigDecimal.ONE)));
+        assertThrows(ForbiddenException.class, () -> service.createReturn(request(BigDecimal.ONE)));
         verify(transactionRepository, never()).save(any());
     }
 

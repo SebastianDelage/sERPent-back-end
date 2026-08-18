@@ -25,4 +25,19 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
            ORDER BY u.name
            """)
     List<UserEntity> search(@Param("includeInactive") boolean includeInactive);
+
+    /**
+     * Active users whose ONLY assigned warehouse is the given one — the users who would be
+     * left unable to operate if it were deactivated. Counting the assignment rather than
+     * checking membership is what makes "only" precise.
+     */
+    @Query("""
+           SELECT u FROM UserEntity u
+           JOIN u.warehouses w
+           WHERE w.id = :warehouseId
+             AND u.active = TRUE
+             AND SIZE(u.warehouses) = 1
+           ORDER BY u.name
+           """)
+    List<UserEntity> findActiveUsersWhoseOnlyWarehouseIs(@Param("warehouseId") Long warehouseId);
 }

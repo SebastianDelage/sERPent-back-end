@@ -12,8 +12,8 @@ import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import com.empresa.serpent.transactions.repository.TransactionRepository;
+import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.users.domain.entity.UserEntity;
-import com.empresa.serpent.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,15 +28,16 @@ public class WarehouseTransferApplicationService {
     private final TransactionRepository transactionRepository;
     private final ProductRepository productRepository;
     private final WarehouseRepository warehouseRepository;
-    private final UserRepository userRepository;
     private final StockValidationService stockValidationService;
     private final InventoryMovementService inventoryMovementService;
+    private final AuthenticatedUserService authenticatedUserService;
+    private final WarehouseAccessService warehouseAccessService;
 
     @Transactional
     public CreateWarehouseTransferResponse createTransfer(CreateWarehouseTransferRequest request) {
 
-        UserEntity createdBy = userRepository.findById(request.createdByUserId())
-                .orElseThrow(() -> new NotFoundException("User not found: " + request.createdByUserId()));
+        UserEntity createdBy = authenticatedUserService.requireCurrentUser();
+        authenticatedUserService.requireMatchingCreatedByUserId(request.createdByUserId(), createdBy);
 
         ProductEntity product = productRepository.findById(request.productId())
                 .orElseThrow(() -> new NotFoundException("Product not found: " + request.productId()));
@@ -58,6 +59,15 @@ public class WarehouseTransferApplicationService {
         if (sourceWarehouse.getId().equals(targetWarehouse.getId())) {
             throw new IllegalArgumentException("Source and target warehouse cannot be the same");
         }
+
+        /*
+         Only the source is checked against the user's assignment. A transfer is
+         cross-warehouse by nature, and the source is where the stock actually leaves —
+         the side with the consequence. Requiring the target too would force assigning the
+         central warehouse to every branch operator, which would hollow out the control
+         it is meant to be.
+         */
+        warehouseAccessService.requireAssigned(sourceWarehouse, createdBy);
 
         stockValidationService.validateAvailableStock(
                 request.productId(),

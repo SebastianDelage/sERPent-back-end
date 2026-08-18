@@ -3,10 +3,11 @@ package com.empresa.serpent.transactions.service;
 import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
-import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import com.empresa.serpent.inventory.service.InventoryMovementService;
 import com.empresa.serpent.inventory.service.StockValidationService;
+import com.empresa.serpent.inventory.service.WarehouseAccessService;
 import com.empresa.serpent.inventory.web.dto.request.StockCheckItemRequest;
+import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
@@ -54,16 +55,45 @@ public class SaleApplicationService {
     private final UserRepository userRepository;
     private final PaymentMethodRepository paymentMethodRepository;
     private final ProductPaymentAdjustmentRepository productPaymentAdjustmentRepository;
-    private final WarehouseRepository warehouseRepository;
     private final StockValidationService stockValidationService;
     private final InventoryMovementService inventoryMovementService;
+    private final AuthenticatedUserService authenticatedUserService;
+    private final WarehouseAccessService warehouseAccessService;
 
+    /** Online path: the acting user is whoever is holding the session. */
     @Transactional
     public CreateSaleResponse createSale(CreateSaleRequest request) {
+        UserEntity createdBy = authenticatedUserService.requireCurrentUser();
+        authenticatedUserService.requireMatchingCreatedByUserId(request.createdByUserId(), createdBy);
+
+        return createSale(request, createdBy);
+    }
+
+    /**
+     * Offline sync path: the acting user is the one named in the queued payload, not whoever
+     * happens to be uploading it. A sale made by cashier A and synced by cashier B must stay
+     * attributed to A — attribution belongs to whoever made the sale.
+     *
+     * <p>This is knowingly the weaker of the two paths: the payload is client-supplied and
+     * therefore forgeable, so a caller could name another user here. It is accepted because
+     * the alternative — attributing the sale to whoever syncs — corrupts the data itself,
+     * which is worse than the residual risk. The warehouse assignment is still enforced,
+     * against the user named in the payload.
+     */
+    @Transactional
+    public CreateSaleResponse createSaleFromSync(CreateSaleRequest request) {
+        if (request.createdByUserId() == null) {
+            throw new ValidationException("La operación no indica el usuario que la registró.");
+        }
 
         UserEntity createdBy = userRepository.findById(request.createdByUserId())
                 .orElseThrow(() ->
                         new NotFoundException("User not found: " + request.createdByUserId()));
+
+        return createSale(request, createdBy);
+    }
+
+    private CreateSaleResponse createSale(CreateSaleRequest request, UserEntity createdBy) {
 
         /*
          Checked here and not only via @NotNull on the request: the offline sync path
@@ -78,13 +108,10 @@ public class SaleApplicationService {
                 .orElseThrow(() ->
                         new NotFoundException("Payment method not found: " + request.paymentMethodId()));
 
-        WarehouseEntity warehouse = warehouseRepository.findById(request.warehouseId())
-                .orElseThrow(() ->
-                        new NotFoundException("Warehouse not found: " + request.warehouseId()));
-
-        if (!Boolean.TRUE.equals(warehouse.getActive())) {
-            throw new ValidationException("El depósito seleccionado está inactivo.");
-        }
+        // Resolves the warehouse (from the terminal when one is named), and checks that it
+        // exists, is active, and is assigned to the acting user.
+        WarehouseEntity warehouse = warehouseAccessService.resolveForOperation(
+                request.terminalId(), request.warehouseId(), createdBy);
 
         if (request.invoiceNumber() != null
                 && !request.invoiceNumber().isBlank()
