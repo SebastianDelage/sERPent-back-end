@@ -40,7 +40,7 @@ public class OfflineBootstrapService {
                 ))
                 .collect(Collectors.toList());
 
-        var paymentMethods = paymentMethodRepository.search(false)
+        var paymentMethods = paymentMethodRepository.search(null, false)
                 .stream()
                 .map(pm -> new PaymentMethodLiteDto(
                         pm.getId(),

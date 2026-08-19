@@ -61,8 +61,9 @@ public class PaymentMethodService {
     }
 
     @Transactional(readOnly = true)
-    public List<PaymentMethodResponse> search(boolean includeInactive) {
-        return paymentMethodRepository.search(includeInactive).stream()
+    public List<PaymentMethodResponse> search(String name, boolean includeInactive) {
+        String term = (name == null || name.isBlank()) ? null : name.trim();
+        return paymentMethodRepository.search(term, includeInactive).stream()
                 .map(paymentMethodMapper::toResponse)
                 .toList();
     }

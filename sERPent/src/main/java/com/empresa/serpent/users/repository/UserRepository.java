@@ -18,13 +18,20 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
 
     boolean existsByEmail(String email);
 
-    /** Lists users; inactive ones are excluded unless asked for. */
+    /**
+     * Lists users; inactive ones are excluded unless asked for. The search term matches
+     * first name, last name or username.
+     */
     @Query("""
            SELECT u FROM UserEntity u
-           WHERE (:includeInactive = TRUE OR u.active = TRUE)
+           WHERE (:name IS NULL
+                  OR LOWER(u.name) LIKE LOWER(CONCAT('%', :name, '%'))
+                  OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', :name, '%'))
+                  OR LOWER(u.username) LIKE LOWER(CONCAT('%', :name, '%')))
+             AND (:includeInactive = TRUE OR u.active = TRUE)
            ORDER BY u.name
            """)
-    List<UserEntity> search(@Param("includeInactive") boolean includeInactive);
+    List<UserEntity> search(@Param("name") String name, @Param("includeInactive") boolean includeInactive);
 
     /**
      * Active users whose ONLY assigned warehouse is the given one — the users who would be

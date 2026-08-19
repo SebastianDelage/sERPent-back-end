@@ -166,8 +166,9 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public List<UserResponse> search(boolean includeInactive) {
-        return userRepository.search(includeInactive).stream()
+    public List<UserResponse> search(String name, boolean includeInactive) {
+        String term = (name == null || name.isBlank()) ? null : name.trim();
+        return userRepository.search(term, includeInactive).stream()
                 .map(userMapper::toResponse)
                 .toList();
     }

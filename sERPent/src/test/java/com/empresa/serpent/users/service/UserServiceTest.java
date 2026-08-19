@@ -292,14 +292,40 @@ class UserServiceTest {
         UserEntity u1 = UserEntity.builder().id(1L).name("Ana").username("ana").active(true).build();
         UserEntity u2 = UserEntity.builder().id(2L).name("Beto").username("beto").active(false).build();
 
-        when(userRepository.search(true)).thenReturn(List.of(u1, u2));
+        when(userRepository.search(null, true)).thenReturn(List.of(u1, u2));
 
-        List<UserResponse> result = userService.search(true);
+        List<UserResponse> result = userService.search(null, true);
 
         assertEquals(2, result.size());
         assertEquals("ana", result.get(0).username());
         assertEquals("beto", result.get(1).username());
-        verify(userRepository).search(true);
+        verify(userRepository).search(null, true);
+    }
+
+    @Test
+    @DisplayName("Should search users by name")
+    void shouldSearchUsersByName() {
+        UserEntity u1 = UserEntity.builder().id(1L).name("Ana").username("ana").active(true).build();
+
+        when(userRepository.search("ana", false)).thenReturn(List.of(u1));
+
+        List<UserResponse> result = userService.search("ana", false);
+
+        assertEquals(1, result.size());
+        assertEquals("ana", result.get(0).username());
+    }
+
+    @Test
+    @DisplayName("Should pass a blank search name to the repository as null")
+    void shouldPassBlankSearchNameAsNull() {
+        UserEntity u1 = UserEntity.builder().id(1L).name("Ana").username("ana").active(true).build();
+
+        when(userRepository.search(null, false)).thenReturn(List.of(u1));
+
+        List<UserResponse> result = userService.search("   ", false);
+
+        assertEquals(1, result.size());
+        verify(userRepository).search(null, false);
     }
 
     // --- warehouse assignment ---

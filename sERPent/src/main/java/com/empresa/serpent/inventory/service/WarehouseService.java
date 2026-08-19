@@ -68,8 +68,9 @@ public class WarehouseService {
     }
 
     @Transactional(readOnly = true)
-    public List<WarehouseResponse> search(boolean includeInactive) {
-        return warehouseRepository.search(includeInactive).stream()
+    public List<WarehouseResponse> search(String name, boolean includeInactive) {
+        String term = (name == null || name.isBlank()) ? null : name.trim();
+        return warehouseRepository.search(term, includeInactive).stream()
                 .map(warehouseMapper::toResponse)
                 .toList();
     }

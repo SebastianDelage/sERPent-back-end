@@ -49,7 +49,7 @@ public class ProductWarehouseMinimumStockService {
                         row -> row.getWarehouse().getId(),
                         ProductWarehouseMinimumStockEntity::getMinimumStock));
 
-        return warehouseRepository.search(false).stream()
+        return warehouseRepository.search(null, false).stream()
                 .map(warehouse -> {
                     BigDecimal own = overrides.get(warehouse.getId());
 

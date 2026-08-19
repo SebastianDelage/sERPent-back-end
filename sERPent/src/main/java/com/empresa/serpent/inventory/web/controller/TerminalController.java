@@ -41,8 +41,9 @@ public class TerminalController {
      */
     @GetMapping
     public List<TerminalResponse> search(
+            @RequestParam(required = false) String name,
             @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
-        return terminalService.search(includeInactive);
+        return terminalService.search(name, includeInactive);
     }
 }

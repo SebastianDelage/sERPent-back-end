@@ -37,8 +37,9 @@ public class WarehouseController {
 
     @GetMapping
     public List<WarehouseResponse> search(
+            @RequestParam(required = false) String name,
             @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
-        return warehouseService.search(includeInactive);
+        return warehouseService.search(name, includeInactive);
     }
 }

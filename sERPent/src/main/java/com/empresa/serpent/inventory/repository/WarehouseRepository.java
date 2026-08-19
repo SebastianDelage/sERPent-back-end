@@ -20,8 +20,9 @@ public interface WarehouseRepository extends JpaRepository<WarehouseEntity, Long
     /** Lists warehouses; inactive ones are excluded unless asked for. */
     @Query("""
            SELECT w FROM WarehouseEntity w
-           WHERE (:includeInactive = TRUE OR w.active = TRUE)
+           WHERE (:name IS NULL OR LOWER(w.name) LIKE LOWER(CONCAT('%', :name, '%')))
+             AND (:includeInactive = TRUE OR w.active = TRUE)
            ORDER BY w.name
            """)
-    List<WarehouseEntity> search(@Param("includeInactive") boolean includeInactive);
+    List<WarehouseEntity> search(@Param("name") String name, @Param("includeInactive") boolean includeInactive);
 }

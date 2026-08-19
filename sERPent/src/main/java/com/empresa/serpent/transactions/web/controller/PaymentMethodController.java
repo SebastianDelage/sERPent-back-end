@@ -37,8 +37,9 @@ public class PaymentMethodController {
 
     @GetMapping
     public List<PaymentMethodResponse> search(
+            @RequestParam(required = false) String name,
             @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
-        return paymentMethodService.search(includeInactive);
+        return paymentMethodService.search(name, includeInactive);
     }
 }

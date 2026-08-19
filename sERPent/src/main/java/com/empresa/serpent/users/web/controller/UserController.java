@@ -39,9 +39,10 @@ public class UserController {
 
     @GetMapping
     public List<UserResponse> search(
+            @RequestParam(required = false) String name,
             @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
-        return userService.search(includeInactive);
+        return userService.search(name, includeInactive);
     }
 
     /**

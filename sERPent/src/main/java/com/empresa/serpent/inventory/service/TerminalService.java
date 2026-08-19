@@ -63,8 +63,9 @@ public class TerminalService {
 
     /** Lists terminals; inactive ones are excluded unless asked for. */
     @Transactional(readOnly = true)
-    public List<TerminalResponse> search(boolean includeInactive) {
-        return terminalRepository.search(includeInactive).stream()
+    public List<TerminalResponse> search(String name, boolean includeInactive) {
+        String term = (name == null || name.isBlank()) ? null : name.trim();
+        return terminalRepository.search(term, includeInactive).stream()
                 .map(terminalMapper::toResponse)
                 .toList();
     }

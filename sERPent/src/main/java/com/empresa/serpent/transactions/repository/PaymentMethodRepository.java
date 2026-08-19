@@ -17,8 +17,9 @@ public interface PaymentMethodRepository extends JpaRepository<PaymentMethodEnti
     /** Lists payment methods; inactive ones are excluded unless asked for. */
     @Query("""
            SELECT pm FROM PaymentMethodEntity pm
-           WHERE (:includeInactive = TRUE OR pm.active = TRUE)
+           WHERE (:name IS NULL OR LOWER(pm.name) LIKE LOWER(CONCAT('%', :name, '%')))
+             AND (:includeInactive = TRUE OR pm.active = TRUE)
            ORDER BY pm.name
            """)
-    List<PaymentMethodEntity> search(@Param("includeInactive") boolean includeInactive);
+    List<PaymentMethodEntity> search(@Param("name") String name, @Param("includeInactive") boolean includeInactive);
 }

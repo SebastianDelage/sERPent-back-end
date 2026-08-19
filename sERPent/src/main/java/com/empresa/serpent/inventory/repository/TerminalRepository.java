@@ -15,8 +15,9 @@ public interface TerminalRepository extends JpaRepository<TerminalEntity, Long> 
     /** Lists terminals; inactive ones are excluded unless asked for. */
     @Query("""
            SELECT t FROM TerminalEntity t
-           WHERE (:includeInactive = TRUE OR t.active = TRUE)
+           WHERE (:name IS NULL OR LOWER(t.name) LIKE LOWER(CONCAT('%', :name, '%')))
+             AND (:includeInactive = TRUE OR t.active = TRUE)
            ORDER BY t.name
            """)
-    List<TerminalEntity> search(@Param("includeInactive") boolean includeInactive);
+    List<TerminalEntity> search(@Param("name") String name, @Param("includeInactive") boolean includeInactive);
 }
