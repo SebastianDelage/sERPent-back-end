@@ -53,8 +53,11 @@ public class StockController {
         return stockQueryService.getStock(new StockFilter(null, warehouseId, null));
     }
 
+    /** One row per (product, warehouse) that is at or below its applicable minimum. */
     @GetMapping("/low")
-    public List<LowStockResponse> getLowStock() {
-        return stockQueryService.getLowStock();
+    public List<LowStockResponse> getLowStock(
+            @RequestParam(required = false) Long warehouseId
+    ) {
+        return stockQueryService.getLowStock(warehouseId);
     }
 }

@@ -40,8 +40,8 @@ public class InventoryReportService {
                 .toList();
     }
 
-    public List<LowStockResponse> getLowStockReport() {
-        return stockQueryService.getLowStock();
+    public List<LowStockResponse> getLowStockReport(Long warehouseId) {
+        return stockQueryService.getLowStock(warehouseId);
     }
 
     public List<WarehouseSummaryResponse> getWarehouseSummary() {

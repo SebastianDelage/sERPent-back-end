@@ -31,8 +31,10 @@ public class InventoryReportController {
     }
 
     @GetMapping("/low-stock")
-    public List<LowStockResponse> getLowStockReport() {
-        return inventoryReportService.getLowStockReport();
+    public List<LowStockResponse> getLowStockReport(
+            @RequestParam(required = false) Long warehouseId
+    ) {
+        return inventoryReportService.getLowStockReport(warehouseId);
     }
 
     @GetMapping("/warehouse-summary")

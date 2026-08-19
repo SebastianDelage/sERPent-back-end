@@ -93,9 +93,12 @@ VALUES
 -- =========================
 -- SALES
 -- =========================
-INSERT INTO sales (sale_id, transaction_id, customer_name, invoice_number, tax_total)
+-- warehouse_id is set so the seeded sale is attributable to a branch: without it the
+-- consolidated report is never the sum of the per-warehouse ones in dev, which reads
+-- like a filtering bug when it is just an unassignable row.
+INSERT INTO sales (sale_id, transaction_id, customer_name, invoice_number, tax_total, warehouse_id)
 VALUES
-    (1, 1, 'Consumidor Final', 'A-0001-00000001', 0);
+    (1, 1, 'Consumidor Final', 'A-0001-00000001', 0, 1);
 
 -- =========================
 -- EXPENSES

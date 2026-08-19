@@ -87,12 +87,13 @@ class InventoryReportServiceTest {
     void shouldReturnLowStockReportFromStockQueryService() {
 
         List<LowStockResponse> lowStockRows = List.of(
-                new LowStockResponse(2L, "Pata muslo", new BigDecimal("19.000"), new BigDecimal("20.000"))
+                new LowStockResponse(2L, "Pata muslo", 1L, "Depósito Central",
+                        new BigDecimal("19.000"), new BigDecimal("20.000"), false, new BigDecimal("1.000"))
         );
 
-        given(stockQueryService.getLowStock()).willReturn(lowStockRows);
+        given(stockQueryService.getLowStock(null)).willReturn(lowStockRows);
 
-        List<LowStockResponse> result = inventoryReportService.getLowStockReport();
+        List<LowStockResponse> result = inventoryReportService.getLowStockReport(null);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).productId()).isEqualTo(2L);
@@ -100,7 +101,7 @@ class InventoryReportServiceTest {
         assertThat(result.get(0).currentStock()).isEqualByComparingTo("19.000");
         assertThat(result.get(0).minimumStock()).isEqualByComparingTo("20.000");
 
-        verify(stockQueryService).getLowStock();
+        verify(stockQueryService).getLowStock(null);
     }
 
     @Test

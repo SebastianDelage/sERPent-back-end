@@ -91,10 +91,11 @@ class InventoryReportControllerTest {
     void shouldReturnLowStockReport() throws Exception {
 
         List<LowStockResponse> response = List.of(
-                new LowStockResponse(2L, "Pata muslo", new BigDecimal("19.000"), new BigDecimal("20.000"))
+                new LowStockResponse(2L, "Pata muslo", 1L, "Depósito Central",
+                        new BigDecimal("19.000"), new BigDecimal("20.000"), false, new BigDecimal("1.000"))
         );
 
-        given(inventoryReportService.getLowStockReport()).willReturn(response);
+        given(inventoryReportService.getLowStockReport(null)).willReturn(response);
 
         mockMvc.perform(get("/api/reports/inventory/low-stock"))
                 .andExpect(status().isOk())

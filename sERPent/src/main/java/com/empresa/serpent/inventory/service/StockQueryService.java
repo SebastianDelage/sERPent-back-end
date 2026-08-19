@@ -3,18 +3,22 @@ package com.empresa.serpent.inventory.service;
 import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.InventoryStockSnapshotEntity;
+import com.empresa.serpent.inventory.domain.entity.ProductWarehouseMinimumStockEntity;
 import com.empresa.serpent.inventory.web.dto.filter.StockFilter;
 import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.ProductStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.StockResponse;
 import com.empresa.serpent.inventory.repository.InventoryStockSnapshotRepository;
+import com.empresa.serpent.inventory.repository.ProductWarehouseMinimumStockRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -25,6 +29,7 @@ public class StockQueryService {
 
     private final InventoryStockSnapshotRepository inventoryStockSnapshotRepository;
     private final ProductRepository productRepository;
+    private final ProductWarehouseMinimumStockRepository productWarehouseMinimumStockRepository;
 
     public List<StockResponse> getStock(StockFilter filter) {
         List<InventoryStockSnapshotEntity> snapshots = loadSnapshots(filter);
@@ -106,34 +111,82 @@ public class StockQueryService {
     }
 
     public List<LowStockResponse> getLowStock() {
-        List<ProductStockResponse> stockRows = getTotalStockGroupedByProduct(false);
+        return getLowStock(null);
+    }
+
+    /**
+     * Low stock, decided PER WAREHOUSE. Restricted to one warehouse when
+     * {@code warehouseId} is given.
+     *
+     * <p>The threshold resolves in cascade: the per-warehouse override for that
+     * (product, warehouse) if one exists, otherwise the product's own minimum. A product
+     * with no minimum at either level is never low and is left out — there are goods
+     * nobody wants to track.
+     *
+     * <p>Comparing per warehouse instead of against the summed total is the whole point:
+     * a product at zero in one branch and overstocked in another has to surface, and
+     * summing first would hide exactly that case.
+     */
+    public List<LowStockResponse> getLowStock(Long warehouseId) {
+        List<StockResponse> stockRows = getStock(new StockFilter(null, warehouseId, null));
 
         Map<Long, ProductEntity> productMap = productRepository.findAll().stream()
                 .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
 
+        // (productId, warehouseId) -> override, loaded once to keep the loop free of N+1.
+        Map<String, BigDecimal> overrides = productWarehouseMinimumStockRepository.findAll()
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> overrideKey(row.getProduct().getId(), row.getWarehouse().getId()),
+                        ProductWarehouseMinimumStockEntity::getMinimumStock));
+
         return stockRows.stream()
-                .filter(stockRow -> {
-                    ProductEntity product = productMap.get(stockRow.productId());
-
-                    if (product == null || product.getMinimumStock() == null) {
-                        return false;
-                    }
-
-                    return stockRow.totalStock()
-                            .compareTo(product.getMinimumStock()) <= 0;
-                })
-                .map(stockRow -> {
-                    ProductEntity product = productMap.get(stockRow.productId());
-
-                    return new LowStockResponse(
-                            stockRow.productId(),
-                            stockRow.productName(),
-                            stockRow.totalStock(),
-                            product.getMinimumStock()
-                    );
-                })
-                .sorted((a, b) -> a.productName().compareToIgnoreCase(b.productName()))
+                .map(row -> toLowStockRow(row, productMap, overrides))
+                .filter(Objects::nonNull)
+                .sorted(Comparator
+                        .comparing(LowStockResponse::productName, String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(LowStockResponse::warehouseName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
+    }
+
+    /** The row if this (product, warehouse) is at or below its minimum, null otherwise. */
+    private LowStockResponse toLowStockRow(StockResponse row,
+                                           Map<Long, ProductEntity> productMap,
+                                           Map<String, BigDecimal> overrides) {
+        ProductEntity product = productMap.get(row.productId());
+        if (product == null) {
+            return null;
+        }
+
+        BigDecimal override = overrides.get(overrideKey(row.productId(), row.warehouseId()));
+        BigDecimal minimum = override != null ? override : product.getMinimumStock();
+
+        // No minimum at either level: nothing to be below.
+        if (minimum == null) {
+            return null;
+        }
+
+        // "At or below" counts as low, matching the pre-existing criterion.
+        if (row.stock().compareTo(minimum) > 0) {
+            return null;
+        }
+
+        BigDecimal missing = minimum.subtract(row.stock()).max(BigDecimal.ZERO);
+
+        return new LowStockResponse(
+                row.productId(),
+                row.productName(),
+                row.warehouseId(),
+                row.warehouseName(),
+                row.stock(),
+                minimum,
+                override != null,
+                missing
+        );
+    }
+
+    private String overrideKey(Long productId, Long warehouseId) {
+        return productId + "-" + warehouseId;
     }
 
     private List<InventoryStockSnapshotEntity> loadSnapshots(StockFilter filter) {

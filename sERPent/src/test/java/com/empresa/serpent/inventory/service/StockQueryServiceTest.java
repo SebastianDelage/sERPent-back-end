@@ -5,6 +5,7 @@ import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.InventoryStockSnapshotEntity;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.repository.InventoryStockSnapshotRepository;
+import com.empresa.serpent.inventory.repository.ProductWarehouseMinimumStockRepository;
 import com.empresa.serpent.inventory.web.dto.filter.StockFilter;
 import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.ProductStockResponse;
@@ -32,6 +33,9 @@ class StockQueryServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private ProductWarehouseMinimumStockRepository productWarehouseMinimumStockRepository;
 
     @InjectMocks
     private StockQueryService stockQueryService;
@@ -179,7 +183,7 @@ class StockQueryServiceTest {
     }
 
     @Test
-    @DisplayName("Should return low stock products with configured minimum stock")
+    @DisplayName("Should return low stock rows per warehouse, using the product minimum")
     void shouldReturnLowStockProductsWithConfiguredMinimumStock() {
 
         ProductEntity pataMuslo = product(2L, "Pata muslo", new BigDecimal("20.000"));
@@ -196,16 +200,19 @@ class StockQueryServiceTest {
 
         given(inventoryStockSnapshotRepository.findAll()).willReturn(snapshots);
         given(productRepository.findAll()).willReturn(List.of(pataMuslo, milanesa));
+        given(productWarehouseMinimumStockRepository.findAll()).willReturn(List.of());
 
         List<LowStockResponse> result = stockQueryService.getLowStock();
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).productId()).isEqualTo(2L);
         assertThat(result.get(0).productName()).isEqualTo("Pata muslo");
+        assertThat(result.get(0).warehouseId()).isEqualTo(1L);
         assertThat(result.get(0).currentStock()).isEqualByComparingTo("19.000");
         assertThat(result.get(0).minimumStock()).isEqualByComparingTo("20.000");
+        assertThat(result.get(0).minimumFromWarehouse()).isFalse();
+        assertThat(result.get(0).missingQuantity()).isEqualByComparingTo("1.000");
 
-        verify(inventoryStockSnapshotRepository).findAll();
         verify(productRepository).findAll();
     }
 
@@ -222,12 +229,12 @@ class StockQueryServiceTest {
 
         given(inventoryStockSnapshotRepository.findAll()).willReturn(snapshots);
         given(productRepository.findAll()).willReturn(List.of(milanesa));
+        given(productWarehouseMinimumStockRepository.findAll()).willReturn(List.of());
 
         List<LowStockResponse> result = stockQueryService.getLowStock();
 
         assertThat(result).isEmpty();
 
-        verify(inventoryStockSnapshotRepository).findAll();
         verify(productRepository).findAll();
     }
 
