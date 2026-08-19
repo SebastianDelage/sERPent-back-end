@@ -2,7 +2,11 @@ package com.empresa.serpent.inventory.repository;
 
 import com.empresa.serpent.inventory.domain.entity.InventoryStockSnapshotEntity;
 import com.empresa.serpent.reports.repository.projection.InventoryReplenishmentProjection;
+import com.empresa.serpent.reports.repository.projection.ProductStockProjection;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,13 +15,122 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
-public interface InventoryStockSnapshotRepository extends JpaRepository<InventoryStockSnapshotEntity, Long> {
+public interface InventoryStockSnapshotRepository extends
+        JpaRepository<InventoryStockSnapshotEntity, Long>,
+        JpaSpecificationExecutor<InventoryStockSnapshotEntity> {
 
     Optional<InventoryStockSnapshotEntity> findByProductIdAndWarehouseId(Long productId, Long warehouseId);
 
     List<InventoryStockSnapshotEntity> findByProductId(Long productId);
 
     List<InventoryStockSnapshotEntity> findByWarehouseId(Long warehouseId);
+
+    /**
+     * The per-product view, paginated: one row per product with its stock summed across
+     * warehouses.
+     *
+     * <p>Specifications cannot serve this one — {@code JpaSpecificationExecutor} pages
+     * entities, and this pages GROUPS. Hence an explicit aggregate query with its own
+     * {@code countQuery}, which counts the distinct products rather than the snapshot
+     * rows behind them.
+     *
+     * <p>{@code belowMinimum} shows a product when it is short in AT LEAST ONE warehouse,
+     * which is the product-level reading of a per-warehouse condition. The cascade is the
+     * same COALESCE used everywhere else, and the explicit IS NOT NULL keeps products
+     * with no minimum at either level out rather than leaning on NULL comparison
+     * semantics.
+     *
+     * <p>The status conditions are EXISTS subqueries rather than predicates on the rows
+     * being summed, and that distinction matters: the status decides WHICH PRODUCTS
+     * qualify, while the total stays the sum across their warehouses. Filtering the summed
+     * rows instead would report "Pollo entero: 8" under a "Stock total" heading for a
+     * product that actually holds 37 — the filter would silently rewrite the number it is
+     * supposed to be selecting on.
+     */
+    @Query(value = """
+           SELECT p.id AS productId,
+                  p.name AS productName,
+                  COALESCE(SUM(s.currentStock), 0) AS totalStock
+           FROM InventoryStockSnapshotEntity s
+           JOIN s.product p
+           WHERE (:search IS NULL
+                  OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                  OR LOWER(p.sku) = LOWER(:search)
+                  OR p.barcode = :search)
+             AND (:warehouseId IS NULL OR s.warehouse.id = :warehouseId)
+             AND (:outOfStock = FALSE OR EXISTS (
+                     SELECT 1 FROM InventoryStockSnapshotEntity s2
+                      WHERE s2.product = p
+                        AND (:warehouseId IS NULL OR s2.warehouse.id = :warehouseId)
+                        AND s2.currentStock <= 0))
+             AND (:inStock = FALSE OR EXISTS (
+                     SELECT 1 FROM InventoryStockSnapshotEntity s2
+                      WHERE s2.product = p
+                        AND (:warehouseId IS NULL OR s2.warehouse.id = :warehouseId)
+                        AND s2.currentStock > 0))
+             AND (:belowMinimum = FALSE OR EXISTS (
+                     SELECT 1 FROM InventoryStockSnapshotEntity s2
+                      WHERE s2.product = p
+                        AND (:warehouseId IS NULL OR s2.warehouse.id = :warehouseId)
+                        AND COALESCE(
+                                (SELECT m.minimumStock
+                                   FROM ProductWarehouseMinimumStockEntity m
+                                  WHERE m.product = p AND m.warehouse = s2.warehouse),
+                                p.minimumStock
+                            ) IS NOT NULL
+                        AND s2.currentStock <= COALESCE(
+                                (SELECT m.minimumStock
+                                   FROM ProductWarehouseMinimumStockEntity m
+                                  WHERE m.product = p AND m.warehouse = s2.warehouse),
+                                p.minimumStock
+                            )))
+           GROUP BY p.id, p.name
+           ORDER BY p.name
+           """,
+            countQuery = """
+           SELECT COUNT(DISTINCT p.id)
+           FROM InventoryStockSnapshotEntity s
+           JOIN s.product p
+           WHERE (:search IS NULL
+                  OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                  OR LOWER(p.sku) = LOWER(:search)
+                  OR p.barcode = :search)
+             AND (:warehouseId IS NULL OR s.warehouse.id = :warehouseId)
+             AND (:outOfStock = FALSE OR EXISTS (
+                     SELECT 1 FROM InventoryStockSnapshotEntity s2
+                      WHERE s2.product = p
+                        AND (:warehouseId IS NULL OR s2.warehouse.id = :warehouseId)
+                        AND s2.currentStock <= 0))
+             AND (:inStock = FALSE OR EXISTS (
+                     SELECT 1 FROM InventoryStockSnapshotEntity s2
+                      WHERE s2.product = p
+                        AND (:warehouseId IS NULL OR s2.warehouse.id = :warehouseId)
+                        AND s2.currentStock > 0))
+             AND (:belowMinimum = FALSE OR EXISTS (
+                     SELECT 1 FROM InventoryStockSnapshotEntity s2
+                      WHERE s2.product = p
+                        AND (:warehouseId IS NULL OR s2.warehouse.id = :warehouseId)
+                        AND COALESCE(
+                                (SELECT m.minimumStock
+                                   FROM ProductWarehouseMinimumStockEntity m
+                                  WHERE m.product = p AND m.warehouse = s2.warehouse),
+                                p.minimumStock
+                            ) IS NOT NULL
+                        AND s2.currentStock <= COALESCE(
+                                (SELECT m.minimumStock
+                                   FROM ProductWarehouseMinimumStockEntity m
+                                  WHERE m.product = p AND m.warehouse = s2.warehouse),
+                                p.minimumStock
+                            )))
+           """)
+    Page<ProductStockProjection> searchGroupedByProduct(
+            @Param("search") String search,
+            @Param("warehouseId") Long warehouseId,
+            @Param("outOfStock") boolean outOfStock,
+            @Param("inStock") boolean inStock,
+            @Param("belowMinimum") boolean belowMinimum,
+            Pageable pageable
+    );
 
     /**
      * Atomically adds {@code quantity} to the balance of an existing snapshot row.

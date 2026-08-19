@@ -60,8 +60,8 @@ class InventoryReportServiceTest {
     void shouldReturnInventoryByWarehouseMappedFromStockQueryService() {
 
         List<StockResponse> stockRows = List.of(
-                new StockResponse(1L, "Pollo entero", 1L, "Depósito Central", new BigDecimal("19.000")),
-                new StockResponse(1L, "Pollo entero", 2L, "Sucursal Norte", new BigDecimal("8.000"))
+                new StockResponse(1L, "Pollo entero", 1L, "Depósito Central", new BigDecimal("19.000"), true),
+                new StockResponse(1L, "Pollo entero", 2L, "Sucursal Norte", new BigDecimal("8.000"), true)
         );
 
         given(stockQueryService.getStock(org.mockito.ArgumentMatchers.any())).willReturn(stockRows);
@@ -109,11 +109,11 @@ class InventoryReportServiceTest {
     void shouldGroupStockByWarehouseAndCalculateSummary() {
 
         List<StockResponse> stockRows = List.of(
-                new StockResponse(3L, "Milanesa de pollo", 1L, "Depósito Central", new BigDecimal("15.000")),
-                new StockResponse(2L, "Pata muslo", 1L, "Depósito Central", new BigDecimal("19.000")),
-                new StockResponse(1L, "Pollo entero", 1L, "Depósito Central", new BigDecimal("19.000")),
-                new StockResponse(3L, "Milanesa de pollo", 2L, "Sucursal Norte", new BigDecimal("5.000")),
-                new StockResponse(1L, "Pollo entero", 2L, "Sucursal Norte", new BigDecimal("8.000"))
+                new StockResponse(3L, "Milanesa de pollo", 1L, "Depósito Central", new BigDecimal("15.000"), true),
+                new StockResponse(2L, "Pata muslo", 1L, "Depósito Central", new BigDecimal("19.000"), true),
+                new StockResponse(1L, "Pollo entero", 1L, "Depósito Central", new BigDecimal("19.000"), true),
+                new StockResponse(3L, "Milanesa de pollo", 2L, "Sucursal Norte", new BigDecimal("5.000"), true),
+                new StockResponse(1L, "Pollo entero", 2L, "Sucursal Norte", new BigDecimal("8.000"), true)
         );
 
         given(stockQueryService.getStock(org.mockito.ArgumentMatchers.any())).willReturn(stockRows);

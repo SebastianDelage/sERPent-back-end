@@ -4,13 +4,20 @@ import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.InventoryStockSnapshotEntity;
 import com.empresa.serpent.inventory.domain.entity.ProductWarehouseMinimumStockEntity;
+import com.empresa.serpent.inventory.domain.enums.StockStatusFilter;
 import com.empresa.serpent.inventory.web.dto.filter.StockFilter;
+import com.empresa.serpent.inventory.web.dto.filter.StockPageFilter;
 import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.ProductStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.StockResponse;
 import com.empresa.serpent.inventory.repository.InventoryStockSnapshotRepository;
+import com.empresa.serpent.inventory.repository.InventoryStockSnapshotSpecifications;
 import com.empresa.serpent.inventory.repository.ProductWarehouseMinimumStockRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,13 +42,7 @@ public class StockQueryService {
         List<InventoryStockSnapshotEntity> snapshots = loadSnapshots(filter);
 
         return snapshots.stream()
-                .map(snapshot -> new StockResponse(
-                        snapshot.getProduct().getId(),
-                        snapshot.getProduct().getName(),
-                        snapshot.getWarehouse().getId(),
-                        snapshot.getWarehouse().getName(),
-                        snapshot.getCurrentStock()
-                ))
+                .map(StockQueryService::toStockResponse)
                 .filter(response ->
                         filter.onlyPositive() == null
                                 || !filter.onlyPositive()
@@ -55,6 +56,82 @@ public class StockQueryService {
                     return a.warehouseName().compareToIgnoreCase(b.warehouseName());
                 })
                 .toList();
+    }
+
+    private static StockResponse toStockResponse(InventoryStockSnapshotEntity snapshot) {
+        return new StockResponse(
+                snapshot.getProduct().getId(),
+                snapshot.getProduct().getName(),
+                snapshot.getWarehouse().getId(),
+                snapshot.getWarehouse().getName(),
+                snapshot.getCurrentStock(),
+                snapshot.getWarehouse().getActive()
+        );
+    }
+
+    /**
+     * The per-warehouse view, paginated and filtered in the query.
+     *
+     * <p>Kept apart from {@link #getStock(StockFilter)}, which stays unpaginated: the
+     * sale, adjustment, transformation and transfer forms all need a warehouse's whole
+     * stock list to work, and handing them a page would break them for no gain.
+     */
+    public Page<StockResponse> searchStock(StockPageFilter filter, Pageable pageable) {
+        return inventoryStockSnapshotRepository
+                .findAll(InventoryStockSnapshotSpecifications.fromFilter(filter), withStableSort(pageable))
+                .map(StockQueryService::toStockResponse);
+    }
+
+    /**
+     * Paging without a deterministic order is not stable: rows can repeat on one page and
+     * vanish from another as the database is free to return them in any order. Falls back
+     * to product then warehouse, matching the unpaginated view's ordering.
+     */
+    private Pageable withStableSort(Pageable pageable) {
+        if (pageable.getSort().isSorted()) {
+            return pageable;
+        }
+
+        return PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by("product.name", "warehouse.name"));
+    }
+
+    /** The per-product view, paginated: stock summed across warehouses, one row per product. */
+    public Page<ProductStockResponse> searchStockGroupedByProduct(
+            StockPageFilter filter, Pageable pageable) {
+
+        StockStatusFilter status = filter.statusOrAll();
+
+        return inventoryStockSnapshotRepository.searchGroupedByProduct(
+                        blankToNull(filter.search()),
+                        filter.warehouseId(),
+                        status == StockStatusFilter.OUT_OF_STOCK,
+                        status == StockStatusFilter.IN_STOCK,
+                        status == StockStatusFilter.BELOW_MINIMUM,
+                        pageable)
+                .map(row -> new ProductStockResponse(
+                        row.getProductId(),
+                        row.getProductName(),
+                        row.getTotalStock()));
+    }
+
+    /**
+     * How many (product, warehouse) pairs are below their minimum within the filtered set.
+     *
+     * <p>Counted over the whole filtered set, never over the current page — a page's worth
+     * of alerts is not the number of situations to attend to. The status filter is
+     * deliberately ignored: honouring it would make this echo the paginator whenever the
+     * user filters by "below minimum".
+     */
+    public long countLowStockAlerts(StockPageFilter filter) {
+        return inventoryStockSnapshotRepository.count(
+                InventoryStockSnapshotSpecifications.fromFilterIgnoringStatus(filter));
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     public BigDecimal getStockByProductAndWarehouse(Long productId, Long warehouseId) {
