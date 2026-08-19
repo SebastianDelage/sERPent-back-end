@@ -49,7 +49,7 @@ class InventoryReportControllerTest {
                 new InventorySummaryResponse(2L, "Pata muslo", new BigDecimal("19.000"))
         );
 
-        given(inventoryReportService.getInventorySummary()).willReturn(response);
+        given(inventoryReportService.getInventorySummary(null)).willReturn(response);
 
         mockMvc.perform(get("/api/reports/inventory/summary"))
                 .andExpect(status().isOk())

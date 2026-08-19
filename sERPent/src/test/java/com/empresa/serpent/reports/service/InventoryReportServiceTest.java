@@ -39,9 +39,9 @@ class InventoryReportServiceTest {
                 new ProductStockResponse(2L, "Pata muslo", new BigDecimal("19.000"))
         );
 
-        given(stockQueryService.getTotalStockGroupedByProduct(false)).willReturn(stockRows);
+        given(stockQueryService.getTotalStockGroupedByProduct(false, null)).willReturn(stockRows);
 
-        List<InventorySummaryResponse> result = inventoryReportService.getInventorySummary();
+        List<InventorySummaryResponse> result = inventoryReportService.getInventorySummary(null);
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).productId()).isEqualTo(1L);
@@ -52,7 +52,7 @@ class InventoryReportServiceTest {
         assertThat(result.get(1).productName()).isEqualTo("Pata muslo");
         assertThat(result.get(1).totalStock()).isEqualByComparingTo("19.000");
 
-        verify(stockQueryService).getTotalStockGroupedByProduct(false);
+        verify(stockQueryService).getTotalStockGroupedByProduct(false, null);
     }
 
     @Test

@@ -22,17 +22,19 @@ public class SalesReportController {
     @GetMapping("/by-product")
     public List<SalesByProductResponse> getSalesByProduct(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
+            @RequestParam(required = false) Long warehouseId
     ) {
-        return salesReportService.getSalesByProduct(dateFrom, dateTo);
+        return salesReportService.getSalesByProduct(dateFrom, dateTo, warehouseId);
     }
 
     @GetMapping("/daily")
     public List<SalesDailyResponse> getSalesDaily(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
+            @RequestParam(required = false) Long warehouseId
     ) {
-        return salesReportService.getSalesDaily(dateFrom, dateTo);
+        return salesReportService.getSalesDaily(dateFrom, dateTo, warehouseId);
     }
 
     /**
@@ -44,16 +46,18 @@ public class SalesReportController {
     @GetMapping("/by-payment-method")
     public List<SalesByPaymentMethodResponse> getSalesByPaymentMethod(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
+            @RequestParam(required = false) Long warehouseId
     ) {
-        return salesReportService.getSalesByPaymentMethod(dateFrom, dateTo);
+        return salesReportService.getSalesByPaymentMethod(dateFrom, dateTo, warehouseId);
     }
 
     @GetMapping("/summary")
     public SalesSummaryResponse getSalesSummary(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
+            @RequestParam(required = false) Long warehouseId
     ) {
-        return salesReportService.getSalesSummary(dateFrom, dateTo);
+        return salesReportService.getSalesSummary(dateFrom, dateTo, warehouseId);
     }
 }

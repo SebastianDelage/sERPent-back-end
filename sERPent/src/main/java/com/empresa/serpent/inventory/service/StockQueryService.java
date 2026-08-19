@@ -67,7 +67,14 @@ public class StockQueryService {
     }
 
     public List<ProductStockResponse> getTotalStockGroupedByProduct(Boolean onlyPositive) {
-        List<InventoryStockSnapshotEntity> snapshots = inventoryStockSnapshotRepository.findAll();
+        return getTotalStockGroupedByProduct(onlyPositive, null);
+    }
+
+    /** Same, restricted to one warehouse when {@code warehouseId} is given. */
+    public List<ProductStockResponse> getTotalStockGroupedByProduct(Boolean onlyPositive, Long warehouseId) {
+        List<InventoryStockSnapshotEntity> snapshots = warehouseId == null
+                ? inventoryStockSnapshotRepository.findAll()
+                : inventoryStockSnapshotRepository.findByWarehouseId(warehouseId);
 
         Map<ProductKey, BigDecimal> grouped = snapshots.stream()
                 .collect(Collectors.groupingBy(

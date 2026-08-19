@@ -57,7 +57,7 @@ class SalesReportControllerTest {
                         new BigDecimal("4600.0000"), new BigDecimal("4600.0000"))
         );
 
-        given(salesReportService.getSalesByProduct(any(), any())).willReturn(response);
+        given(salesReportService.getSalesByProduct(any(), any(), any())).willReturn(response);
 
         mockMvc.perform(get("/api/reports/sales/by-product"))
                 .andExpect(status().isOk())
@@ -85,7 +85,7 @@ class SalesReportControllerTest {
                         new BigDecimal("8100.0000"), new BigDecimal("8100.0000"))
         );
 
-        given(salesReportService.getSalesDaily(any(), any())).willReturn(response);
+        given(salesReportService.getSalesDaily(any(), any(), any())).willReturn(response);
 
         mockMvc.perform(get("/api/reports/sales/daily"))
                 .andExpect(status().isOk())
@@ -106,7 +106,7 @@ class SalesReportControllerTest {
                 new SalesByPaymentMethodResponse(1L, "Cash", 1L, new BigDecimal("9100.0000"))
         );
 
-        given(salesReportService.getSalesByPaymentMethod(any(), any())).willReturn(response);
+        given(salesReportService.getSalesByPaymentMethod(any(), any(), any())).willReturn(response);
 
         mockMvc.perform(get("/api/reports/sales/by-payment-method"))
                 .andExpect(status().isOk())
@@ -133,7 +133,7 @@ class SalesReportControllerTest {
                 new BigDecimal("9100.0000")
         );
 
-        given(salesReportService.getSalesSummary(any(), any())).willReturn(response);
+        given(salesReportService.getSalesSummary(any(), any(), any())).willReturn(response);
 
         mockMvc.perform(get("/api/reports/sales/summary"))
                 .andExpect(status().isOk())

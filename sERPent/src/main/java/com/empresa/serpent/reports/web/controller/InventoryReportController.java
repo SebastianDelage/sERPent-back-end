@@ -6,6 +6,7 @@ import com.empresa.serpent.reports.web.dto.response.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -18,8 +19,10 @@ public class InventoryReportController {
     private final InventoryReportService inventoryReportService;
 
     @GetMapping("/summary")
-    public List<InventorySummaryResponse> getInventorySummary() {
-        return inventoryReportService.getInventorySummary();
+    public List<InventorySummaryResponse> getInventorySummary(
+            @RequestParam(required = false) Long warehouseId
+    ) {
+        return inventoryReportService.getInventorySummary(warehouseId);
     }
 
     @GetMapping("/by-warehouse")
@@ -38,8 +41,10 @@ public class InventoryReportController {
     }
 
     @GetMapping("/movements/by-type")
-    public List<InventoryMovementsByTypeResponse> getInventoryMovementsByType() {
-        return inventoryReportService.getInventoryMovementsByType();
+    public List<InventoryMovementsByTypeResponse> getInventoryMovementsByType(
+            @RequestParam(required = false) Long warehouseId
+    ) {
+        return inventoryReportService.getInventoryMovementsByType(warehouseId);
     }
 
     @GetMapping("/movements/by-warehouse")
@@ -48,8 +53,10 @@ public class InventoryReportController {
     }
 
     @GetMapping("/movements/by-product")
-    public List<InventoryMovementsByProductResponse> getInventoryMovementsByProduct() {
-        return inventoryReportService.getInventoryMovementsByProduct();
+    public List<InventoryMovementsByProductResponse> getInventoryMovementsByProduct(
+            @RequestParam(required = false) Long warehouseId
+    ) {
+        return inventoryReportService.getInventoryMovementsByProduct(warehouseId);
     }
 
     @GetMapping("/replenishment")

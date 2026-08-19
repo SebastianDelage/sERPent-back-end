@@ -26,8 +26,8 @@ public class InventoryReportService {
     private final InventoryMovementRepository inventoryMovementRepository;
     private final InventoryStockSnapshotRepository snapshotRepository;
 
-    public List<InventorySummaryResponse> getInventorySummary() {
-        return stockQueryService.getTotalStockGroupedByProduct(false)
+    public List<InventorySummaryResponse> getInventorySummary(Long warehouseId) {
+        return stockQueryService.getTotalStockGroupedByProduct(false, warehouseId)
                 .stream()
                 .map(this::toInventorySummaryResponse)
                 .toList();
@@ -80,8 +80,8 @@ public class InventoryReportService {
                 .toList();
     }
 
-    public List<InventoryMovementsByTypeResponse> getInventoryMovementsByType() {
-        return inventoryMovementRepository.getInventoryMovementsByTypeReportRaw()
+    public List<InventoryMovementsByTypeResponse> getInventoryMovementsByType(Long warehouseId) {
+        return inventoryMovementRepository.getInventoryMovementsByTypeReportRaw(warehouseId)
                 .stream()
                 .map(row -> new InventoryMovementsByTypeResponse(
                         row.getMovementType(),
@@ -105,8 +105,8 @@ public class InventoryReportService {
                 .toList();
     }
 
-    public List<InventoryMovementsByProductResponse> getInventoryMovementsByProduct() {
-        return inventoryMovementRepository.getInventoryMovementsByProductReportRaw()
+    public List<InventoryMovementsByProductResponse> getInventoryMovementsByProduct(Long warehouseId) {
+        return inventoryMovementRepository.getInventoryMovementsByProductReportRaw(warehouseId)
                 .stream()
                 .map(row -> new InventoryMovementsByProductResponse(
                         row.getProductId(),

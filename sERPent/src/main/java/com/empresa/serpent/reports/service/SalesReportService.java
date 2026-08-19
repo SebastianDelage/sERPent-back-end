@@ -20,12 +20,14 @@ public class SalesReportService {
 
     private final TransactionRepository transactionRepository;
 
-    public List<SalesByProductResponse> getSalesByProduct(LocalDateTime dateFrom, LocalDateTime dateTo) {
-        return transactionRepository.getSalesByProductReport(dateFrom, dateTo);
+    public List<SalesByProductResponse> getSalesByProduct(
+            LocalDateTime dateFrom, LocalDateTime dateTo, Long warehouseId) {
+        return transactionRepository.getSalesByProductReport(dateFrom, dateTo, warehouseId);
     }
 
-    public List<SalesDailyResponse> getSalesDaily(LocalDateTime dateFrom, LocalDateTime dateTo) {
-        return transactionRepository.getSalesDailyReportRaw(dateFrom, dateTo)
+    public List<SalesDailyResponse> getSalesDaily(
+            LocalDateTime dateFrom, LocalDateTime dateTo, Long warehouseId) {
+        return transactionRepository.getSalesDailyReportRaw(dateFrom, dateTo, warehouseId)
                 .stream()
                 .map(row -> new SalesDailyResponse(
                         row.getDate(),
@@ -39,13 +41,15 @@ public class SalesReportService {
                 .toList();
     }
 
-    public List<SalesByPaymentMethodResponse> getSalesByPaymentMethod(LocalDateTime dateFrom, LocalDateTime dateTo) {
-        return transactionRepository.getSalesByPaymentMethodReport(dateFrom, dateTo);
+    public List<SalesByPaymentMethodResponse> getSalesByPaymentMethod(
+            LocalDateTime dateFrom, LocalDateTime dateTo, Long warehouseId) {
+        return transactionRepository.getSalesByPaymentMethodReport(dateFrom, dateTo, warehouseId);
     }
 
-    public SalesSummaryResponse getSalesSummary(LocalDateTime dateFrom, LocalDateTime dateTo) {
+    public SalesSummaryResponse getSalesSummary(
+            LocalDateTime dateFrom, LocalDateTime dateTo, Long warehouseId) {
 
-        var row = transactionRepository.getSalesSummaryReportRaw(dateFrom, dateTo);
+        var row = transactionRepository.getSalesSummaryReportRaw(dateFrom, dateTo, warehouseId);
 
         return new SalesSummaryResponse(
                 row.getTransactions(),

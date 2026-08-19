@@ -8,6 +8,7 @@ import com.empresa.serpent.reports.repository.projection.InventoryMovementsByWar
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,10 +35,13 @@ public interface InventoryMovementRepository extends
            COUNT(m.id) AS movements,
            COALESCE(SUM(m.quantity), 0) AS totalQuantity
        FROM InventoryMovementEntity m
+       WHERE (:warehouseId IS NULL OR m.warehouse.id = :warehouseId)
        GROUP BY m.movementType
        ORDER BY m.movementType
        """)
-    List<InventoryMovementsByTypeProjection> getInventoryMovementsByTypeReportRaw();
+    List<InventoryMovementsByTypeProjection> getInventoryMovementsByTypeReportRaw(
+            @Param("warehouseId") Long warehouseId
+    );
 
     @Query("""
        SELECT
@@ -126,8 +130,11 @@ public interface InventoryMovementRepository extends
                END
            ), 0) AS netQuantity
        FROM InventoryMovementEntity m
+       WHERE (:warehouseId IS NULL OR m.warehouse.id = :warehouseId)
        GROUP BY m.product.id, m.product.name
        ORDER BY m.product.name
        """)
-    List<InventoryMovementsByProductProjection> getInventoryMovementsByProductReportRaw();
+    List<InventoryMovementsByProductProjection> getInventoryMovementsByProductReportRaw(
+            @Param("warehouseId") Long warehouseId
+    );
 }

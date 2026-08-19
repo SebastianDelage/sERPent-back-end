@@ -48,9 +48,9 @@ class SalesReportServiceTest {
                         new BigDecimal("4600.0000"), new BigDecimal("4600.0000"))
         );
 
-        given(transactionRepository.getSalesByProductReport(any(), any())).willReturn(rows);
+        given(transactionRepository.getSalesByProductReport(any(), any(), any())).willReturn(rows);
 
-        List<SalesByProductResponse> result = salesReportService.getSalesByProduct(null, null);
+        List<SalesByProductResponse> result = salesReportService.getSalesByProduct(null, null, null);
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).productId()).isEqualTo(1L);
@@ -66,7 +66,7 @@ class SalesReportServiceTest {
         assertThat(result.get(1).quantitySold()).isEqualByComparingTo("1.000");
         assertThat(result.get(1).netRevenue()).isEqualByComparingTo("4600.0000");
 
-        verify(transactionRepository).getSalesByProductReport(any(), any());
+        verify(transactionRepository).getSalesByProductReport(any(), any(), any());
     }
 
     @Test
@@ -76,9 +76,9 @@ class SalesReportServiceTest {
         SalesDailyProjection row = dailyRow(
                 LocalDate.of(2026, 3, 12), 1L, "9100.0000", "-1000.0000", "8100.0000");
 
-        given(transactionRepository.getSalesDailyReportRaw(any(), any())).willReturn(List.of(row));
+        given(transactionRepository.getSalesDailyReportRaw(any(), any(), any())).willReturn(List.of(row));
 
-        List<SalesDailyResponse> result = salesReportService.getSalesDaily(null, null);
+        List<SalesDailyResponse> result = salesReportService.getSalesDaily(null, null, null);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).date()).isEqualTo(LocalDate.of(2026, 3, 12));
@@ -89,7 +89,7 @@ class SalesReportServiceTest {
         // totalRevenue is an alias of netSales for existing consumers.
         assertThat(result.get(0).totalRevenue()).isEqualByComparingTo("8100.0000");
 
-        verify(transactionRepository).getSalesDailyReportRaw(any(), any());
+        verify(transactionRepository).getSalesDailyReportRaw(any(), any(), any());
     }
 
     @Test
@@ -100,9 +100,9 @@ class SalesReportServiceTest {
                 new SalesByPaymentMethodResponse(1L, "Cash", 1L, new BigDecimal("9100.0000"))
         );
 
-        given(transactionRepository.getSalesByPaymentMethodReport(any(), any())).willReturn(rows);
+        given(transactionRepository.getSalesByPaymentMethodReport(any(), any(), any())).willReturn(rows);
 
-        List<SalesByPaymentMethodResponse> result = salesReportService.getSalesByPaymentMethod(null, null);
+        List<SalesByPaymentMethodResponse> result = salesReportService.getSalesByPaymentMethod(null, null, null);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).paymentMethodId()).isEqualTo(1L);
@@ -110,7 +110,7 @@ class SalesReportServiceTest {
         assertThat(result.get(0).transactions()).isEqualTo(1L);
         assertThat(result.get(0).totalRevenue()).isEqualByComparingTo("9100.0000");
 
-        verify(transactionRepository).getSalesByPaymentMethodReport(any(), any());
+        verify(transactionRepository).getSalesByPaymentMethodReport(any(), any(), any());
     }
 
     @Test
@@ -119,16 +119,16 @@ class SalesReportServiceTest {
 
         SalesSummaryProjection row = summaryRow(3L, "100.0", "0", "0", "0", "100.0", "33.33333");
 
-        given(transactionRepository.getSalesSummaryReportRaw(any(), any())).willReturn(row);
+        given(transactionRepository.getSalesSummaryReportRaw(any(), any(), any())).willReturn(row);
 
-        SalesSummaryResponse result = salesReportService.getSalesSummary(null, null);
+        SalesSummaryResponse result = salesReportService.getSalesSummary(null, null, null);
 
         assertThat(result.transactions()).isEqualTo(3L);
         assertThat(result.totalRevenue()).isEqualByComparingTo("100.0");
         assertThat(result.averageTicket()).isEqualByComparingTo("33.3333");
         assertThat(result.averageTicket().scale()).isEqualTo(4);
 
-        verify(transactionRepository).getSalesSummaryReportRaw(any(), any());
+        verify(transactionRepository).getSalesSummaryReportRaw(any(), any(), any());
     }
 
     @Test
@@ -140,9 +140,9 @@ class SalesReportServiceTest {
         SalesSummaryProjection row = summaryRow(
                 2L, "22500.0000", "1500.0000", "-2000.0000", "-9000.0000", "13000.0000", "11250.0000");
 
-        given(transactionRepository.getSalesSummaryReportRaw(any(), any())).willReturn(row);
+        given(transactionRepository.getSalesSummaryReportRaw(any(), any(), any())).willReturn(row);
 
-        SalesSummaryResponse result = salesReportService.getSalesSummary(null, null);
+        SalesSummaryResponse result = salesReportService.getSalesSummary(null, null, null);
 
         assertThat(result.listPriceSales()).isEqualByComparingTo("22500.0000");
         assertThat(result.paymentMethodSurcharges()).isEqualByComparingTo("1500.0000");

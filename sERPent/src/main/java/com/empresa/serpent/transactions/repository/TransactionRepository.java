@@ -15,6 +15,26 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * <h2>How sales reports attribute a row to a warehouse</h2>
+ *
+ * A SALE carries its warehouse directly ({@code sales.warehouse_id}). A RETURN does not:
+ * {@code sale_returns} only points at the original sale, and the return is processed
+ * against whatever warehouse the operator's session/terminal resolves to — which is not
+ * necessarily where the sale happened.
+ *
+ * <p>Every warehouse-filtered query here attributes a return to the warehouse of its
+ * ORIGINAL SALE, not to where it was processed. A return is a reversal of revenue and
+ * belongs where the revenue was booked, so a branch's net figure stays internally
+ * consistent: the sale and the money coming back sit on the same side.
+ *
+ * <p><b>Consequence, deliberately accepted:</b> a return processed at branch B against a
+ * sale made at branch A does not appear in B's net at all — it lands in A's. The stock
+ * movement is unaffected and still belongs to B, where the goods physically came back in
+ * (see {@code SaleReturnApplicationService}), so inventory reports and sales reports will
+ * legitimately disagree about that return's location. They are answering different
+ * questions.
+ */
 public interface TransactionRepository extends
         JpaRepository<TransactionEntity, Long>,
         JpaSpecificationExecutor<TransactionEntity> {
@@ -44,6 +64,9 @@ public interface TransactionRepository extends
            )
            FROM TransactionEntity t
            JOIN t.details d
+           LEFT JOIN t.sale s
+           LEFT JOIN SaleReturnEntity sr ON sr.transaction = t
+           LEFT JOIN sr.originalSale os
            WHERE t.type IN (
                      com.empresa.serpent.transactions.domain.enums.TransactionType.SALE,
                      com.empresa.serpent.transactions.domain.enums.TransactionType.RETURN
@@ -51,13 +74,16 @@ public interface TransactionRepository extends
              AND d.product IS NOT NULL
              AND (:dateFrom IS NULL OR t.date >= :dateFrom)
              AND (:dateTo IS NULL OR t.date <= :dateTo)
+             AND (:warehouseId IS NULL
+                  OR COALESCE(s.warehouse.id, os.warehouse.id) = :warehouseId)
            GROUP BY d.product.id, d.product.name
            ORDER BY COALESCE(SUM(CASE WHEN t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.SALE
                                       THEN d.quantity ELSE 0 END), 0) DESC
            """)
     List<SalesByProductResponse> getSalesByProductReport(
             @Param("dateFrom") LocalDateTime dateFrom,
-            @Param("dateTo") LocalDateTime dateTo
+            @Param("dateTo") LocalDateTime dateTo,
+            @Param("warehouseId") Long warehouseId
     );
 
     /** A return lands on the day it was registered, not the day of the original sale. */
@@ -69,15 +95,21 @@ public interface TransactionRepository extends
                COALESCE(SUM(CASE WHEN t.type = 'RETURN' THEN t.total END), 0) AS returnsTotal,
                COALESCE(SUM(t.total), 0) AS netSales
            FROM transactions t
+           LEFT JOIN sales s ON s.transaction_id = t.transaction_id
+           LEFT JOIN sale_returns sr ON sr.transaction_id = t.transaction_id
+           LEFT JOIN sales os ON os.sale_id = sr.original_sale_id
            WHERE t.type IN ('SALE', 'RETURN')
              AND (:dateFrom IS NULL OR t.date >= :dateFrom)
              AND (:dateTo IS NULL OR t.date <= :dateTo)
+             AND (:warehouseId IS NULL
+                  OR COALESCE(s.warehouse_id, os.warehouse_id) = :warehouseId)
            GROUP BY CAST(t.date AS DATE)
            ORDER BY CAST(t.date AS DATE) DESC
            """, nativeQuery = true)
     List<SalesDailyProjection> getSalesDailyReportRaw(
             @Param("dateFrom") LocalDateTime dateFrom,
-            @Param("dateTo") LocalDateTime dateTo
+            @Param("dateTo") LocalDateTime dateTo,
+            @Param("warehouseId") Long warehouseId
     );
 
     /**
@@ -95,15 +127,18 @@ public interface TransactionRepository extends
            )
            FROM TransactionEntity t
            JOIN t.paymentMethod pm
+           LEFT JOIN t.sale s
            WHERE t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.SALE
              AND (:dateFrom IS NULL OR t.date >= :dateFrom)
              AND (:dateTo IS NULL OR t.date <= :dateTo)
+             AND (:warehouseId IS NULL OR s.warehouse.id = :warehouseId)
            GROUP BY pm.id, pm.name
            ORDER BY SUM(t.total) DESC
            """)
     List<SalesByPaymentMethodResponse> getSalesByPaymentMethodReport(
             @Param("dateFrom") LocalDateTime dateFrom,
-            @Param("dateTo") LocalDateTime dateTo
+            @Param("dateTo") LocalDateTime dateTo,
+            @Param("warehouseId") Long warehouseId
     );
 
     /**
@@ -123,7 +158,15 @@ public interface TransactionRepository extends
      * would otherwise be counted a second time on top of returnsTotal.
      *
      * <p>The join to {@code sales} is safe — one row per transaction, enforced by
-     * ux_sales_transaction — and returns have no sales row, so SUM skips their NULL.
+     * ux_sales_transaction — and returns have no sales row, so SUM skips their NULL. The
+     * two extra joins added for the warehouse filter ({@code sale_returns} and the
+     * original sale behind it) are safe for the same reason: ux_sale_returns_transaction
+     * makes them at most one row, and a transaction is either a sale or a return, never
+     * both.
+     *
+     * <p>The warehouse filter is repeated in the subqueries rather than hoisted, because
+     * they are independent statements: leaving them unfiltered would sum every branch's
+     * line figures against one branch's totals and break the identity outright.
      */
     @Query(value = """
        SELECT
@@ -138,9 +181,11 @@ public interface TransactionRepository extends
                                ELSE d.subtotal END)
                FROM transaction_details d
                JOIN transactions td ON td.transaction_id = d.transaction_id
+               LEFT JOIN sales sd ON sd.transaction_id = td.transaction_id
                WHERE d.transaction_type = 'SALE'
                  AND (:dateFrom IS NULL OR td.date >= :dateFrom)
                  AND (:dateTo IS NULL OR td.date <= :dateTo)
+                 AND (:warehouseId IS NULL OR sd.warehouse_id = :warehouseId)
            ), 0) AS listPriceSales,
            COALESCE((
                SELECT SUM(CASE WHEN d.base_unit_price IS NOT NULL
@@ -148,18 +193,25 @@ public interface TransactionRepository extends
                                ELSE 0 END)
                FROM transaction_details d
                JOIN transactions td ON td.transaction_id = d.transaction_id
+               LEFT JOIN sales sd ON sd.transaction_id = td.transaction_id
                WHERE d.transaction_type = 'SALE'
                  AND (:dateFrom IS NULL OR td.date >= :dateFrom)
                  AND (:dateTo IS NULL OR td.date <= :dateTo)
+                 AND (:warehouseId IS NULL OR sd.warehouse_id = :warehouseId)
            ), 0) AS paymentMethodSurcharges
        FROM transactions t
        LEFT JOIN sales s ON s.transaction_id = t.transaction_id
+       LEFT JOIN sale_returns sr ON sr.transaction_id = t.transaction_id
+       LEFT JOIN sales os ON os.sale_id = sr.original_sale_id
        WHERE t.type IN ('SALE', 'RETURN')
          AND (:dateFrom IS NULL OR t.date >= :dateFrom)
          AND (:dateTo IS NULL OR t.date <= :dateTo)
+         AND (:warehouseId IS NULL
+              OR COALESCE(s.warehouse_id, os.warehouse_id) = :warehouseId)
        """, nativeQuery = true)
     SalesSummaryProjection getSalesSummaryReportRaw(
             @Param("dateFrom") LocalDateTime dateFrom,
-            @Param("dateTo") LocalDateTime dateTo
+            @Param("dateTo") LocalDateTime dateTo,
+            @Param("warehouseId") Long warehouseId
     );
 }
