@@ -68,6 +68,7 @@ class ExpenseApplicationServiceTest {
                 1L,
                 1L,
                 1L,
+                null,
                 1L,
                 new BigDecimal("3000.0000"),
                 "REC-002",
@@ -136,6 +137,7 @@ class ExpenseApplicationServiceTest {
                 1L,
                 null,
                 1L,
+                null,
                 1L,
                 new BigDecimal("1500.0000"),
                 "REC-003",
@@ -180,6 +182,7 @@ class ExpenseApplicationServiceTest {
     void shouldAllowNullReceiptNumber() {
         CreateExpenseRequest request = new CreateExpenseRequest(
                 1L,
+                null,
                 null,
                 null,
                 1L,
@@ -354,6 +357,7 @@ class ExpenseApplicationServiceTest {
                 1L,
                 null,
                 null,
+                null,
                 1L,
                 null,
                 "REC-010",
@@ -383,6 +387,7 @@ class ExpenseApplicationServiceTest {
     void shouldThrowWhenTotalIsNegative() {
         CreateExpenseRequest request = new CreateExpenseRequest(
                 1L,
+                null,
                 null,
                 null,
                 1L,
@@ -440,6 +445,7 @@ class ExpenseApplicationServiceTest {
                 1L,
                 1L,
                 1L,
+                null,
                 1L,
                 new BigDecimal("3000.0000"),
                 "REC-002",

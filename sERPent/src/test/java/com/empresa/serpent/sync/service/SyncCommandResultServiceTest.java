@@ -91,7 +91,7 @@ class SyncCommandResultServiceTest {
     @DisplayName("Creates the expense and marks the command PROCESSED with the EXPENSE reference")
     void processCreateExpense_marksProcessedWithReference() throws Exception {
         CreateExpenseRequest expensePayload = new CreateExpenseRequest(
-                1L, null, null, 1L, new BigDecimal("2500.0000"), "EXP-1", "Offline expense", false, null);
+                1L, null, null, null, 1L, new BigDecimal("2500.0000"), "EXP-1", "Offline expense", false, null);
 
         ClientSyncCommandEntity command = ClientSyncCommandEntity.builder()
                 .id(2L).clientId("device-01").clientOperationId("expense-1")

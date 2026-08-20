@@ -2,6 +2,8 @@ package com.empresa.serpent.transactions.service;
 
 import com.empresa.serpent.catalog.domain.entity.SupplierEntity;
 import com.empresa.serpent.catalog.repository.SupplierRepository;
+import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
+import com.empresa.serpent.inventory.repository.WarehouseRepository;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.shared.security.AuthenticatedUserService;
@@ -35,6 +37,7 @@ public class ExpenseApplicationService {
     private final PaymentMethodRepository paymentMethodRepository;
     private final SupplierRepository supplierRepository;
     private final ExpenseCategoryRepository expenseCategoryRepository;
+    private final WarehouseRepository warehouseRepository;
     private final AuthenticatedUserService authenticatedUserService;
 
     /** Online path: the acting user is whoever is holding the session. */
@@ -87,6 +90,8 @@ public class ExpenseApplicationService {
             }
         }
 
+        WarehouseEntity warehouse = resolveWarehouse(request.warehouseId());
+
         ExpenseCategoryEntity expenseCategory = expenseCategoryRepository.findById(request.expenseCategoryId())
                 .orElseThrow(() ->
                         new NotFoundException("Expense category not found: " + request.expenseCategoryId()));
@@ -112,6 +117,7 @@ public class ExpenseApplicationService {
         ExpenseEntity expense = ExpenseEntity.builder()
                 .transaction(savedTransaction)
                 .supplier(supplier)
+                .warehouse(warehouse)
                 .expenseCategory(expenseCategory)
                 .receiptNumber(normalizeOptional(request.receiptNumber()))
                 .reimbursable(request.reimbursable() != null ? request.reimbursable() : false)
@@ -126,6 +132,35 @@ public class ExpenseApplicationService {
                 savedTransaction.getStatus().name(),
                 "Expense created successfully"
         );
+    }
+
+    /**
+     * The branch this expense belongs to, or null for a general one.
+     *
+     * <p>DELIBERATELY NOT {@code WarehouseAccessService.resolveForOperation}, and the two
+     * differences are both on purpose:
+     *
+     * <p>1. No assignment check. Every stock operation requires the warehouse to be one of
+     * the acting user's, because it says where the goods physically moved. An expense moves
+     * neither stock nor cash — it records who a cost belongs to — and in most shops one
+     * person loads every expense from one place. Requiring assignment would stop them from
+     * booking the other branch's rent. Worth revisiting once there are roles: the right gate
+     * for this is a role, not a warehouse assignment.
+     *
+     * <p>2. Inactive warehouses are ACCEPTED. Stock operations reject them correctly, since
+     * nothing can move through a closed branch. But expenses arrive after the fact: close a
+     * branch in March and its final electricity bill shows up in April. Rejecting it would
+     * force that bill to be recorded as general, which is exactly the false attribution this
+     * whole column exists to avoid. The UI marks inactive warehouses so nobody picks one by
+     * mistake.
+     */
+    private WarehouseEntity resolveWarehouse(Long warehouseId) {
+        if (warehouseId == null) {
+            return null;
+        }
+
+        return warehouseRepository.findById(warehouseId)
+                .orElseThrow(() -> new NotFoundException("Warehouse not found: " + warehouseId));
     }
 
     private void validateTotal(BigDecimal total) {

@@ -17,6 +17,12 @@ public record CreateExpenseRequest(
 
         Long supplierId,
 
+        /**
+         * The branch this expense belongs to. Omit it for a company-wide expense — absent
+         * means GENERAL, which is a valid answer and not an oversight.
+         */
+        Long warehouseId,
+
         @NotNull(message = "ExpenseCategoryId cannot be null")
         Long expenseCategoryId,
 

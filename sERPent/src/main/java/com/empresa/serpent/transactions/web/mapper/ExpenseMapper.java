@@ -22,5 +22,9 @@ public interface ExpenseMapper {
     @Mapping(target = "expenseCategoryId", source = "expenseCategory.id")
     @Mapping(target = "expenseCategoryName", source = "expenseCategory.name")
 
+    @Mapping(target = "warehouseId", source = "warehouse.id")
+    @Mapping(target = "warehouseName", source = "warehouse.name")
+    @Mapping(target = "warehouseActive", source = "warehouse.active")
+
     ExpenseResponse toResponse(ExpenseEntity entity);
 }
