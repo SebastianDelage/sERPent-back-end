@@ -1,5 +1,6 @@
 package com.empresa.serpent.transactions.domain.entity;
 
+import com.empresa.serpent.catalog.domain.entity.CustomerEntity;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.transactions.domain.enums.AdjustmentType;
 import jakarta.persistence.*;
@@ -20,14 +21,32 @@ public class SaleEntity {
     @Column(name = "sale_id", nullable = false, updatable = false)
     private Long id;
 
-    @Column(name = "customer_id")
-    private Long customerId;
+    /**
+     * The named customer, when there is one. Optional: most sales are counter sales, which
+     * carry only the free-text fields below.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
+    private CustomerEntity customer;
 
     @Column(name = "customer_name")
     private String customerName;
 
     @Column(name = "customer_document")
     private String customerDocument;
+
+    /**
+     * The sale was taken on credit: nothing was collected, and the total was added to the
+     * customer's balance instead.
+     *
+     * <p>A flag of its own rather than a payment method called "Fiado", which would put
+     * money that never arrived into the sales-by-payment-method report. A sale on credit
+     * carries no payment method at all, and {@code customer} is then mandatory — free text
+     * cannot owe anything.
+     */
+    @Builder.Default
+    @Column(name = "on_credit", nullable = false)
+    private Boolean onCredit = false;
 
     @Column(name = "invoice_number")
     private String invoiceNumber;

@@ -2,10 +2,12 @@ package com.empresa.serpent.reports.service;
 
 import com.empresa.serpent.reports.repository.projection.SalesDailyProjection;
 import com.empresa.serpent.reports.repository.projection.SalesSummaryProjection;
+import com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodReportResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesByProductResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesDailyResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesSummaryResponse;
+import com.empresa.serpent.transactions.repository.SaleRepository;
 import com.empresa.serpent.transactions.repository.TransactionRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,9 @@ class SalesReportServiceTest {
 
     @Mock
     private TransactionRepository transactionRepository;
+
+    @Mock
+    private SaleRepository saleRepository;
 
     @InjectMocks
     private SalesReportService salesReportService;
@@ -101,14 +106,22 @@ class SalesReportServiceTest {
         );
 
         given(transactionRepository.getSalesByPaymentMethodReport(any(), any(), any())).willReturn(rows);
+        given(saleRepository.sumCreditSales(any(), any(), any())).willReturn(new BigDecimal("2000.0000"));
 
-        List<SalesByPaymentMethodResponse> result = salesReportService.getSalesByPaymentMethod(null, null, null);
+        SalesByPaymentMethodReportResponse result =
+                salesReportService.getSalesByPaymentMethod(null, null, null);
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).paymentMethodId()).isEqualTo(1L);
-        assertThat(result.get(0).paymentMethodName()).isEqualTo("Cash");
-        assertThat(result.get(0).transactions()).isEqualTo(1L);
-        assertThat(result.get(0).totalRevenue()).isEqualByComparingTo("9100.0000");
+        assertThat(result.methods()).hasSize(1);
+        assertThat(result.methods().get(0).paymentMethodId()).isEqualTo(1L);
+        assertThat(result.methods().get(0).paymentMethodName()).isEqualTo("Cash");
+        assertThat(result.methods().get(0).transactions()).isEqualTo(1L);
+        assertThat(result.methods().get(0).totalRevenue()).isEqualByComparingTo("9100.0000");
+
+        assertThat(result.collected()).isEqualByComparingTo("9100.0000");
+
+        // Sold on account, so it is deliberately absent from the method rows and reported
+        // on its own: the rows alone no longer add up to what was sold.
+        assertThat(result.creditSales()).isEqualByComparingTo("2000.0000");
 
         verify(transactionRepository).getSalesByPaymentMethodReport(any(), any(), any());
     }

@@ -25,6 +25,8 @@ import com.empresa.serpent.transactions.web.dto.request.CreatePurchaseRequest;
 import com.empresa.serpent.transactions.web.dto.response.CreatePurchaseResponse;
 import com.empresa.serpent.users.domain.entity.UserEntity;
 import com.empresa.serpent.users.repository.UserRepository;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -340,5 +342,119 @@ class PurchaseApplicationServiceTest {
                         new CreatePurchaseItemRequest(1L, "Pollo entero", new BigDecimal("2.000"), new BigDecimal("3000.0000"))
                 )
         );
+    }
+
+    @Nested
+    @DisplayName("purchases on credit")
+    class CreditPurchases {
+
+        @Test
+        @DisplayName("Is stored flagged on credit, with no payment method")
+        void creditPurchaseCarriesNoPaymentMethod() {
+            CreatePurchaseRequest request = creditRequest(null, 1L);
+
+            UserEntity user = UserEntity.builder().id(1L).build();
+            SupplierEntity supplier = SupplierEntity.builder().id(1L).name("Distribuidora").active(true).build();
+            WarehouseEntity warehouse = WarehouseEntity.builder().id(1L).active(true).build();
+            ProductEntity product = ProductEntity.builder().id(1L).name("Pollo entero").build();
+
+            when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
+            when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
+            when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse);
+            when(productRepository.findByIdIn(List.of(1L))).thenReturn(List.of(product));
+            when(transactionRepository.save(any(TransactionEntity.class)))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            when(purchaseRepository.save(any(PurchaseEntity.class)))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+
+            purchaseApplicationService.createPurchase(request);
+
+            ArgumentCaptor<PurchaseEntity> captor = ArgumentCaptor.forClass(PurchaseEntity.class);
+            verify(purchaseRepository).save(captor.capture());
+
+            assertTrue(captor.getValue().getOnCredit());
+            assertEquals(1L, captor.getValue().getSupplier().getId());
+            assertNull(captor.getValue().getTransaction().getPaymentMethod());
+        }
+
+        @Test
+        @DisplayName("Is rejected when it also names a payment method")
+        void creditPurchaseRejectsAPaymentMethod() {
+            CreatePurchaseRequest request = creditRequest(1L, 1L);
+
+            when(authenticatedUserService.requireCurrentUser())
+                    .thenReturn(UserEntity.builder().id(1L).build());
+
+            ValidationException ex = assertThrows(
+                    ValidationException.class,
+                    () -> purchaseApplicationService.createPurchase(request)
+            );
+
+            assertEquals("Una compra a plazo no lleva método de pago, porque no se paga en el momento.",
+                    ex.getMessage());
+            verify(transactionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Is rejected without a supplier: a balance needs someone to belong to")
+        void creditPurchaseRequiresASupplier() {
+            CreatePurchaseRequest request = creditRequest(null, null);
+
+            when(authenticatedUserService.requireCurrentUser())
+                    .thenReturn(UserEntity.builder().id(1L).build());
+
+            ValidationException ex = assertThrows(
+                    ValidationException.class,
+                    () -> purchaseApplicationService.createPurchase(request)
+            );
+
+            assertEquals("Una compra a plazo tiene que indicar el proveedor al que se le debe.",
+                    ex.getMessage());
+            verify(transactionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("A purchase with no payment method and no flag is NOT on credit")
+        void missingPaymentMethodIsNotCredit() {
+            // Purchases have accepted a null payment method since they were introduced, with
+            // no defined meaning. Reading that null as "on credit" would rewrite the meaning
+            // of rows already in the database, which is exactly why the flag is explicit.
+            CreatePurchaseRequest request = new CreatePurchaseRequest(
+                    1L, null, 1L, null, 1L, null, "PUR-CREDIT-4", "Compra sin método", null,
+                    List.of(new CreatePurchaseItemRequest(
+                            1L, "Pollo entero", new BigDecimal("2.000"), new BigDecimal("3000.0000")))
+            );
+
+            UserEntity user = UserEntity.builder().id(1L).build();
+            SupplierEntity supplier = SupplierEntity.builder().id(1L).active(true).build();
+            WarehouseEntity warehouse = WarehouseEntity.builder().id(1L).active(true).build();
+            ProductEntity product = ProductEntity.builder().id(1L).name("Pollo entero").build();
+
+            when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
+            when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
+            when(warehouseAccessService.resolveForOperation(any(), any(), any())).thenReturn(warehouse);
+            when(purchaseRepository.existsByReceiptNumberIgnoreCase("PUR-CREDIT-4")).thenReturn(false);
+            when(productRepository.findByIdIn(List.of(1L))).thenReturn(List.of(product));
+            when(transactionRepository.save(any(TransactionEntity.class)))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            when(purchaseRepository.save(any(PurchaseEntity.class)))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+
+            purchaseApplicationService.createPurchase(request);
+
+            ArgumentCaptor<PurchaseEntity> captor = ArgumentCaptor.forClass(PurchaseEntity.class);
+            verify(purchaseRepository).save(captor.capture());
+
+            assertFalse(captor.getValue().getOnCredit());
+        }
+
+        private CreatePurchaseRequest creditRequest(Long paymentMethodId, Long supplierId) {
+            return new CreatePurchaseRequest(
+                    1L, paymentMethodId, supplierId, true, 1L, null,
+                    null, "Compra a plazo", null,
+                    List.of(new CreatePurchaseItemRequest(
+                            1L, "Pollo entero", new BigDecimal("2.000"), new BigDecimal("3000.0000")))
+            );
+        }
     }
 }

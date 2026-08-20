@@ -19,6 +19,16 @@ public record CreatePurchaseRequest(
 
         Long supplierId,
 
+        /**
+         * Take the purchase on the supplier's account instead of paying it. Requires
+         * {@code supplierId} and forbids {@code paymentMethodId}.
+         *
+         * <p>An explicit flag rather than "no payment method", which purchases have always
+         * accepted with no defined meaning — treating that null as credit would rewrite
+         * the meaning of rows already in the database.
+         */
+        Boolean onCredit,
+
         /** Ignored when {@code terminalId} is set: the terminal decides the warehouse. */
         Long warehouseId,
 
@@ -36,6 +46,11 @@ public record CreatePurchaseRequest(
         List<@Valid CreatePurchaseItemRequest> items
 ) {
 
+    /** True only when the caller explicitly asked for it; absent means a normal, paid purchase. */
+    public boolean isOnCredit() {
+        return Boolean.TRUE.equals(onCredit);
+    }
+
     /** Convenience overload for callers that do not go through a terminal. */
     public CreatePurchaseRequest(Long createdByUserId,
                                  Long paymentMethodId,
@@ -45,7 +60,7 @@ public record CreatePurchaseRequest(
                                  String description,
                                  String notes,
                                  List<CreatePurchaseItemRequest> items) {
-        this(createdByUserId, paymentMethodId, supplierId, warehouseId, null,
+        this(createdByUserId, paymentMethodId, supplierId, null, warehouseId, null,
                 receiptNumber, description, notes, items);
     }
 }

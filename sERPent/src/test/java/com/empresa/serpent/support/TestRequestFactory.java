@@ -13,7 +13,7 @@ public final class TestRequestFactory {
 
     public static CreateSaleRequest createSaleRequestOneItem() {
         return new CreateSaleRequest(
-                100L,
+                null,
                 "Consumidor Final",
                 "12345678",
                 "A-0001-00000001",

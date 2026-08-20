@@ -1,6 +1,7 @@
 package com.empresa.serpent.reports.web.controller;
 
 import com.empresa.serpent.reports.service.SalesReportService;
+import com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodReportResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesByProductResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesDailyResponse;
@@ -102,8 +103,10 @@ class SalesReportControllerTest {
     @DisplayName("Should return sales by payment method report")
     void shouldReturnSalesByPaymentMethodReport() throws Exception {
 
-        List<SalesByPaymentMethodResponse> response = List.of(
-                new SalesByPaymentMethodResponse(1L, "Cash", 1L, new BigDecimal("9100.0000"))
+        SalesByPaymentMethodReportResponse response = new SalesByPaymentMethodReportResponse(
+                List.of(new SalesByPaymentMethodResponse(1L, "Cash", 1L, new BigDecimal("9100.0000"))),
+                new BigDecimal("9100.0000"),
+                new BigDecimal("2000.0000")
         );
 
         given(salesReportService.getSalesByPaymentMethod(any(), any(), any())).willReturn(response);
@@ -111,10 +114,13 @@ class SalesReportControllerTest {
         mockMvc.perform(get("/api/reports/sales/by-payment-method"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$[0].paymentMethodId").value(1))
-                .andExpect(jsonPath("$[0].paymentMethodName").value("Cash"))
-                .andExpect(jsonPath("$[0].transactions").value(1))
-                .andExpect(jsonPath("$[0].totalRevenue").value(9100.0000));
+                .andExpect(jsonPath("$.methods[0].paymentMethodId").value(1))
+                .andExpect(jsonPath("$.methods[0].paymentMethodName").value("Cash"))
+                .andExpect(jsonPath("$.methods[0].transactions").value(1))
+                .andExpect(jsonPath("$.methods[0].totalRevenue").value(9100.0000))
+                .andExpect(jsonPath("$.collected").value(9100.0000))
+                // Sold on account: absent from the method rows on purpose, reported apart.
+                .andExpect(jsonPath("$.creditSales").value(2000.0000));
     }
 
     @Test

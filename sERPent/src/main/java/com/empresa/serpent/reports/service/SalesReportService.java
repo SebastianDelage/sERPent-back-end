@@ -1,17 +1,21 @@
 package com.empresa.serpent.reports.service;
 
+import com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodReportResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesByProductResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesDailyResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesSummaryResponse;
+import com.empresa.serpent.transactions.repository.SaleRepository;
 import com.empresa.serpent.transactions.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +23,7 @@ import java.util.List;
 public class SalesReportService {
 
     private final TransactionRepository transactionRepository;
+    private final SaleRepository saleRepository;
 
     public List<SalesByProductResponse> getSalesByProduct(
             LocalDateTime dateFrom, LocalDateTime dateTo, Long warehouseId) {
@@ -41,9 +46,28 @@ public class SalesReportService {
                 .toList();
     }
 
-    public List<SalesByPaymentMethodResponse> getSalesByPaymentMethod(
+    /**
+     * What came in and how, plus what was sold on account and did not come in at all.
+     *
+     * <p>The two figures are gathered separately because they are different questions. A
+     * credit sale names no payment method, so it cannot appear among the method rows, and
+     * the total of those rows therefore stops being total sales — see
+     * {@link SalesByPaymentMethodReportResponse} for the invariant this breaks and why.
+     */
+    public SalesByPaymentMethodReportResponse getSalesByPaymentMethod(
             LocalDateTime dateFrom, LocalDateTime dateTo, Long warehouseId) {
-        return transactionRepository.getSalesByPaymentMethodReport(dateFrom, dateTo, warehouseId);
+
+        List<SalesByPaymentMethodResponse> methods =
+                transactionRepository.getSalesByPaymentMethodReport(dateFrom, dateTo, warehouseId);
+
+        BigDecimal collected = methods.stream()
+                .map(SalesByPaymentMethodResponse::totalRevenue)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal creditSales = saleRepository.sumCreditSales(dateFrom, dateTo, warehouseId);
+
+        return new SalesByPaymentMethodReportResponse(methods, collected, creditSales);
     }
 
     public SalesSummaryResponse getSalesSummary(

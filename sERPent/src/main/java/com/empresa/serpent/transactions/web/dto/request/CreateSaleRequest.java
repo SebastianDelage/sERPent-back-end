@@ -3,7 +3,6 @@ package com.empresa.serpent.transactions.web.dto.request;
 import com.empresa.serpent.transactions.domain.enums.AdjustmentType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -22,8 +21,18 @@ public record CreateSaleRequest(
         @Size(max = 60, message = "Invoice number cannot be longer than 60 characters")
         String invoiceNumber,
 
-        @NotNull(message = "Payment method id cannot be null")
+        /**
+         * Required unless the sale goes on the customer's account: a credit sale collects
+         * nothing, so there is no method to name. Validated in the service rather than with
+         * {@code @NotNull}, because whether it is required depends on {@code onCredit}.
+         */
         Long paymentMethodId,
+
+        /**
+         * Take the sale on account instead of collecting it. Requires {@code customerId}
+         * and forbids {@code paymentMethodId}.
+         */
+        Boolean onCredit,
 
         /**
          * Legacy field. The acting user now comes from the authenticated session; sending a
@@ -56,6 +65,11 @@ public record CreateSaleRequest(
 
 ) {
 
+    /** True only when the caller explicitly asked for it; absent means a normal, collected sale. */
+    public boolean isOnCredit() {
+        return Boolean.TRUE.equals(onCredit);
+    }
+
     /** Convenience overload for callers that do not go through a terminal. */
     public CreateSaleRequest(Long customerId,
                              String customerName,
@@ -69,7 +83,8 @@ public record CreateSaleRequest(
                              AdjustmentType adjustmentType,
                              BigDecimal adjustmentValue) {
         this(customerId, customerName, customerDocument, invoiceNumber, paymentMethodId,
-                createdByUserId, warehouseId, null, description, items, adjustmentType, adjustmentValue);
+                null, createdByUserId, warehouseId, null, description, items,
+                adjustmentType, adjustmentValue);
     }
 
     /** Convenience overload for callers that do not apply an adjustment nor use a terminal. */
@@ -83,6 +98,6 @@ public record CreateSaleRequest(
                              String description,
                              List<CreateSaleItemRequest> items) {
         this(customerId, customerName, customerDocument, invoiceNumber, paymentMethodId,
-                createdByUserId, warehouseId, null, description, items, null, null);
+                null, createdByUserId, warehouseId, null, description, items, null, null);
     }
 }

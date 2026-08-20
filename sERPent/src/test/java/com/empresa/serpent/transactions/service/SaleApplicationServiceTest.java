@@ -1,6 +1,8 @@
 package com.empresa.serpent.transactions.service;
 
 import com.empresa.serpent.catalog.domain.entity.ProductEntity;
+import com.empresa.serpent.catalog.domain.entity.CustomerEntity;
+import com.empresa.serpent.catalog.repository.CustomerRepository;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.service.InventoryMovementService;
@@ -76,6 +78,9 @@ class SaleApplicationServiceTest {
 
     @Mock
     private PaymentMethodRepository paymentMethodRepository;
+
+    @Mock
+    private CustomerRepository customerRepository;
 
     /**
      * Returns an empty list by default, so a sale whose products carry no
@@ -165,7 +170,7 @@ class SaleApplicationServiceTest {
     @DisplayName("Should reject a sale with no payment method")
     void shouldRejectSaleWithoutPaymentMethod() {
         CreateSaleRequest request = new CreateSaleRequest(
-                100L,
+                null,
                 "Consumidor Final",
                 "12345678",
                 "A-0001-00000001",
@@ -206,7 +211,7 @@ class SaleApplicationServiceTest {
         ProductEntity product2 = product(20L, "Pata muslo");
 
         CreateSaleRequest request = new CreateSaleRequest(
-                100L,
+                null,
                 "Consumidor Final",
                 "12345678",
                 "A-0001-00000002",
@@ -272,7 +277,7 @@ class SaleApplicationServiceTest {
         ProductEntity product = product(10L, "Pollo entero");
 
         CreateSaleRequest request = new CreateSaleRequest(
-                100L,
+                null,
                 "Consumidor Final",
                 "12345678",
                 null,
@@ -325,7 +330,7 @@ class SaleApplicationServiceTest {
         ProductEntity product = product(10L, "Pollo entero");
 
         CreateSaleRequest request = new CreateSaleRequest(
-                100L,
+                null,
                 "Consumidor Final",
                 "12345678",
                 null,
@@ -378,7 +383,7 @@ class SaleApplicationServiceTest {
         ProductEntity product = product(10L, "Pollo entero");
 
         CreateSaleRequest request = new CreateSaleRequest(
-                100L,
+                null,
                 "Consumidor Final",
                 "12345678",
                 null,
@@ -427,7 +432,7 @@ class SaleApplicationServiceTest {
         ProductEntity product2 = product(20L, "Pata muslo");
 
         CreateSaleRequest request = new CreateSaleRequest(
-                100L,
+                null,
                 "Consumidor Final",
                 "12345678",
                 null,
@@ -574,7 +579,7 @@ class SaleApplicationServiceTest {
         /** One line of 2 x 5000 = 10000 subtotal, so the adjustment maths are easy to read. */
         private CreateSaleRequest requestWith(AdjustmentType type, BigDecimal value) {
             return new CreateSaleRequest(
-                    100L, "Consumidor Final", "12345678", null, 1L, 1L, 1L, "Venta con ajuste",
+                    null, "Consumidor Final", "12345678", null, 1L, 1L, 1L, "Venta con ajuste",
                     List.of(new CreateSaleItemRequest(
                             10L, null, new BigDecimal("2.000"), new BigDecimal("5000.0000"))),
                     type, value
@@ -765,7 +770,7 @@ class SaleApplicationServiceTest {
         /** A cart of one product, so the per-line maths stay readable. */
         private CreateSaleRequest requestFor(Long productId, String quantity, String unitPrice) {
             return new CreateSaleRequest(
-                    100L, "Consumidor Final", "12345678", null, CARD_ID, 1L, 1L, "Venta con tarjeta",
+                    null, "Consumidor Final", "12345678", null, CARD_ID, 1L, 1L, "Venta con tarjeta",
                     List.of(new CreateSaleItemRequest(
                             productId, null, new BigDecimal(quantity), new BigDecimal(unitPrice)))
             );
@@ -859,7 +864,7 @@ class SaleApplicationServiceTest {
                     .willReturn(List.of(rule(cigarettes, "10")));
 
             CreateSaleRequest request = new CreateSaleRequest(
-                    100L, "Consumidor Final", "12345678", null, CARD_ID, 1L, 1L, "Venta mixta",
+                    null, "Consumidor Final", "12345678", null, CARD_ID, 1L, 1L, "Venta mixta",
                     List.of(
                             new CreateSaleItemRequest(10L, null, new BigDecimal("1.000"), new BigDecimal("1000.0000")),
                             new CreateSaleItemRequest(20L, null, new BigDecimal("2.000"), new BigDecimal("500.0000"))
@@ -891,7 +896,7 @@ class SaleApplicationServiceTest {
                     .willReturn(List.of(rule(cigarettes, "10")));
 
             CreateSaleRequest request = new CreateSaleRequest(
-                    100L, "Consumidor Final", "12345678", null, CARD_ID, 1L, 1L, "Venta con ambas capas",
+                    null, "Consumidor Final", "12345678", null, CARD_ID, 1L, 1L, "Venta con ambas capas",
                     List.of(new CreateSaleItemRequest(
                             10L, null, new BigDecimal("2.000"), new BigDecimal("1000.0000"))),
                     AdjustmentType.FIXED, new BigDecimal("-500.0000")
@@ -1024,7 +1029,7 @@ class SaleApplicationServiceTest {
         @DisplayName("Should throw when item unit price is null")
         void shouldThrowWhenItemUnitPriceIsNull() {
             CreateSaleRequest request = new CreateSaleRequest(
-                    100L,
+                    null,
                     "Consumidor Final",
                     "12345678",
                     "A-0001-00000001",
@@ -1062,7 +1067,7 @@ class SaleApplicationServiceTest {
         @DisplayName("Should throw when item unit price is negative")
         void shouldThrowWhenItemUnitPriceIsNegative() {
             CreateSaleRequest request = new CreateSaleRequest(
-                    100L,
+                    null,
                     "Consumidor Final",
                     "12345678",
                     "A-0001-00000001",
@@ -1094,6 +1099,155 @@ class SaleApplicationServiceTest {
 
             verify(transactionRepository, never()).save(any());
             verify(saleRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("sales on account")
+    class CreditSales {
+
+        private static final Long CUSTOMER_ID = 7L;
+
+        @Test
+        @DisplayName("Is stored with no payment method and flagged on credit")
+        void creditSaleCarriesNoPaymentMethod() {
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
+            given(customerRepository.findById(CUSTOMER_ID)).willReturn(Optional.of(customer()));
+            given(warehouseAccessService.resolveForOperation(any(), any(), any()))
+                    .willReturn(warehouse(1L, "Central", true));
+            given(productRepository.findByIdIn(List.of(10L)))
+                    .willReturn(List.of(product(10L, "Pollo entero")));
+            given(transactionRepository.save(any(TransactionEntity.class)))
+                    .willAnswer(invocation -> invocation.getArgument(0));
+            given(saleRepository.save(any(SaleEntity.class)))
+                    .willAnswer(invocation -> invocation.getArgument(0));
+
+            saleApplicationService.createSale(creditRequest());
+
+            ArgumentCaptor<TransactionEntity> transaction = ArgumentCaptor.forClass(TransactionEntity.class);
+            verify(transactionRepository).save(transaction.capture());
+            // Nothing was collected, so there is no method to name. A "Fiado" payment method
+            // would put money that never arrived into the sales-by-method report.
+            assertThat(transaction.getValue().getPaymentMethod()).isNull();
+
+            ArgumentCaptor<SaleEntity> sale = ArgumentCaptor.forClass(SaleEntity.class);
+            verify(saleRepository).save(sale.capture());
+            assertThat(sale.getValue().getOnCredit()).isTrue();
+            assertThat(sale.getValue().getCustomer().getId()).isEqualTo(CUSTOMER_ID);
+
+            verifyNoInteractions(productPaymentAdjustmentRepository);
+        }
+
+        @Test
+        @DisplayName("Sells at list price: the per-method rules cannot apply without a method")
+        void creditSaleIgnoresPaymentMethodRules() {
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
+            given(customerRepository.findById(CUSTOMER_ID)).willReturn(Optional.of(customer()));
+            given(warehouseAccessService.resolveForOperation(any(), any(), any()))
+                    .willReturn(warehouse(1L, "Central", true));
+            given(productRepository.findByIdIn(List.of(10L)))
+                    .willReturn(List.of(product(10L, "Pollo entero")));
+            given(transactionRepository.save(any(TransactionEntity.class)))
+                    .willAnswer(invocation -> invocation.getArgument(0));
+            given(saleRepository.save(any(SaleEntity.class)))
+                    .willAnswer(invocation -> invocation.getArgument(0));
+
+            saleApplicationService.createSale(creditRequest());
+
+            ArgumentCaptor<TransactionEntity> captor = ArgumentCaptor.forClass(TransactionEntity.class);
+            verify(transactionRepository).save(captor.capture());
+
+            TransactionDetailEntity line = captor.getValue().getDetails().get(0);
+            // 2 x 5000 at list price, untouched.
+            assertThat(line.getUnitPrice()).isEqualByComparingTo("5000.0000");
+            assertThat(captor.getValue().getTotal()).isEqualByComparingTo("10000.0000");
+
+            // The three frozen breakdown fields mean "a rule moved this price", and none did.
+            assertThat(line.getBaseUnitPrice()).isNull();
+            assertThat(line.getAppliedPercentage()).isNull();
+            assertThat(line.getAppliedMethodName()).isNull();
+        }
+
+        @Test
+        @DisplayName("Is rejected without a customer: free text cannot owe money")
+        void creditSaleRequiresACustomer() {
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
+
+            CreateSaleRequest request = new CreateSaleRequest(
+                    null, "Consumidor Final", null, null, null, true, 1L, 1L, null,
+                    "Venta fiada", oneItem(), null, null);
+
+            assertThatThrownBy(() -> saleApplicationService.createSale(request))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Una venta a cuenta corriente tiene que indicar el cliente que se lleva la deuda.");
+
+            verify(transactionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Is rejected when it also names a payment method")
+        void creditSaleRejectsAPaymentMethod() {
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
+            given(customerRepository.findById(CUSTOMER_ID)).willReturn(Optional.of(customer()));
+
+            CreateSaleRequest request = new CreateSaleRequest(
+                    CUSTOMER_ID, null, null, null, 1L, true, 1L, 1L, null,
+                    "Venta fiada", oneItem(), null, null);
+
+            // Silently dropping the method would leave the caller believing it collected.
+            assertThatThrownBy(() -> saleApplicationService.createSale(request))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Una venta a cuenta corriente no lleva método de pago, porque no se cobra en el momento.");
+
+            verify(transactionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Is rejected for an inactive customer")
+        void creditSaleRejectsInactiveCustomer() {
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
+
+            CustomerEntity inactive = CustomerEntity.builder()
+                    .id(CUSTOMER_ID).name("Vecino del barrio").active(false).build();
+            given(customerRepository.findById(CUSTOMER_ID)).willReturn(Optional.of(inactive));
+
+            assertThatThrownBy(() -> saleApplicationService.createSale(creditRequest()))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("El cliente \"Vecino del barrio\" está inactivo.");
+
+            verify(transactionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("An ordinary sale still demands a payment method")
+        void ordinarySaleStillRequiresAPaymentMethod() {
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
+
+            CreateSaleRequest request = new CreateSaleRequest(
+                    null, "Consumidor Final", null, null, null, null, 1L, 1L, null,
+                    "Venta mostrador", oneItem(), null, null);
+
+            assertThatThrownBy(() -> saleApplicationService.createSale(request))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Tenés que indicar el método de pago de la venta.");
+
+            verify(transactionRepository, never()).save(any());
+        }
+
+        private CustomerEntity customer() {
+            return CustomerEntity.builder()
+                    .id(CUSTOMER_ID).name("Vecino del barrio").active(true).build();
+        }
+
+        private CreateSaleRequest creditRequest() {
+            return new CreateSaleRequest(
+                    CUSTOMER_ID, null, null, null, null, true, 1L, 1L, null,
+                    "Venta fiada", oneItem(), null, null);
+        }
+
+        private List<CreateSaleItemRequest> oneItem() {
+            return List.of(new CreateSaleItemRequest(
+                    10L, null, new BigDecimal("2.000"), new BigDecimal("5000.0000")));
         }
     }
 }

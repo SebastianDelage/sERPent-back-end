@@ -36,4 +36,18 @@ public class PurchaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "warehouse_id", nullable = false)
     private WarehouseEntity warehouse;
+
+    /**
+     * The purchase was taken on credit: nothing was paid, and the total was added to the
+     * supplier's balance instead.
+     *
+     * <p>An explicit flag, NOT inferred from a missing payment method. Purchases have
+     * accepted a null payment method since they were introduced, with no defined meaning,
+     * so reading that null as "on credit" would silently reinterpret rows that already
+     * exist. {@code supplier} is mandatory when this is set — a balance needs someone to
+     * belong to.
+     */
+    @Builder.Default
+    @Column(name = "on_credit", nullable = false)
+    private Boolean onCredit = false;
 }

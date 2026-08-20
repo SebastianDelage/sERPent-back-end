@@ -1,6 +1,8 @@
 package com.empresa.serpent.transactions.service;
 
+import com.empresa.serpent.catalog.domain.entity.CustomerEntity;
 import com.empresa.serpent.catalog.domain.entity.ProductEntity;
+import com.empresa.serpent.catalog.repository.CustomerRepository;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.service.InventoryMovementService;
@@ -54,6 +56,7 @@ public class SaleApplicationService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final PaymentMethodRepository paymentMethodRepository;
+    private final CustomerRepository customerRepository;
     private final ProductPaymentAdjustmentRepository productPaymentAdjustmentRepository;
     private final StockValidationService stockValidationService;
     private final InventoryMovementService inventoryMovementService;
@@ -96,17 +99,15 @@ public class SaleApplicationService {
     private CreateSaleResponse createSale(CreateSaleRequest request, UserEntity createdBy) {
 
         /*
-         Checked here and not only via @NotNull on the request: the offline sync path
+         Checked here and not only through Bean Validation: the offline sync path
          (SyncCommandResultService.processCreateSale) deserializes the payload with
          Jackson and calls this method directly, bypassing Bean Validation entirely.
-         */
-        if (request.paymentMethodId() == null) {
-            throw new ValidationException("Tenés que indicar el método de pago de la venta.");
-        }
 
-        PaymentMethodEntity paymentMethod = paymentMethodRepository.findById(request.paymentMethodId())
-                .orElseThrow(() ->
-                        new NotFoundException("Payment method not found: " + request.paymentMethodId()));
+         A sale is either collected now — and then it names how — or taken on the
+         customer's account, and then it names whom. Never both, never neither.
+         */
+        CustomerEntity customer = resolveCustomer(request);
+        PaymentMethodEntity paymentMethod = resolvePaymentMethod(request);
 
         // Resolves the warehouse (from the terminal when one is named), and checks that it
         // exists, is active, and is assigned to the acting user.
@@ -141,13 +142,21 @@ public class SaleApplicationService {
         /*
          Per-product surcharge/discount for this sale's payment method, in one query
          for the whole cart. Products without a rule are simply absent from the map.
+
+         A credit sale has no payment method, so there is no rule to look up and the map
+         stays empty: it sells at list price, and the three frozen breakdown fields on each
+         line stay null, which is exactly what they mean. Charging extra for buying on
+         account would be a new pricing rule nobody asked for; the per-sale manual
+         adjustment is already there for that.
          */
-        Map<Long, BigDecimal> percentageByProduct = productPaymentAdjustmentRepository
-                .findByPaymentMethodIdAndProductIdInAndActiveTrue(paymentMethod.getId(), productIds)
-                .stream()
-                .collect(Collectors.toMap(
-                        rule -> rule.getProduct().getId(),
-                        ProductPaymentAdjustmentEntity::getAdjustmentPercentage));
+        Map<Long, BigDecimal> percentageByProduct = paymentMethod == null
+                ? Map.of()
+                : productPaymentAdjustmentRepository
+                        .findByPaymentMethodIdAndProductIdInAndActiveTrue(paymentMethod.getId(), productIds)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                rule -> rule.getProduct().getId(),
+                                ProductPaymentAdjustmentEntity::getAdjustmentPercentage));
 
         TransactionEntity transaction = TransactionEntity.builder()
                 .type(TransactionType.SALE)
@@ -251,7 +260,8 @@ public class SaleApplicationService {
         SaleEntity sale = SaleEntity.builder()
                 .transaction(savedTransaction)
                 .warehouse(warehouse)
-                .customerId(request.customerId())
+                .customer(customer)
+                .onCredit(request.isOnCredit())
                 .customerName(request.customerName())
                 .customerDocument(request.customerDocument())
                 .invoiceNumber(request.invoiceNumber())
@@ -277,5 +287,59 @@ public class SaleApplicationService {
                 savedTransaction.getStatus().name(),
                 "Sale created successfully"
         );
+    }
+
+    /**
+     * The named customer, mandatory when the sale goes on account.
+     *
+     * <p>A balance has to belong to someone the system can find again: the free-text
+     * customer name on the sale is enough to print on a ticket, but nothing can be
+     * collected from it later.
+     */
+    private CustomerEntity resolveCustomer(CreateSaleRequest request) {
+        if (request.customerId() == null) {
+            if (request.isOnCredit()) {
+                throw new ValidationException(
+                        "Una venta a cuenta corriente tiene que indicar el cliente que se lleva la deuda.");
+            }
+            return null;
+        }
+
+        CustomerEntity customer = customerRepository.findById(request.customerId())
+                .orElseThrow(() ->
+                        new NotFoundException("Customer not found: " + request.customerId()));
+
+        if (!Boolean.TRUE.equals(customer.getActive())) {
+            throw new ValidationException(
+                    "El cliente \"" + customer.getName() + "\" está inactivo.");
+        }
+
+        return customer;
+    }
+
+    /**
+     * The payment method, mandatory for a collected sale and forbidden for a credit one.
+     *
+     * <p>Rejecting the method outright on a credit sale rather than ignoring it keeps the
+     * sales-by-payment-method report honest: money that never arrived must not be
+     * attributed to a method, and silently dropping the field would hide a caller that
+     * believes it collected the sale.
+     */
+    private PaymentMethodEntity resolvePaymentMethod(CreateSaleRequest request) {
+        if (request.isOnCredit()) {
+            if (request.paymentMethodId() != null) {
+                throw new ValidationException(
+                        "Una venta a cuenta corriente no lleva método de pago, porque no se cobra en el momento.");
+            }
+            return null;
+        }
+
+        if (request.paymentMethodId() == null) {
+            throw new ValidationException("Tenés que indicar el método de pago de la venta.");
+        }
+
+        return paymentMethodRepository.findById(request.paymentMethodId())
+                .orElseThrow(() ->
+                        new NotFoundException("Payment method not found: " + request.paymentMethodId()));
     }
 }

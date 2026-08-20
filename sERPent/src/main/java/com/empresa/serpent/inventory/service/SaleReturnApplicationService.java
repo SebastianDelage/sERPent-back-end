@@ -159,6 +159,17 @@ public class SaleReturnApplicationService {
                 "Devolución de la venta #" + request.saleId()
         );
 
+        /*
+         Returning goods from a sale that was taken on account does not send cash out the
+         door: it lowers what the customer owes. No extra bookkeeping is needed for that —
+         the return's total is already stored negative, and the customer's statement adds
+         returns against their credit sales alongside the sales themselves, so the balance
+         drops by exactly this amount. What DOES need saying is that no money changes hands,
+         because the cashier is standing in front of the customer deciding whether to open
+         the till.
+         */
+        boolean lowersCustomerBalance = Boolean.TRUE.equals(originalSale.getOnCredit());
+
         return new CreateSaleReturnResponse(
                 savedTransaction.getId(),
                 originalSale.getId(),
@@ -167,7 +178,11 @@ public class SaleReturnApplicationService {
                 warehouse.getId(),
                 warehouse.getName(),
                 request.quantity(),
-                "Devolución registrada correctamente."
+                lowersCustomerBalance,
+                lowersCustomerBalance
+                        ? "Devolución registrada. Como la venta fue a cuenta corriente, "
+                          + "el importe se descuenta del saldo del cliente y no se devuelve dinero."
+                        : "Devolución registrada correctamente."
         );
     }
 

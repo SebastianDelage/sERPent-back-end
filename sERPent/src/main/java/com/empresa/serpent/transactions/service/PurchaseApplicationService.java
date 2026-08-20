@@ -9,6 +9,7 @@ import com.empresa.serpent.inventory.service.InventoryMovementService;
 import com.empresa.serpent.inventory.service.WarehouseAccessService;
 import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.shared.exception.NotFoundException;
+import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.PurchaseEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
@@ -51,6 +52,26 @@ public class PurchaseApplicationService {
 
         UserEntity createdBy = authenticatedUserService.requireCurrentUser();
         authenticatedUserService.requireMatchingCreatedByUserId(request.createdByUserId(), createdBy);
+
+        /*
+         A purchase on credit is owed to a particular supplier and pays nothing now, so it
+         carries no payment method. Rejecting the method outright rather than dropping it
+         keeps a caller from believing it paid something it did not.
+
+         Note this only constrains purchases that ASK for credit. A purchase with no
+         payment method and no credit flag keeps meaning whatever it meant before: nothing
+         in particular, which is how it has behaved since purchases were introduced.
+         */
+        if (request.isOnCredit()) {
+            if (request.paymentMethodId() != null) {
+                throw new ValidationException(
+                        "Una compra a plazo no lleva método de pago, porque no se paga en el momento.");
+            }
+            if (request.supplierId() == null) {
+                throw new ValidationException(
+                        "Una compra a plazo tiene que indicar el proveedor al que se le debe.");
+            }
+        }
 
         PaymentMethodEntity paymentMethod = null;
         if (request.paymentMethodId() != null) {
@@ -133,6 +154,7 @@ public class PurchaseApplicationService {
         PurchaseEntity purchase = PurchaseEntity.builder()
                 .transaction(savedTransaction)
                 .supplier(supplier)
+                .onCredit(request.isOnCredit())
                 .warehouse(warehouse)
                 .receiptNumber(normalizeOptional(request.receiptNumber()))
                 .notes(normalizeOptional(request.notes()))
