@@ -2,6 +2,8 @@ package com.empresa.serpent.transactions.service;
 
 import com.empresa.serpent.catalog.domain.entity.CustomerEntity;
 import com.empresa.serpent.catalog.repository.CustomerRepository;
+import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
+import com.empresa.serpent.inventory.service.WarehouseAccessService;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.shared.security.AuthenticatedUserService;
@@ -36,6 +38,7 @@ public class CustomerPaymentService {
     private final CustomerRepository customerRepository;
     private final PaymentMethodRepository paymentMethodRepository;
     private final AuthenticatedUserService authenticatedUserService;
+    private final WarehouseAccessService warehouseAccessService;
 
     @Transactional
     public CustomerPaymentResponse create(CreateCustomerPaymentRequest request) {
@@ -58,6 +61,12 @@ public class CustomerPaymentService {
                 .orElseThrow(() ->
                         new NotFoundException("Payment method not found: " + request.paymentMethodId()));
 
+        // Same resolution as a sale: the terminal decides when there is one, and the user
+        // has to be assigned to the branch. Collecting cash is money entering a particular
+        // drawer, so it is authorized like any other operation on that branch.
+        WarehouseEntity warehouse = warehouseAccessService.resolveForOperation(
+                request.terminalId(), request.warehouseId(), createdBy);
+
         /*
          The amount is deliberately NOT capped at the outstanding balance. Paying more than
          what is owed leaves a credit in the customer's favour, which is real money they
@@ -65,6 +74,7 @@ public class CustomerPaymentService {
          */
         CustomerPaymentEntity payment = CustomerPaymentEntity.builder()
                 .customer(customer)
+                .warehouse(warehouse)
                 .paymentMethod(paymentMethod)
                 .amount(request.amount())
                 .paymentDate(request.paymentDate())
@@ -91,6 +101,7 @@ public class CustomerPaymentService {
 
     private CustomerPaymentResponse toResponse(CustomerPaymentEntity payment) {
         UserEntity user = payment.getCreatedByUserEntity();
+        WarehouseEntity warehouse = payment.getWarehouse();
 
         return new CustomerPaymentResponse(
                 payment.getId(),
@@ -98,6 +109,8 @@ public class CustomerPaymentService {
                 payment.getCustomer().getName(),
                 payment.getPaymentMethod().getId(),
                 payment.getPaymentMethod().getName(),
+                warehouse == null ? null : warehouse.getId(),
+                warehouse == null ? null : warehouse.getName(),
                 payment.getAmount(),
                 payment.getPaymentDate(),
                 payment.getNote(),

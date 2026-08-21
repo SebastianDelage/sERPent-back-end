@@ -72,12 +72,26 @@ public class ExpenseApplicationService {
 
     private CreateExpenseResponse createExpense(CreateExpenseRequest request, UserEntity createdBy) {
 
-        PaymentMethodEntity paymentMethod = null;
-        if (request.paymentMethodId() != null) {
-            paymentMethod = paymentMethodRepository.findById(request.paymentMethodId())
-                    .orElseThrow(() ->
-                            new NotFoundException("Payment method not found: " + request.paymentMethodId()));
+        // How much, before how it was paid: an amount that makes no sense is the more basic
+        // complaint, and reporting the payment method first would bury it.
+        validateTotal(request.total());
+
+        /*
+         Required from here on. An expense that does not say how it was paid leaves the
+         till count with a hole it cannot explain: the cash came out of the drawer or it
+         did not, and only the method says which. Rows recorded before this rule keep
+         their null — nobody knows how they were paid, and the count reports them as
+         unattributable rather than guessing.
+         */
+        if (request.paymentMethodId() == null) {
+            throw new ValidationException(
+                    "Indicá con qué método se pagó el gasto. Sin eso, el arqueo de caja no puede "
+                            + "saber si la plata salió del cajón.");
         }
+
+        PaymentMethodEntity paymentMethod = paymentMethodRepository.findById(request.paymentMethodId())
+                .orElseThrow(() ->
+                        new NotFoundException("Payment method not found: " + request.paymentMethodId()));
 
         SupplierEntity supplier = null;
         if (request.supplierId() != null) {
@@ -100,7 +114,6 @@ public class ExpenseApplicationService {
             throw new IllegalArgumentException("Expense category is inactive: " + request.expenseCategoryId());
         }
 
-        validateTotal(request.total());
         validateReceiptNumber(request.receiptNumber());
 
         TransactionEntity transaction = TransactionEntity.builder()

@@ -1,6 +1,7 @@
 package com.empresa.serpent.transactions.domain.entity;
 
 import com.empresa.serpent.catalog.domain.entity.SupplierEntity;
+import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.users.domain.entity.UserEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -38,6 +39,21 @@ public class SupplierPaymentEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "supplier_id", nullable = false)
     private SupplierEntity supplier;
+
+    /**
+     * The branch whose till this payment came out of.
+     *
+     * <p>Required for anything recorded from here on, because the shift count is per branch:
+     * a payment that carried no branch would have to be subtracted from every branch's count
+     * or from none, and both are wrong.
+     *
+     * <p>Nullable only for the rows that predate the column. Those genuinely do not know
+     * where they happened, so the count reports them as unattributable rather than inventing
+     * a branch for them.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warehouse_id")
+    private WarehouseEntity warehouse;
 
     /** Required: this is real cash moving, and the till has to be able to explain it. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

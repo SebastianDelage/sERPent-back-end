@@ -23,6 +23,19 @@ public record CreateSaleReturnRequest(
         @Positive(message = "Quantity must be greater than zero")
         BigDecimal quantity,
 
+        /**
+         * How the money was handed back, so the till count can subtract it from the right
+         * bucket.
+         *
+         * <p>Asked rather than inferred from the original sale, deliberately: refunding cash
+         * for a card sale is an ordinary thing to do, so copying the sale's method would
+         * assert something nobody recorded.
+         *
+         * <p>Required EXCEPT when the original sale was on credit, where it must be omitted:
+         * no money moves at all, the customer's balance just drops.
+         */
+        Long refundPaymentMethodId,
+
         String reason,
 
         /**
@@ -38,8 +51,9 @@ public record CreateSaleReturnRequest(
                                    Long productId,
                                    Long warehouseId,
                                    BigDecimal quantity,
+                                   Long refundPaymentMethodId,
                                    String reason,
                                    Long createdByUserId) {
-        this(saleId, productId, warehouseId, null, quantity, reason, createdByUserId);
+        this(saleId, productId, warehouseId, null, quantity, refundPaymentMethodId, reason, createdByUserId);
     }
 }

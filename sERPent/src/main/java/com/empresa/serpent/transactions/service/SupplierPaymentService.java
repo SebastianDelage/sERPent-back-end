@@ -2,6 +2,8 @@ package com.empresa.serpent.transactions.service;
 
 import com.empresa.serpent.catalog.domain.entity.SupplierEntity;
 import com.empresa.serpent.catalog.repository.SupplierRepository;
+import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
+import com.empresa.serpent.inventory.service.WarehouseAccessService;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.shared.security.AuthenticatedUserService;
@@ -36,6 +38,7 @@ public class SupplierPaymentService {
     private final SupplierRepository supplierRepository;
     private final PaymentMethodRepository paymentMethodRepository;
     private final AuthenticatedUserService authenticatedUserService;
+    private final WarehouseAccessService warehouseAccessService;
 
     @Transactional
     public SupplierPaymentResponse create(CreateSupplierPaymentRequest request) {
@@ -58,10 +61,17 @@ public class SupplierPaymentService {
                 .orElseThrow(() ->
                         new NotFoundException("Payment method not found: " + request.paymentMethodId()));
 
+        // Same resolution as a sale: the terminal decides when there is one, and the user
+        // has to be assigned to the branch. Paying a supplier in cash empties a particular
+        // drawer, so it is authorized like any other operation on that branch.
+        WarehouseEntity warehouse = warehouseAccessService.resolveForOperation(
+                request.terminalId(), request.warehouseId(), createdBy);
+
         // Not capped at the outstanding balance, for the same reason as on the customer
         // side: paying more than owed leaves a credit in our favour, and that is real money.
         SupplierPaymentEntity payment = SupplierPaymentEntity.builder()
                 .supplier(supplier)
+                .warehouse(warehouse)
                 .paymentMethod(paymentMethod)
                 .amount(request.amount())
                 .paymentDate(request.paymentDate())
@@ -87,6 +97,7 @@ public class SupplierPaymentService {
 
     private SupplierPaymentResponse toResponse(SupplierPaymentEntity payment) {
         UserEntity user = payment.getCreatedByUserEntity();
+        WarehouseEntity warehouse = payment.getWarehouse();
 
         return new SupplierPaymentResponse(
                 payment.getId(),
@@ -94,6 +105,8 @@ public class SupplierPaymentService {
                 payment.getSupplier().getName(),
                 payment.getPaymentMethod().getId(),
                 payment.getPaymentMethod().getName(),
+                warehouse == null ? null : warehouse.getId(),
+                warehouse == null ? null : warehouse.getName(),
                 payment.getAmount(),
                 payment.getPaymentDate(),
                 payment.getNote(),

@@ -22,6 +22,14 @@ public record TransactionDetailResponse(
         Long saleId,
         Long warehouseId,
         String warehouseName,
+        /**
+         * Sale-only: the sale was taken on account and nothing was collected.
+         *
+         * <p>Sent explicitly rather than left for the client to infer from a missing payment
+         * method. The return dialog needs it: a return against a credit sale hands no money
+         * back, so it must not ask which method the refund left through.
+         */
+        Boolean onCredit,
         /*
          The sale-wide manual adjustment: one figure for the whole sale. Distinct from
          the per-line payment-method surcharge, which each TransactionItemResponse

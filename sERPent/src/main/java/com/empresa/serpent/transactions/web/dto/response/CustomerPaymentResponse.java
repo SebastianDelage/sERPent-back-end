@@ -10,6 +10,11 @@ public record CustomerPaymentResponse(
         String customerName,
         Long paymentMethodId,
         String paymentMethodName,
+
+        /** The branch whose till took the money. Null only on rows recorded before it was asked for. */
+        Long warehouseId,
+        String warehouseName,
+
         BigDecimal amount,
         LocalDate paymentDate,
         String note,

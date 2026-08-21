@@ -31,7 +31,11 @@ public class PaymentMethodService {
         if (entity.getActive() == null) {
             entity.setActive(true);
         }
+        if (entity.getIsCash() == null) {
+            entity.setIsCash(false);
+        }
 
+        validateSingleCashMethod(entity.getIsCash(), null);
         normalizeName(entity);
 
         PaymentMethodEntity saved = paymentMethodRepository.save(entity);
@@ -44,6 +48,12 @@ public class PaymentMethodService {
 
         PaymentMethodEntity entity = paymentMethodRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Payment method not found: " + id));
+
+        // Omitting the field leaves the flag alone, same as warehouseIds on a user: an
+        // update that does not mention cash is not a request to stop being cash.
+        if (request.isCash() != null) {
+            validateSingleCashMethod(request.isCash(), id);
+        }
 
         paymentMethodMapper.updateEntityFromRequest(request, entity);
         normalizeName(entity);
@@ -79,6 +89,27 @@ public class PaymentMethodService {
                         throw new ConflictException(
                                 "Ya existe un método de pago con el nombre \"" + name.trim() + "\".");
                     }
+                });
+    }
+
+    /**
+     * Only one method can be the drawer.
+     *
+     * <p>Refused rather than silently un-flagging the other one: moving what "cash" means is
+     * a decision with consequences for every till count from here on, so it has to be made
+     * on purpose, in two steps.
+     */
+    private void validateSingleCashMethod(Boolean isCash, Long currentPaymentMethodId) {
+        if (!Boolean.TRUE.equals(isCash)) {
+            return;
+        }
+
+        paymentMethodRepository.findByIsCashTrue()
+                .filter(existing -> !existing.getId().equals(currentPaymentMethodId))
+                .ifPresent(existing -> {
+                    throw new ValidationException(
+                            "El método de pago \"" + existing.getName() + "\" ya está marcado como efectivo. "
+                                    + "Solo puede haber uno, así que primero desmarcá ese.");
                 });
     }
 

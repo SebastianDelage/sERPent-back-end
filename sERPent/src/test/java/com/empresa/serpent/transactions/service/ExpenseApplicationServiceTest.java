@@ -7,6 +7,7 @@ import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.transactions.domain.entity.ExpenseCategoryEntity;
 import com.empresa.serpent.transactions.domain.entity.ExpenseEntity;
+import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
@@ -131,8 +132,14 @@ class ExpenseApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("Should create expense without payment method")
-    void shouldCreateExpenseWithoutPaymentMethod() {
+    @DisplayName("Should refuse an expense that does not say how it was paid")
+    void shouldRefuseExpenseWithoutPaymentMethod() {
+        /*
+         This used to be allowed, and the change is deliberate: an expense with no payment
+         method leaves the till count unable to say whether the cash left the drawer. Rows
+         recorded under the old rule keep their null and are reported as unattributable —
+         nothing is back-filled, because nobody knows how they were paid.
+         */
         CreateExpenseRequest request = new CreateExpenseRequest(
                 1L,
                 null,
@@ -146,35 +153,13 @@ class ExpenseApplicationServiceTest {
                 null
         );
 
-        UserEntity user = UserEntity.builder().id(1L).build();
-        SupplierEntity supplier = SupplierEntity.builder().id(1L).active(true).build();
-        ExpenseCategoryEntity category = ExpenseCategoryEntity.builder().id(1L).active(true).build();
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(UserEntity.builder().id(1L).build());
 
-        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
-        when(supplierRepository.findById(1L)).thenReturn(Optional.of(supplier));
-        when(expenseCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
-        when(expenseRepository.findByReceiptNumberIgnoreCase("REC-003")).thenReturn(Optional.empty());
+        ValidationException exception = assertThrows(ValidationException.class,
+                () -> expenseApplicationService.createExpense(request));
 
-        when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(invocation -> {
-            TransactionEntity tx = invocation.getArgument(0);
-            tx.setId(11L);
-            return tx;
-        });
-
-        when(expenseRepository.save(any(ExpenseEntity.class))).thenAnswer(invocation -> {
-            ExpenseEntity expense = invocation.getArgument(0);
-            expense.setId(21L);
-            return expense;
-        });
-
-        CreateExpenseResponse response = expenseApplicationService.createExpense(request);
-
-        assertEquals(11L, response.transactionId());
-        assertEquals(21L, response.expenseId());
-
-        ArgumentCaptor<TransactionEntity> transactionCaptor = ArgumentCaptor.forClass(TransactionEntity.class);
-        verify(transactionRepository).save(transactionCaptor.capture());
-        assertNull(transactionCaptor.getValue().getPaymentMethod());
+        assertTrue(exception.getMessage().contains("Indicá con qué método se pagó el gasto"));
+        verify(transactionRepository, never()).save(any(TransactionEntity.class));
     }
 
     @Test
@@ -182,7 +167,7 @@ class ExpenseApplicationServiceTest {
     void shouldAllowNullReceiptNumber() {
         CreateExpenseRequest request = new CreateExpenseRequest(
                 1L,
-                null,
+                1L,
                 null,
                 null,
                 1L,
@@ -197,6 +182,8 @@ class ExpenseApplicationServiceTest {
         ExpenseCategoryEntity category = ExpenseCategoryEntity.builder().id(1L).active(true).build();
 
         when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
+        when(paymentMethodRepository.findById(1L))
+                .thenReturn(Optional.of(PaymentMethodEntity.builder().id(1L).name("Efectivo").build()));
         when(expenseCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
 
         when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(invocation -> {
@@ -366,11 +353,9 @@ class ExpenseApplicationServiceTest {
                 null
         );
 
-        UserEntity user = UserEntity.builder().id(1L).build();
-        ExpenseCategoryEntity category = ExpenseCategoryEntity.builder().id(1L).active(true).build();
-
-        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
-        when(expenseCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
+        // The amount is checked before anything else is looked up, so nothing else
+        // needs stubbing here.
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(UserEntity.builder().id(1L).build());
 
         IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
@@ -398,10 +383,8 @@ class ExpenseApplicationServiceTest {
                 null
         );
 
-        UserEntity user = UserEntity.builder().id(1L).build();
-        ExpenseCategoryEntity category = ExpenseCategoryEntity.builder().id(1L).active(true).build();
-        when(authenticatedUserService.requireCurrentUser()).thenReturn(user);
-        when(expenseCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
+        // Same as above: the amount is rejected before the lookups happen.
+        when(authenticatedUserService.requireCurrentUser()).thenReturn(UserEntity.builder().id(1L).build());
 
         IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,

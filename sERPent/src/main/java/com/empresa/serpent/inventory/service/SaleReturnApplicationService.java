@@ -9,12 +9,14 @@ import com.empresa.serpent.inventory.web.dto.response.CreateSaleReturnResponse;
 import com.empresa.serpent.inventory.web.dto.response.SaleReturnResponse;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
+import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleReturnEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
+import com.empresa.serpent.transactions.repository.PaymentMethodRepository;
 import com.empresa.serpent.transactions.repository.SaleRepository;
 import com.empresa.serpent.transactions.repository.SaleReturnRepository;
 import com.empresa.serpent.transactions.repository.TransactionDetailRepository;
@@ -43,6 +45,7 @@ public class SaleReturnApplicationService {
     private final SaleRepository saleRepository;
     private final SaleReturnRepository saleReturnRepository;
     private final ProductRepository productRepository;
+    private final PaymentMethodRepository paymentMethodRepository;
     private final AuthenticatedUserService authenticatedUserService;
     private final WarehouseAccessService warehouseAccessService;
     private final InventoryMovementService inventoryMovementService;
@@ -104,6 +107,8 @@ public class SaleReturnApplicationService {
             );
         }
 
+        PaymentMethodEntity refundPaymentMethod = resolveRefundPaymentMethod(request, originalSale);
+
         String description = request.reason() != null && !request.reason().isBlank()
                 ? request.reason().trim()
                 : "Devolución de la venta #" + request.saleId() + " — " + product.getName();
@@ -123,7 +128,9 @@ public class SaleReturnApplicationService {
                 .type(TransactionType.RETURN)
                 .status(TransactionStatus.CONFIRMED)
                 .description(description)
-                .paymentMethod(null)
+                // How the money went back out. Null only for a credit-sale return, where
+                // none did — see resolveRefundPaymentMethod.
+                .paymentMethod(refundPaymentMethod)
                 .createdByUserEntity(createdBy)
                 .total(returnTotal)
                 .details(new ArrayList<>())
@@ -262,6 +269,43 @@ public class SaleReturnApplicationService {
         }
 
         return unitPrice.multiply(saleTotal).divide(saleSubtotal, AMOUNT_SCALE, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * How the refund left the till, when it left at all.
+     *
+     * <p>Asked for rather than copied from the original sale. Refunding cash for a card sale
+     * is an ordinary thing to do — the customer is standing there and the card refund takes
+     * days — so reading the sale's method would record something nobody said. Wrong here is
+     * worse than missing: the shift count would come up short in one bucket and long in
+     * another, and no one would know why.
+     *
+     * <p>A return against a credit sale is the one case with no method: nothing was ever
+     * collected, so nothing goes back out. It lowers the customer's balance instead, and
+     * naming a method would put a payout in the count that never happened.
+     */
+    private PaymentMethodEntity resolveRefundPaymentMethod(CreateSaleReturnRequest request,
+                                                           SaleEntity originalSale) {
+        boolean onCredit = Boolean.TRUE.equals(originalSale.getOnCredit());
+
+        if (onCredit) {
+            if (request.refundPaymentMethodId() != null) {
+                throw new ValidationException(
+                        "Esta venta fue a cuenta corriente, así que la devolución no paga plata: "
+                                + "baja el saldo del cliente. No indiques un método de pago.");
+            }
+            return null;
+        }
+
+        if (request.refundPaymentMethodId() == null) {
+            throw new ValidationException(
+                    "Indicá por qué método devolvés la plata. Sin eso, el arqueo de caja no puede "
+                            + "saber de dónde salió.");
+        }
+
+        return paymentMethodRepository.findById(request.refundPaymentMethodId())
+                .orElseThrow(() -> new NotFoundException(
+                        "Payment method not found: " + request.refundPaymentMethodId()));
     }
 
     private BigDecimal getSoldQuantity(Long saleTransactionId, Long productId) {

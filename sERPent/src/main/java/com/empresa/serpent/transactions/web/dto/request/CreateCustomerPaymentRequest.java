@@ -18,6 +18,17 @@ public record CreateCustomerPaymentRequest(
         @NotNull(message = "Payment method id cannot be null")
         Long paymentMethodId,
 
+        /**
+         * The branch whose till takes the money. Required — the shift count is per branch,
+         * and a collection with no branch could not be counted anywhere.
+         *
+         * <p>Ignored when {@code terminalId} is set: the terminal decides the branch.
+         */
+        Long warehouseId,
+
+        /** Optional registered point of sale. When present it supplies the branch. */
+        Long terminalId,
+
         @NotNull(message = "Amount cannot be null")
         @Positive(message = "Amount must be greater than zero")
         BigDecimal amount,

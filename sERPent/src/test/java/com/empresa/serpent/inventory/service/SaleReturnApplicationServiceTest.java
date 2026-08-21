@@ -10,12 +10,14 @@ import com.empresa.serpent.inventory.web.dto.response.CreateSaleReturnResponse;
 import com.empresa.serpent.shared.exception.ForbiddenException;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
+import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleReturnEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.domain.enums.AdjustmentType;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
+import com.empresa.serpent.transactions.repository.PaymentMethodRepository;
 import com.empresa.serpent.transactions.repository.SaleRepository;
 import com.empresa.serpent.transactions.repository.SaleReturnRepository;
 import com.empresa.serpent.transactions.repository.TransactionDetailRepository;
@@ -40,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -54,6 +57,7 @@ class SaleReturnApplicationServiceTest {
     @Mock private SaleRepository saleRepository;
     @Mock private SaleReturnRepository saleReturnRepository;
     @Mock private ProductRepository productRepository;
+    @Mock private PaymentMethodRepository paymentMethodRepository;
     @Mock private WarehouseAccessService warehouseAccessService;
     @Mock private AuthenticatedUserService authenticatedUserService;
     @Mock private InventoryMovementService inventoryMovementService;
@@ -65,6 +69,9 @@ class SaleReturnApplicationServiceTest {
     private static final Long WAREHOUSE_ID = 3L;
     private static final Long SALE_ID = 5L;
     private static final Long SALE_TX_ID = 100L;
+
+    /** The method the refund goes back out through, now that it has to be stated. */
+    private static final Long REFUND_METHOD_ID = 7L;
 
     /** What the customer paid at the time of the sale. */
     private static final BigDecimal SALE_UNIT_PRICE = new BigDecimal("4500.0000");
@@ -80,14 +87,21 @@ class SaleReturnApplicationServiceTest {
                 saleRepository,
                 saleReturnRepository,
                 productRepository,
+                paymentMethodRepository,
                 authenticatedUserService,
                 warehouseAccessService,
                 inventoryMovementService
         );
+
+        // The refund method is now asked for on every return of a paid sale. Lenient: the
+        // tests that fail before reaching it never resolve it.
+        lenient().when(paymentMethodRepository.findById(REFUND_METHOD_ID))
+                .thenReturn(Optional.of(PaymentMethodEntity.builder()
+                        .id(REFUND_METHOD_ID).name("Efectivo").isCash(true).active(true).build()));
     }
 
     private CreateSaleReturnRequest request(BigDecimal quantity) {
-        return new CreateSaleReturnRequest(SALE_ID, PRODUCT_ID, WAREHOUSE_ID, quantity, "Fallado", USER_ID);
+        return new CreateSaleReturnRequest(SALE_ID, PRODUCT_ID, WAREHOUSE_ID, quantity, REFUND_METHOD_ID, "Fallado", USER_ID);
     }
 
     private UserEntity user() {
@@ -360,7 +374,7 @@ class SaleReturnApplicationServiceTest {
         // Return every product in full, one call per product: that is the whole sale back.
         for (Long productId : productIds) {
             service.createReturn(new CreateSaleReturnRequest(
-                    SALE_ID, productId, WAREHOUSE_ID, new BigDecimal("1"), "Fallado", USER_ID));
+                    SALE_ID, productId, WAREHOUSE_ID, new BigDecimal("1"), REFUND_METHOD_ID, "Fallado", USER_ID));
         }
 
         ArgumentCaptor<TransactionEntity> captor = ArgumentCaptor.forClass(TransactionEntity.class);
