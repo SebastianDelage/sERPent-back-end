@@ -4,6 +4,8 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import com.empresa.serpent.users.domain.enums.UserRole;
+
 import java.util.List;
 
 public record CreateUserRequest(
@@ -25,6 +27,9 @@ public record CreateUserRequest(
         String email,
 
         Boolean active,
+
+    /** Omit for the narrower role: a user created without an explicit role is an EMPLOYEE. */
+        UserRole role,
 
         /** Warehouses this user may operate in. At least one active warehouse is required. */
         List<Long> warehouseIds

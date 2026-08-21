@@ -6,6 +6,7 @@ import com.empresa.serpent.inventory.web.dto.request.UpdateWarehouseRequest;
 import com.empresa.serpent.inventory.web.dto.response.WarehouseResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,11 +18,13 @@ public class WarehouseController {
 
     private final WarehouseService warehouseService;
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public WarehouseResponse create(@Valid @RequestBody CreateWarehouseRequest request) {
         return warehouseService.create(request);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public WarehouseResponse update(
             @PathVariable Long id,

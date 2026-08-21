@@ -1,6 +1,7 @@
 package com.empresa.serpent.users.domain.entity;
 
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
+import com.empresa.serpent.users.domain.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -41,6 +42,18 @@ public class UserEntity {
     @Builder.Default
     @Column(name = "active", nullable = false)
     private Boolean active = true;
+
+    /**
+     * What this user may DO. Orthogonal to {@code warehouses}, which says WHERE.
+     *
+     * <p>Defaults to EMPLOYEE: a user created without an explicit role should get the
+     * narrower one. The migration that introduced this column did the opposite for rows
+     * that already existed, and for the opposite reason — see V24.
+     */
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private UserRole role = UserRole.EMPLOYEE;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

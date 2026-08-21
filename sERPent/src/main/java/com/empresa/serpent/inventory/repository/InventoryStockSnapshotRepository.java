@@ -25,6 +25,10 @@ public interface InventoryStockSnapshotRepository extends
 
     List<InventoryStockSnapshotEntity> findByWarehouseId(Long warehouseId);
 
+    List<InventoryStockSnapshotEntity> findByWarehouseIdIn(List<Long> warehouseIds);
+
+    List<InventoryStockSnapshotEntity> findByProductIdAndWarehouseIdIn(Long productId, List<Long> warehouseIds);
+
     /**
      * The per-product view, paginated: one row per product with its stock summed across
      * warehouses.
@@ -57,21 +61,21 @@ public interface InventoryStockSnapshotRepository extends
                   OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
                   OR LOWER(p.sku) = LOWER(:search)
                   OR p.barcode = :search)
-             AND (:warehouseId IS NULL OR s.warehouse.id = :warehouseId)
+             AND (:unrestricted = TRUE OR s.warehouse.id IN :warehouseIds)
              AND (:outOfStock = FALSE OR EXISTS (
                      SELECT 1 FROM InventoryStockSnapshotEntity s2
                       WHERE s2.product = p
-                        AND (:warehouseId IS NULL OR s2.warehouse.id = :warehouseId)
+                        AND (:unrestricted = TRUE OR s2.warehouse.id IN :warehouseIds)
                         AND s2.currentStock <= 0))
              AND (:inStock = FALSE OR EXISTS (
                      SELECT 1 FROM InventoryStockSnapshotEntity s2
                       WHERE s2.product = p
-                        AND (:warehouseId IS NULL OR s2.warehouse.id = :warehouseId)
+                        AND (:unrestricted = TRUE OR s2.warehouse.id IN :warehouseIds)
                         AND s2.currentStock > 0))
              AND (:belowMinimum = FALSE OR EXISTS (
                      SELECT 1 FROM InventoryStockSnapshotEntity s2
                       WHERE s2.product = p
-                        AND (:warehouseId IS NULL OR s2.warehouse.id = :warehouseId)
+                        AND (:unrestricted = TRUE OR s2.warehouse.id IN :warehouseIds)
                         AND COALESCE(
                                 (SELECT m.minimumStock
                                    FROM ProductWarehouseMinimumStockEntity m
@@ -95,21 +99,21 @@ public interface InventoryStockSnapshotRepository extends
                   OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
                   OR LOWER(p.sku) = LOWER(:search)
                   OR p.barcode = :search)
-             AND (:warehouseId IS NULL OR s.warehouse.id = :warehouseId)
+             AND (:unrestricted = TRUE OR s.warehouse.id IN :warehouseIds)
              AND (:outOfStock = FALSE OR EXISTS (
                      SELECT 1 FROM InventoryStockSnapshotEntity s2
                       WHERE s2.product = p
-                        AND (:warehouseId IS NULL OR s2.warehouse.id = :warehouseId)
+                        AND (:unrestricted = TRUE OR s2.warehouse.id IN :warehouseIds)
                         AND s2.currentStock <= 0))
              AND (:inStock = FALSE OR EXISTS (
                      SELECT 1 FROM InventoryStockSnapshotEntity s2
                       WHERE s2.product = p
-                        AND (:warehouseId IS NULL OR s2.warehouse.id = :warehouseId)
+                        AND (:unrestricted = TRUE OR s2.warehouse.id IN :warehouseIds)
                         AND s2.currentStock > 0))
              AND (:belowMinimum = FALSE OR EXISTS (
                      SELECT 1 FROM InventoryStockSnapshotEntity s2
                       WHERE s2.product = p
-                        AND (:warehouseId IS NULL OR s2.warehouse.id = :warehouseId)
+                        AND (:unrestricted = TRUE OR s2.warehouse.id IN :warehouseIds)
                         AND COALESCE(
                                 (SELECT m.minimumStock
                                    FROM ProductWarehouseMinimumStockEntity m
@@ -125,7 +129,8 @@ public interface InventoryStockSnapshotRepository extends
            """)
     Page<ProductStockProjection> searchGroupedByProduct(
             @Param("search") String search,
-            @Param("warehouseId") Long warehouseId,
+            @Param("unrestricted") boolean unrestricted,
+            @Param("warehouseIds") List<Long> warehouseIds,
             @Param("outOfStock") boolean outOfStock,
             @Param("inStock") boolean inStock,
             @Param("belowMinimum") boolean belowMinimum,

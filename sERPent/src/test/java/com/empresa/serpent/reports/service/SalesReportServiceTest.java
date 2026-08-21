@@ -7,8 +7,11 @@ import com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodResponse
 import com.empresa.serpent.reports.web.dto.response.SalesByProductResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesDailyResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesSummaryResponse;
+import com.empresa.serpent.shared.security.WarehouseScopeService;
+import com.empresa.serpent.shared.security.WarehouseScopeService.WarehouseScope;
 import com.empresa.serpent.transactions.repository.SaleRepository;
 import com.empresa.serpent.transactions.repository.TransactionRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +26,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,8 +40,18 @@ class SalesReportServiceTest {
     @Mock
     private SaleRepository saleRepository;
 
+    @Mock
+    private WarehouseScopeService warehouseScopeService;
+
     @InjectMocks
     private SalesReportService salesReportService;
+
+    /** These tests are about mapping, so the caller always sees every branch. */
+    @BeforeEach
+    void unrestrictedScope() {
+        lenient().when(warehouseScopeService.resolve(any()))
+                .thenReturn(new WarehouseScope(true, List.of()));
+    }
 
     @Test
     @DisplayName("Should return sales by product report from repository")
@@ -53,7 +68,7 @@ class SalesReportServiceTest {
                         new BigDecimal("4600.0000"), new BigDecimal("4600.0000"))
         );
 
-        given(transactionRepository.getSalesByProductReport(any(), any(), any())).willReturn(rows);
+        given(transactionRepository.getSalesByProductReport(any(), any(), anyBoolean(), any())).willReturn(rows);
 
         List<SalesByProductResponse> result = salesReportService.getSalesByProduct(null, null, null);
 
@@ -71,7 +86,7 @@ class SalesReportServiceTest {
         assertThat(result.get(1).quantitySold()).isEqualByComparingTo("1.000");
         assertThat(result.get(1).netRevenue()).isEqualByComparingTo("4600.0000");
 
-        verify(transactionRepository).getSalesByProductReport(any(), any(), any());
+        verify(transactionRepository).getSalesByProductReport(any(), any(), anyBoolean(), any());
     }
 
     @Test
@@ -81,7 +96,7 @@ class SalesReportServiceTest {
         SalesDailyProjection row = dailyRow(
                 LocalDate.of(2026, 3, 12), 1L, "9100.0000", "-1000.0000", "8100.0000");
 
-        given(transactionRepository.getSalesDailyReportRaw(any(), any(), any())).willReturn(List.of(row));
+        given(transactionRepository.getSalesDailyReportRaw(any(), any(), anyBoolean(), any())).willReturn(List.of(row));
 
         List<SalesDailyResponse> result = salesReportService.getSalesDaily(null, null, null);
 
@@ -94,7 +109,7 @@ class SalesReportServiceTest {
         // totalRevenue is an alias of netSales for existing consumers.
         assertThat(result.get(0).totalRevenue()).isEqualByComparingTo("8100.0000");
 
-        verify(transactionRepository).getSalesDailyReportRaw(any(), any(), any());
+        verify(transactionRepository).getSalesDailyReportRaw(any(), any(), anyBoolean(), any());
     }
 
     @Test
@@ -105,8 +120,8 @@ class SalesReportServiceTest {
                 new SalesByPaymentMethodResponse(1L, "Cash", 1L, new BigDecimal("9100.0000"))
         );
 
-        given(transactionRepository.getSalesByPaymentMethodReport(any(), any(), any())).willReturn(rows);
-        given(saleRepository.sumCreditSales(any(), any(), any())).willReturn(new BigDecimal("2000.0000"));
+        given(transactionRepository.getSalesByPaymentMethodReport(any(), any(), anyBoolean(), any())).willReturn(rows);
+        given(saleRepository.sumCreditSales(any(), any(), anyBoolean(), any())).willReturn(new BigDecimal("2000.0000"));
 
         SalesByPaymentMethodReportResponse result =
                 salesReportService.getSalesByPaymentMethod(null, null, null);
@@ -123,7 +138,7 @@ class SalesReportServiceTest {
         // on its own: the rows alone no longer add up to what was sold.
         assertThat(result.creditSales()).isEqualByComparingTo("2000.0000");
 
-        verify(transactionRepository).getSalesByPaymentMethodReport(any(), any(), any());
+        verify(transactionRepository).getSalesByPaymentMethodReport(any(), any(), anyBoolean(), any());
     }
 
     @Test
@@ -132,7 +147,7 @@ class SalesReportServiceTest {
 
         SalesSummaryProjection row = summaryRow(3L, "100.0", "0", "0", "0", "100.0", "33.33333");
 
-        given(transactionRepository.getSalesSummaryReportRaw(any(), any(), any())).willReturn(row);
+        given(transactionRepository.getSalesSummaryReportRaw(any(), any(), anyBoolean(), any())).willReturn(row);
 
         SalesSummaryResponse result = salesReportService.getSalesSummary(null, null, null);
 
@@ -141,7 +156,7 @@ class SalesReportServiceTest {
         assertThat(result.averageTicket()).isEqualByComparingTo("33.3333");
         assertThat(result.averageTicket().scale()).isEqualTo(4);
 
-        verify(transactionRepository).getSalesSummaryReportRaw(any(), any(), any());
+        verify(transactionRepository).getSalesSummaryReportRaw(any(), any(), anyBoolean(), any());
     }
 
     @Test
@@ -153,7 +168,7 @@ class SalesReportServiceTest {
         SalesSummaryProjection row = summaryRow(
                 2L, "22500.0000", "1500.0000", "-2000.0000", "-9000.0000", "13000.0000", "11250.0000");
 
-        given(transactionRepository.getSalesSummaryReportRaw(any(), any(), any())).willReturn(row);
+        given(transactionRepository.getSalesSummaryReportRaw(any(), any(), anyBoolean(), any())).willReturn(row);
 
         SalesSummaryResponse result = salesReportService.getSalesSummary(null, null, null);
 

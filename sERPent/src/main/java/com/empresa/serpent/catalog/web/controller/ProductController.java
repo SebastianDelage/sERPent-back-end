@@ -6,6 +6,7 @@ import com.empresa.serpent.catalog.web.dto.request.ProductUpdateRequest;
 import com.empresa.serpent.catalog.web.dto.response.ProductResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,11 +18,13 @@ public class ProductController {
 
     private final ProductService productService;
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ProductResponse create(@Valid @RequestBody ProductCreateRequest request) {
         return productService.create(request);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ProductResponse update(
             @PathVariable Long id,

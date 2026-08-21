@@ -13,6 +13,8 @@ import com.empresa.serpent.inventory.web.dto.response.StockResponse;
 import com.empresa.serpent.inventory.repository.InventoryStockSnapshotRepository;
 import com.empresa.serpent.inventory.repository.InventoryStockSnapshotSpecifications;
 import com.empresa.serpent.inventory.repository.ProductWarehouseMinimumStockRepository;
+import com.empresa.serpent.shared.security.WarehouseScopeService;
+import com.empresa.serpent.shared.security.WarehouseScopeService.WarehouseScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -37,9 +39,22 @@ public class StockQueryService {
     private final InventoryStockSnapshotRepository inventoryStockSnapshotRepository;
     private final ProductRepository productRepository;
     private final ProductWarehouseMinimumStockRepository productWarehouseMinimumStockRepository;
+    private final WarehouseScopeService warehouseScopeService;
 
+    /**
+     * Stock rows, restricted to the branches the caller may see.
+     *
+     * <p>The scope is applied here rather than in the controller because every read path
+     * into stock lands on this method — the reports and the low-stock view included. One
+     * place to get it right, and no way to reach the data around it.
+     */
     public List<StockResponse> getStock(StockFilter filter) {
-        List<InventoryStockSnapshotEntity> snapshots = loadSnapshots(filter);
+        WarehouseScope scope = warehouseScopeService.resolve(filter.warehouseId());
+        if (scope.seesNothing()) {
+            return List.of();
+        }
+
+        List<InventoryStockSnapshotEntity> snapshots = loadSnapshots(filter, scope);
 
         return snapshots.stream()
                 .map(StockQueryService::toStockResponse)
@@ -77,8 +92,16 @@ public class StockQueryService {
      * stock list to work, and handing them a page would break them for no gain.
      */
     public Page<StockResponse> searchStock(StockPageFilter filter, Pageable pageable) {
+        WarehouseScope scope = warehouseScopeService.resolve(filter.warehouseId());
+        if (scope.seesNothing()) {
+            return Page.empty(pageable);
+        }
+
         return inventoryStockSnapshotRepository
-                .findAll(InventoryStockSnapshotSpecifications.fromFilter(filter), withStableSort(pageable))
+                .findAll(
+                        InventoryStockSnapshotSpecifications.fromFilter(filter)
+                                .and(InventoryStockSnapshotSpecifications.withinScope(scope)),
+                        withStableSort(pageable))
                 .map(StockQueryService::toStockResponse);
     }
 
@@ -104,9 +127,15 @@ public class StockQueryService {
 
         StockStatusFilter status = filter.statusOrAll();
 
+        WarehouseScope scope = warehouseScopeService.resolve(filter.warehouseId());
+        if (scope.seesNothing()) {
+            return Page.empty(pageable);
+        }
+
         return inventoryStockSnapshotRepository.searchGroupedByProduct(
                         blankToNull(filter.search()),
-                        filter.warehouseId(),
+                        scope.unrestricted(),
+                        scope.warehouseIds(),
                         status == StockStatusFilter.OUT_OF_STOCK,
                         status == StockStatusFilter.IN_STOCK,
                         status == StockStatusFilter.BELOW_MINIMUM,
@@ -126,8 +155,14 @@ public class StockQueryService {
      * user filters by "below minimum".
      */
     public long countLowStockAlerts(StockPageFilter filter) {
+        WarehouseScope scope = warehouseScopeService.resolve(filter.warehouseId());
+        if (scope.seesNothing()) {
+            return 0L;
+        }
+
         return inventoryStockSnapshotRepository.count(
-                InventoryStockSnapshotSpecifications.fromFilterIgnoringStatus(filter));
+                InventoryStockSnapshotSpecifications.fromFilterIgnoringStatus(filter)
+                        .and(InventoryStockSnapshotSpecifications.withinScope(scope)));
     }
 
     private String blankToNull(String value) {
@@ -154,9 +189,14 @@ public class StockQueryService {
 
     /** Same, restricted to one warehouse when {@code warehouseId} is given. */
     public List<ProductStockResponse> getTotalStockGroupedByProduct(Boolean onlyPositive, Long warehouseId) {
-        List<InventoryStockSnapshotEntity> snapshots = warehouseId == null
+        WarehouseScope scope = warehouseScopeService.resolve(warehouseId);
+        if (scope.seesNothing()) {
+            return List.of();
+        }
+
+        List<InventoryStockSnapshotEntity> snapshots = scope.unrestricted()
                 ? inventoryStockSnapshotRepository.findAll()
-                : inventoryStockSnapshotRepository.findByWarehouseId(warehouseId);
+                : inventoryStockSnapshotRepository.findByWarehouseIdIn(scope.warehouseIds());
 
         Map<ProductKey, BigDecimal> grouped = snapshots.stream()
                 .collect(Collectors.groupingBy(
@@ -266,23 +306,27 @@ public class StockQueryService {
         return productId + "-" + warehouseId;
     }
 
-    private List<InventoryStockSnapshotEntity> loadSnapshots(StockFilter filter) {
-        if (filter.productId() != null && filter.warehouseId() != null) {
-            return inventoryStockSnapshotRepository
-                    .findByProductIdAndWarehouseId(filter.productId(), filter.warehouseId())
-                    .stream()
-                    .toList();
+    /**
+     * Loads the snapshots for a filter, never reaching outside the caller's scope.
+     *
+     * <p>The scope has already folded the requested warehouse into itself, so the branch
+     * conditions come from it and not from {@code filter.warehouseId()} — reading the
+     * filter here again is what would let an unscoped path slip back in.
+     */
+    private List<InventoryStockSnapshotEntity> loadSnapshots(StockFilter filter, WarehouseScope scope) {
+        if (scope.unrestricted()) {
+            if (filter.productId() != null) {
+                return inventoryStockSnapshotRepository.findByProductId(filter.productId());
+            }
+            return inventoryStockSnapshotRepository.findAll();
         }
 
         if (filter.productId() != null) {
-            return inventoryStockSnapshotRepository.findByProductId(filter.productId());
+            return inventoryStockSnapshotRepository
+                    .findByProductIdAndWarehouseIdIn(filter.productId(), scope.warehouseIds());
         }
 
-        if (filter.warehouseId() != null) {
-            return inventoryStockSnapshotRepository.findByWarehouseId(filter.warehouseId());
-        }
-
-        return inventoryStockSnapshotRepository.findAll();
+        return inventoryStockSnapshotRepository.findByWarehouseIdIn(scope.warehouseIds());
     }
 
     private record ProductKey(

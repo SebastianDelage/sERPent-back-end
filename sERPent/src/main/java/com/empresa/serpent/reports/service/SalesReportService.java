@@ -5,6 +5,8 @@ import com.empresa.serpent.reports.web.dto.response.SalesByPaymentMethodResponse
 import com.empresa.serpent.reports.web.dto.response.SalesByProductResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesDailyResponse;
 import com.empresa.serpent.reports.web.dto.response.SalesSummaryResponse;
+import com.empresa.serpent.shared.security.WarehouseScopeService;
+import com.empresa.serpent.shared.security.WarehouseScopeService.WarehouseScope;
 import com.empresa.serpent.transactions.repository.SaleRepository;
 import com.empresa.serpent.transactions.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,15 +26,36 @@ public class SalesReportService {
 
     private final TransactionRepository transactionRepository;
     private final SaleRepository saleRepository;
+    private final WarehouseScopeService warehouseScopeService;
+
+    /** Zeroes rather than nulls: the breakdown identity still holds at 0 = 0. */
+    private static SalesSummaryResponse emptySummary() {
+        return new SalesSummaryResponse(
+                0L, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+    }
 
     public List<SalesByProductResponse> getSalesByProduct(
             LocalDateTime dateFrom, LocalDateTime dateTo, Long warehouseId) {
-        return transactionRepository.getSalesByProductReport(dateFrom, dateTo, warehouseId);
+
+        WarehouseScope scope = warehouseScopeService.resolve(warehouseId);
+        if (scope.seesNothing()) {
+            return List.of();
+        }
+
+        return transactionRepository.getSalesByProductReport(
+                dateFrom, dateTo, scope.unrestricted(), scope.warehouseIds());
     }
 
     public List<SalesDailyResponse> getSalesDaily(
             LocalDateTime dateFrom, LocalDateTime dateTo, Long warehouseId) {
-        return transactionRepository.getSalesDailyReportRaw(dateFrom, dateTo, warehouseId)
+        WarehouseScope scope = warehouseScopeService.resolve(warehouseId);
+        if (scope.seesNothing()) {
+            return List.of();
+        }
+
+        return transactionRepository
+                .getSalesDailyReportRaw(dateFrom, dateTo, scope.unrestricted(), scope.warehouseIds())
                 .stream()
                 .map(row -> new SalesDailyResponse(
                         row.getDate(),
@@ -57,15 +80,21 @@ public class SalesReportService {
     public SalesByPaymentMethodReportResponse getSalesByPaymentMethod(
             LocalDateTime dateFrom, LocalDateTime dateTo, Long warehouseId) {
 
-        List<SalesByPaymentMethodResponse> methods =
-                transactionRepository.getSalesByPaymentMethodReport(dateFrom, dateTo, warehouseId);
+        WarehouseScope scope = warehouseScopeService.resolve(warehouseId);
+        if (scope.seesNothing()) {
+            return new SalesByPaymentMethodReportResponse(List.of(), BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+
+        List<SalesByPaymentMethodResponse> methods = transactionRepository
+                .getSalesByPaymentMethodReport(dateFrom, dateTo, scope.unrestricted(), scope.warehouseIds());
 
         BigDecimal collected = methods.stream()
                 .map(SalesByPaymentMethodResponse::totalRevenue)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal creditSales = saleRepository.sumCreditSales(dateFrom, dateTo, warehouseId);
+        BigDecimal creditSales = saleRepository.sumCreditSales(
+                dateFrom, dateTo, scope.unrestricted(), scope.warehouseIds());
 
         return new SalesByPaymentMethodReportResponse(methods, collected, creditSales);
     }
@@ -73,7 +102,13 @@ public class SalesReportService {
     public SalesSummaryResponse getSalesSummary(
             LocalDateTime dateFrom, LocalDateTime dateTo, Long warehouseId) {
 
-        var row = transactionRepository.getSalesSummaryReportRaw(dateFrom, dateTo, warehouseId);
+        WarehouseScope scope = warehouseScopeService.resolve(warehouseId);
+        if (scope.seesNothing()) {
+            return emptySummary();
+        }
+
+        var row = transactionRepository.getSalesSummaryReportRaw(
+                dateFrom, dateTo, scope.unrestricted(), scope.warehouseIds());
 
         return new SalesSummaryResponse(
                 row.getTransactions(),

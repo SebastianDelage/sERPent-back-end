@@ -11,6 +11,7 @@ import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
+import com.empresa.serpent.shared.security.WarehouseScopeService.WarehouseScope;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
@@ -107,6 +108,19 @@ public final class InventoryStockSnapshotSpecifications {
         coalesce.value(root.<ProductEntity>get("product").<BigDecimal>get("minimumStock"));
 
         return coalesce;
+    }
+
+
+    /**
+     * Restricts to the branches the caller may see. A no-op for an unrestricted caller.
+     *
+     * <p>Callers must short-circuit an empty scope before reaching this: an empty IN list is
+     * a portability trap, and "sees nothing" is answerable without a query.
+     */
+    public static Specification<InventoryStockSnapshotEntity> withinScope(WarehouseScope scope) {
+        return (root, query, cb) -> scope.unrestricted()
+                ? cb.conjunction()
+                : root.get("warehouse").get("id").in(scope.warehouseIds());
     }
 
     public static Specification<InventoryStockSnapshotEntity> fromFilter(StockPageFilter filter) {

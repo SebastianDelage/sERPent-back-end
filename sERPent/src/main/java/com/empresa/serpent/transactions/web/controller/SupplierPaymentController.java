@@ -8,11 +8,17 @@ import com.empresa.serpent.transactions.web.dto.response.SupplierPaymentResponse
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * ADMIN only. Collecting from a customer is part of selling, so employees do it;
+ * paying a supplier is money leaving the business, which is the owner's call.
+ */
+@PreAuthorize("hasRole('ADMIN')")
 @RestController
 @RequiredArgsConstructor
 public class SupplierPaymentController {

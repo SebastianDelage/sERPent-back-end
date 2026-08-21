@@ -8,6 +8,8 @@ import com.empresa.serpent.transactions.web.dto.filter.ExpenseFilter;
 import com.empresa.serpent.transactions.web.dto.response.ExpenseResponse;
 import com.empresa.serpent.transactions.web.dto.response.GeneralExpensesSummaryResponse;
 import com.empresa.serpent.transactions.web.mapper.ExpenseMapper;
+import com.empresa.serpent.shared.security.WarehouseScopeService;
+import com.empresa.serpent.shared.security.WarehouseScopeService.WarehouseScope;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -31,9 +33,19 @@ public class ExpenseQueryService {
     private final ExpenseRepository expenseRepository;
     private final ExpenseMapper expenseMapper;
     private final EntityManager entityManager;
+    private final WarehouseScopeService warehouseScopeService;
 
     public Page<ExpenseResponse> search(ExpenseFilter filter, Pageable pageable) {
-        return expenseRepository.findAll(ExpenseSpecifications.fromFilter(filter), pageable)
+        WarehouseScope scope = warehouseScopeService.resolve(filter.warehouseId());
+        if (scope.seesNothing()) {
+            return Page.empty(pageable);
+        }
+
+        return expenseRepository
+                .findAll(
+                        ExpenseSpecifications.fromFilter(filter)
+                                .and(ExpenseSpecifications.withinScope(scope)),
+                        pageable)
                 .map(expenseMapper::toResponse);
     }
 
@@ -53,6 +65,8 @@ public class ExpenseQueryService {
      * insert and report a count that does not match its own total.
      */
     public GeneralExpensesSummaryResponse summarizeGeneral(ExpenseFilter filter) {
+        // General expenses are visible to everyone, so this aggregate needs no scoping:
+        // by definition it only ever counts rows that belong to no branch.
         Specification<ExpenseEntity> specification = ExpenseSpecifications.generalFromFilter(filter);
 
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();

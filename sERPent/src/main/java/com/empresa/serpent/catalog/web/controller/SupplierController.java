@@ -6,6 +6,7 @@ import com.empresa.serpent.catalog.web.dto.request.SupplierUpdateRequest;
 import com.empresa.serpent.catalog.web.dto.response.SupplierResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,11 +18,13 @@ public class SupplierController {
 
     private final SupplierService supplierService;
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public SupplierResponse create(@Valid @RequestBody SupplierCreateRequest request) {
         return supplierService.create(request);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public SupplierResponse update(
             @PathVariable Long id,

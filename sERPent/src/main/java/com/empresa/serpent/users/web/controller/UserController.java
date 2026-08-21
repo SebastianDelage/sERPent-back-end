@@ -8,10 +8,12 @@ import com.empresa.serpent.users.web.dto.request.UpdateUserWarehousesRequest;
 import com.empresa.serpent.users.web.dto.response.UserResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@PreAuthorize("hasRole('ADMIN')")
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
@@ -52,6 +54,9 @@ public class UserController {
      *
      * <p>Declared before {@code /{id}/warehouses} so the literal path wins over the template.
      */
+    // Overrides the class-level ADMIN rule: this returns only the caller's OWN
+    // branches, and the session branch selector would not work without it.
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/me/warehouses")
     public List<WarehouseResponse> findMyWarehouses() {
         return userService.findWarehousesOfCurrentUser();

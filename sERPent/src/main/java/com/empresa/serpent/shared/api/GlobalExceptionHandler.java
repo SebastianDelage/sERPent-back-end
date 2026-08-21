@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -77,6 +78,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest req) {
         log.warn("Illegal argument at {}: {}", req.getRequestURI(), ex.getMessage());
         return build(HttpStatus.BAD_REQUEST, "La solicitud no es válida.", req, Map.of());
+    }
+
+    /**
+     * A role restriction refused the request.
+     *
+     * <p>Thrown by Spring Security's @PreAuthorize, which is not a BusinessException and so
+     * would otherwise fall through to the catch-all and surface as a 500 — telling the user
+     * something broke when in fact the system worked exactly as intended.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex, HttpServletRequest req) {
+        log.warn("Access denied at {}: {}", req.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.FORBIDDEN,
+                "No tenés permiso para realizar esta acción.", req, Map.of());
     }
 
     @ExceptionHandler(ResponseStatusException.class)

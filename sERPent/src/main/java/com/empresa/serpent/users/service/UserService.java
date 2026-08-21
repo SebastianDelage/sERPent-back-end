@@ -9,6 +9,7 @@ import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.users.domain.entity.UserEntity;
+import com.empresa.serpent.users.domain.enums.UserRole;
 import com.empresa.serpent.users.repository.UserRepository;
 import com.empresa.serpent.users.web.dto.request.CreateUserRequest;
 import com.empresa.serpent.users.web.dto.request.UpdateUserRequest;
@@ -36,7 +37,12 @@ public class UserService {
     private final WarehouseMapper warehouseMapper;
     private final AuthenticatedUserService authenticatedUserService;
 
-    /** Seeded admin: it must always stay usable, so it can't be deactivated. */
+    /**
+     * Seeded admin: it must always stay usable, so it can neither be deactivated nor
+     * demoted. Those two rules together are what guarantee the installation always has at
+     * least one active administrator — without the second, an owner could quietly turn
+     * themselves into an employee and leave nobody able to hand roles back out.
+     */
     private static final Long PROTECTED_USER_ID = 1L;
 
     @Transactional
@@ -51,6 +57,10 @@ public class UserService {
         if (entity.getActive() == null) {
             entity.setActive(true);
         }
+
+        // Absent means the narrower role. Defaulting a new account to ADMIN because the
+        // caller forgot a field is not a mistake worth making.
+        entity.setRole(request.role() != null ? request.role() : UserRole.EMPLOYEE);
 
         // A brand new user always needs somewhere to operate: creating one without
         // warehouses would just produce an account that cannot do anything.
@@ -74,7 +84,18 @@ public class UserService {
             throw new ValidationException("El usuario administrador no se puede desactivar.");
         }
 
+        if (PROTECTED_USER_ID.equals(id) && request.role() != null && request.role() != UserRole.ADMIN) {
+            throw new ValidationException(
+                    "El usuario administrador no puede dejar de ser administrador, "
+                            + "porque el sistema quedaría sin nadie que pueda administrarlo.");
+        }
+
         userMapper.updateEntityFromRequest(request, entity);
+
+        // Omitted means "leave it as it is", same as the warehouse assignment below.
+        if (request.role() != null) {
+            entity.setRole(request.role());
+        }
 
         if (request.password() != null && !request.password().isBlank()) {
             entity.setPasswordHash(passwordEncoder.encode(request.password()));

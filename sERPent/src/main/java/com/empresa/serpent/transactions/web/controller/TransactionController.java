@@ -42,6 +42,7 @@ public class TransactionController {
             LocalDateTime dateTo,
 
             @RequestParam(required = false) Long createdByUserId,
+            @RequestParam(required = false) Long warehouseId,
             @RequestParam(required = false) Long paymentMethodId,
             @RequestParam(required = false) String text,
 
@@ -53,6 +54,7 @@ public class TransactionController {
                 dateFrom,
                 dateTo,
                 createdByUserId,
+                warehouseId,
                 paymentMethodId,
                 text
         );

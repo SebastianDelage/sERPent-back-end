@@ -4,6 +4,7 @@ import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.reports.service.InventoryReportService;
 import com.empresa.serpent.reports.web.dto.response.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -25,6 +26,8 @@ public class InventoryReportController {
         return inventoryReportService.getInventorySummary(warehouseId);
     }
 
+    /** One row per branch: consolidated by construction. */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/by-warehouse")
     public List<InventoryByWarehouseResponse> getInventoryByWarehouse() {
         return inventoryReportService.getInventoryByWarehouse();
@@ -37,6 +40,8 @@ public class InventoryReportController {
         return inventoryReportService.getLowStockReport(warehouseId);
     }
 
+    /** One row per branch: consolidated by construction. */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/warehouse-summary")
     public List<WarehouseSummaryResponse> getWarehouseSummary() {
         return inventoryReportService.getWarehouseSummary();
@@ -49,6 +54,8 @@ public class InventoryReportController {
         return inventoryReportService.getInventoryMovementsByType(warehouseId);
     }
 
+    /** One row per branch: consolidated by construction. */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/movements/by-warehouse")
     public List<InventoryMovementsByWarehouseResponse> getInventoryMovementsByWarehouse() {
         return inventoryReportService.getInventoryMovementsByWarehouse();
@@ -61,6 +68,9 @@ public class InventoryReportController {
         return inventoryReportService.getInventoryMovementsByProduct(warehouseId);
     }
 
+    /** ADMIN because this report has NO warehouse parameter to scope it by, not because the
+     * data is sensitive. Give it a branch filter and it can be opened to employees. */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/replenishment")
     public List<InventoryReplenishmentResponse> getReplenishmentReport() {
         return inventoryReportService.getReplenishmentReport();

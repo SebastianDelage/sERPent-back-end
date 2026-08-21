@@ -10,10 +10,13 @@ import com.empresa.serpent.inventory.web.dto.filter.StockFilter;
 import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.ProductStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.StockResponse;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import com.empresa.serpent.shared.security.WarehouseScopeService;
+import com.empresa.serpent.shared.security.WarehouseScopeService.WarehouseScope;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -22,6 +25,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -36,6 +41,25 @@ class StockQueryServiceTest {
 
     @Mock
     private ProductWarehouseMinimumStockRepository productWarehouseMinimumStockRepository;
+
+    @Mock
+    private WarehouseScopeService warehouseScopeService;
+
+    /**
+     * Mirrors the real contract instead of always answering "unrestricted": no branch asked
+     * for means everything, a branch asked for means that branch. Stubbing it flat would
+     * quietly drop the warehouse filter these tests are here to check.
+     */
+    @BeforeEach
+    void scopeMirrorsTheRequest() {
+        lenient().when(warehouseScopeService.resolve(any()))
+                .thenAnswer(invocation -> {
+                    Long requested = invocation.getArgument(0);
+                    return requested == null
+                            ? new WarehouseScope(true, List.of())
+                            : new WarehouseScope(false, List.of(requested));
+                });
+    }
 
     @InjectMocks
     private StockQueryService stockQueryService;

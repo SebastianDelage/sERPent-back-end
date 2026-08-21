@@ -6,6 +6,7 @@ import com.empresa.serpent.transactions.web.dto.request.UpdatePaymentMethodReque
 import com.empresa.serpent.transactions.web.dto.response.PaymentMethodResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,11 +18,13 @@ public class PaymentMethodController {
 
     private final PaymentMethodService paymentMethodService;
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public PaymentMethodResponse create(@Valid @RequestBody CreatePaymentMethodRequest request) {
         return paymentMethodService.create(request);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public PaymentMethodResponse update(
             @PathVariable Long id,

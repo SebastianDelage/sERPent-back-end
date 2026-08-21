@@ -14,6 +14,8 @@ import java.util.List;
 @Mapper(config = MapStructConfig.class)
 public interface TransactionMapper {
 
+    // Branch names are batch-loaded by TransactionQueryService, not reachable from the entity.
+    @Mapping(target = "warehouseNames", ignore = true)
     TransactionListResponse toListResponse(TransactionEntity entity);
 
     @Mapping(target = "paymentMethodId", source = "paymentMethod.id")

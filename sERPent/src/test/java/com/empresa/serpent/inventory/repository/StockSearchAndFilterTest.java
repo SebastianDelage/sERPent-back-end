@@ -181,7 +181,10 @@ class StockSearchAndFilterTest {
         private Page<ProductStockProjection> search(String term, Long warehouseId, StockStatusFilter status) {
             return repository.searchGroupedByProduct(
                     term,
-                    warehouseId,
+                    // The scope is resolved a layer up, in StockQueryService; at the repository
+                    // level a query is either unrestricted or handed an explicit list.
+                    warehouseId == null,
+                    warehouseId == null ? List.of() : List.of(warehouseId),
                     status == StockStatusFilter.OUT_OF_STOCK,
                     status == StockStatusFilter.IN_STOCK,
                     status == StockStatusFilter.BELOW_MINIMUM,

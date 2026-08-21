@@ -2,6 +2,7 @@ package com.empresa.serpent.transactions.repository;
 
 import com.empresa.serpent.transactions.domain.entity.ExpenseEntity;
 import com.empresa.serpent.transactions.web.dto.filter.ExpenseFilter;
+import com.empresa.serpent.shared.security.WarehouseScopeService.WarehouseScope;
 import org.springframework.data.jpa.domain.Specification;
 
 public final class ExpenseSpecifications {
@@ -29,6 +30,21 @@ public final class ExpenseSpecifications {
                 warehouseId == null
                         ? cb.conjunction()
                         : cb.equal(root.get("warehouse").get("id"), warehouseId);
+    }
+
+    /**
+     * Restricts to the branches the caller may see, WITHOUT hiding the general expenses.
+     *
+     * <p>A general expense belongs to the company rather than to any branch, so it is not
+     * another branch's data and there is nothing to protect it from. Excluding it would
+     * make an employee's expense list silently understate what the shop spends.
+     */
+    public static Specification<ExpenseEntity> withinScope(WarehouseScope scope) {
+        return (root, query, cb) -> scope.unrestricted()
+                ? cb.conjunction()
+                : cb.or(
+                        cb.isNull(root.get("warehouse")),
+                        root.get("warehouse").get("id").in(scope.warehouseIds()));
     }
 
     /** The general expenses: the ones that belong to the company and not to any branch. */

@@ -239,14 +239,14 @@ class CurrentAccountTest {
         @DisplayName("A credit sale is absent from the by-payment-method rows, and reported apart")
         void creditSaleIsNotAttributedToAnyMethod() {
             List<SalesByPaymentMethodResponse> methods =
-                    transactionRepository.getSalesByPaymentMethodReport(null, null, null);
+                    transactionRepository.getSalesByPaymentMethodReport(null, null, true, List.of());
 
             // Only the cash sale: money that never arrived must not be shown as if it had.
             assertThat(methods).hasSize(1);
             assertThat(methods.get(0).paymentMethodName()).isEqualTo("Efectivo");
             assertThat(methods.get(0).totalRevenue()).isEqualByComparingTo(CASH_SALE);
 
-            BigDecimal creditSales = saleRepository.sumCreditSales(null, null, null);
+            BigDecimal creditSales = saleRepository.sumCreditSales(null, null, true, List.of());
             assertThat(creditSales).isEqualByComparingTo(CREDIT_SALE);
 
             // The invariant that replaced "the rows add up to total sales".
@@ -255,7 +255,7 @@ class CurrentAccountTest {
         }
 
         private SalesSummaryProjection summary() {
-            return transactionRepository.getSalesSummaryReportRaw(null, null, null);
+            return transactionRepository.getSalesSummaryReportRaw(null, null, true, List.of());
         }
     }
 

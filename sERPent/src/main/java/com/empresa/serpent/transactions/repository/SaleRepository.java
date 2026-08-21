@@ -55,11 +55,12 @@ public interface SaleRepository extends JpaRepository<SaleEntity, Long> {
            WHERE s.onCredit = TRUE
              AND (:dateFrom IS NULL OR s.transaction.date >= :dateFrom)
              AND (:dateTo IS NULL OR s.transaction.date <= :dateTo)
-             AND (:warehouseId IS NULL OR s.warehouse.id = :warehouseId)
+             AND (:unrestricted = TRUE OR s.warehouse.id IN :warehouseIds)
            """)
     BigDecimal sumCreditSales(
             @Param("dateFrom") java.time.LocalDateTime dateFrom,
             @Param("dateTo") java.time.LocalDateTime dateTo,
-            @Param("warehouseId") Long warehouseId
+            @Param("unrestricted") boolean unrestricted,
+            @Param("warehouseIds") List<Long> warehouseIds
     );
 }

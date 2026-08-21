@@ -3,7 +3,6 @@ package com.empresa.serpent.shared.security;
 import com.empresa.serpent.users.domain.entity.UserEntity;
 import com.empresa.serpent.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -25,12 +24,13 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() ->
                         new UsernameNotFoundException("Invalid credentials"));
 
-        // No roles for now: empty authority list = authenticated, no special roles.
+        // Only used at login (DaoAuthenticationProvider). Per-request authentication goes
+        // through JwtAuthenticationFilter, which reads the role the same way.
         return User.builder()
                 .username(user.getUsername())
                 .password(user.getPasswordHash())
                 .disabled(!Boolean.TRUE.equals(user.getActive()))
-                .authorities(AuthorityUtils.NO_AUTHORITIES)
+                .authorities("ROLE_" + user.getRole().name())
                 .build();
     }
 }

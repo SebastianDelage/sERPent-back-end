@@ -8,6 +8,8 @@ import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.ProductStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.StockResponse;
 import com.empresa.serpent.reports.web.dto.response.*;
+import com.empresa.serpent.shared.security.WarehouseScopeService;
+import com.empresa.serpent.shared.security.WarehouseScopeService.WarehouseScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,7 @@ public class InventoryReportService {
 
     private final StockQueryService stockQueryService;
     private final InventoryMovementRepository inventoryMovementRepository;
+    private final WarehouseScopeService warehouseScopeService;
     private final InventoryStockSnapshotRepository snapshotRepository;
 
     public List<InventorySummaryResponse> getInventorySummary(Long warehouseId) {
@@ -81,7 +84,13 @@ public class InventoryReportService {
     }
 
     public List<InventoryMovementsByTypeResponse> getInventoryMovementsByType(Long warehouseId) {
-        return inventoryMovementRepository.getInventoryMovementsByTypeReportRaw(warehouseId)
+        WarehouseScope scope = warehouseScopeService.resolve(warehouseId);
+        if (scope.seesNothing()) {
+            return List.of();
+        }
+
+        return inventoryMovementRepository
+                .getInventoryMovementsByTypeReportRaw(scope.unrestricted(), scope.warehouseIds())
                 .stream()
                 .map(row -> new InventoryMovementsByTypeResponse(
                         row.getMovementType(),
@@ -106,7 +115,13 @@ public class InventoryReportService {
     }
 
     public List<InventoryMovementsByProductResponse> getInventoryMovementsByProduct(Long warehouseId) {
-        return inventoryMovementRepository.getInventoryMovementsByProductReportRaw(warehouseId)
+        WarehouseScope scope = warehouseScopeService.resolve(warehouseId);
+        if (scope.seesNothing()) {
+            return List.of();
+        }
+
+        return inventoryMovementRepository
+                .getInventoryMovementsByProductReportRaw(scope.unrestricted(), scope.warehouseIds())
                 .stream()
                 .map(row -> new InventoryMovementsByProductResponse(
                         row.getProductId(),

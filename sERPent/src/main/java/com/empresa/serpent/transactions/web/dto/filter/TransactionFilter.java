@@ -11,6 +11,7 @@ public record TransactionFilter(
         LocalDateTime dateFrom,
         LocalDateTime dateTo,
         Long createdByUserId,
+        Long warehouseId,
         Long paymentMethodId,
         String text
 ) {

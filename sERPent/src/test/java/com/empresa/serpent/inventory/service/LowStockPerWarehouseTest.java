@@ -8,10 +8,13 @@ import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.repository.InventoryStockSnapshotRepository;
 import com.empresa.serpent.inventory.repository.ProductWarehouseMinimumStockRepository;
 import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import com.empresa.serpent.shared.security.WarehouseScopeService;
+import com.empresa.serpent.shared.security.WarehouseScopeService.WarehouseScope;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -19,6 +22,8 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.BDDMockito.given;
 
 /**
@@ -40,6 +45,25 @@ class LowStockPerWarehouseTest {
 
     @Mock
     private ProductWarehouseMinimumStockRepository minimumStockRepository;
+
+    @Mock
+    private WarehouseScopeService warehouseScopeService;
+
+    /**
+     * Mirrors the real contract instead of always answering "unrestricted": no branch asked
+     * for means everything, a branch asked for means that branch. Stubbing it flat would
+     * quietly drop the warehouse filter these tests are here to check.
+     */
+    @BeforeEach
+    void scopeMirrorsTheRequest() {
+        lenient().when(warehouseScopeService.resolve(any()))
+                .thenAnswer(invocation -> {
+                    Long requested = invocation.getArgument(0);
+                    return requested == null
+                            ? new WarehouseScope(true, List.of())
+                            : new WarehouseScope(false, List.of(requested));
+                });
+    }
 
     @InjectMocks
     private StockQueryService stockQueryService;
@@ -187,7 +211,7 @@ class LowStockPerWarehouseTest {
         WarehouseEntity branch = branch();
 
         // Short at both, so the filter is what makes the difference, not the data.
-        given(snapshotRepository.findByWarehouseId(BRANCH_ID)).willReturn(List.of(
+        given(snapshotRepository.findByWarehouseIdIn(List.of(BRANCH_ID))).willReturn(List.of(
                 snapshot(pollo, branch, "2.000")
         ));
         given(productRepository.findAll()).willReturn(List.of(pollo));

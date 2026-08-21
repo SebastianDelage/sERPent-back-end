@@ -62,7 +62,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        List<SalesByProductResponse> result = transactionRepository.getSalesByProductReport(null, null, null);
+        List<SalesByProductResponse> result = transactionRepository.getSalesByProductReport(null, null, true, List.of());
 
         assertThat(result).hasSize(2);
 
@@ -98,7 +98,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        List<SalesByProductResponse> result = transactionRepository.getSalesByProductReport(null, null, null);
+        List<SalesByProductResponse> result = transactionRepository.getSalesByProductReport(null, null, true, List.of());
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).productName()).isEqualTo("Pollo entero");
@@ -133,7 +133,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        List<SalesDailyProjection> result = transactionRepository.getSalesDailyReportRaw(null, null, null);
+        List<SalesDailyProjection> result = transactionRepository.getSalesDailyReportRaw(null, null, true, List.of());
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getDate()).isEqualTo(LocalDate.of(2026, 3, 12));
@@ -160,7 +160,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        List<SalesDailyProjection> result = transactionRepository.getSalesDailyReportRaw(null, null, null);
+        List<SalesDailyProjection> result = transactionRepository.getSalesDailyReportRaw(null, null, true, List.of());
 
         assertThat(result).hasSize(2);
 
@@ -201,7 +201,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        List<SalesByPaymentMethodResponse> result = transactionRepository.getSalesByPaymentMethodReport(null, null, null);
+        List<SalesByPaymentMethodResponse> result = transactionRepository.getSalesByPaymentMethodReport(null, null, true, List.of());
 
         assertThat(result).hasSize(2);
 
@@ -244,7 +244,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, null);
+        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, true, List.of());
 
         assertThat(result).isNotNull();
         assertThat(result.getTransactions()).isEqualTo(2L);
@@ -280,7 +280,7 @@ class TransactionRepositoryTest {
                 .extracting(TransactionEntity::getTotal, as(BIG_DECIMAL))
                 .isEqualByComparingTo("-9000.0000");
 
-        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, null);
+        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, true, List.of());
 
         // The return is not a sale, so it does not inflate the transaction count
         // nor the average ticket.
@@ -343,7 +343,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, null);
+        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, true, List.of());
 
         assertThat(result.getListPriceSales()).isEqualByComparingTo("20000.0000");
         assertThat(result.getPaymentMethodSurcharges()).isEqualByComparingTo("2000.0000");
@@ -375,7 +375,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, null);
+        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, true, List.of());
 
         assertThat(result.getListPriceSales()).isEqualByComparingTo("9000.0000");
         assertThat(result.getPaymentMethodSurcharges()).isEqualByComparingTo("0");
@@ -401,7 +401,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, null);
+        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, true, List.of());
 
         assertThat(result.getListPriceSales()).isEqualByComparingTo("2000.0000");
         assertThat(result.getPaymentMethodSurcharges()).isEqualByComparingTo("200.0000");
@@ -426,7 +426,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, null);
+        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, true, List.of());
 
         assertThat(result.getListPriceSales()).isEqualByComparingTo("10000.0000");
         assertThat(result.getPaymentMethodSurcharges()).isEqualByComparingTo("0");
@@ -451,7 +451,7 @@ class TransactionRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, null);
+        SalesSummaryProjection result = transactionRepository.getSalesSummaryReportRaw(null, null, true, List.of());
 
         assertThat(result.getListPriceSales()).isEqualByComparingTo("2000.0000");
         assertThat(result.getPaymentMethodSurcharges()).isEqualByComparingTo("-100.0000");

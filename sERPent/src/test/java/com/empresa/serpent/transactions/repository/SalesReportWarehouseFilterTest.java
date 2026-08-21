@@ -156,7 +156,8 @@ class SalesReportWarehouseFilterTest {
         }
 
         private SalesSummaryProjection summaryFor(Long warehouseId) {
-            return transactionRepository.getSalesSummaryReportRaw(null, null, warehouseId);
+            return transactionRepository.getSalesSummaryReportRaw(
+                    null, null, warehouseId == null, warehouseId == null ? List.of() : List.of(warehouseId));
         }
     }
 
@@ -168,7 +169,7 @@ class SalesReportWarehouseFilterTest {
         @DisplayName("by-product counts the return against the original sale's branch")
         void byProductAttributesReturnToOriginalBranch() {
             List<SalesByProductResponse> a =
-                    transactionRepository.getSalesByProductReport(null, null, branchA.getId());
+                    transactionRepository.getSalesByProductReport(null, null, false, List.of(branchA.getId()));
 
             assertThat(a).hasSize(1);
             // 2 sold at branch A, and the 1 returned unit counted here too.
@@ -176,7 +177,7 @@ class SalesReportWarehouseFilterTest {
             assertThat(a.get(0).quantityReturned()).isEqualByComparingTo(new BigDecimal("1.000"));
 
             List<SalesByProductResponse> b =
-                    transactionRepository.getSalesByProductReport(null, null, branchB.getId());
+                    transactionRepository.getSalesByProductReport(null, null, false, List.of(branchB.getId()));
 
             assertThat(b).hasSize(1);
             assertThat(b.get(0).quantitySold()).isEqualByComparingTo(new BigDecimal("1.000"));
@@ -188,7 +189,7 @@ class SalesReportWarehouseFilterTest {
         @DisplayName("daily reports each branch separately and both consolidated")
         void dailyFiltersByBranch() {
             List<SalesDailyProjection> a =
-                    transactionRepository.getSalesDailyReportRaw(null, null, branchA.getId());
+                    transactionRepository.getSalesDailyReportRaw(null, null, false, List.of(branchA.getId()));
 
             // Branch A: the sale on the 10th, the return on the 11th.
             assertThat(a).hasSize(2);
@@ -196,13 +197,13 @@ class SalesReportWarehouseFilterTest {
                     .reduce(BigDecimal.ZERO, BigDecimal::add)).isEqualByComparingTo(A_NET);
 
             List<SalesDailyProjection> b =
-                    transactionRepository.getSalesDailyReportRaw(null, null, branchB.getId());
+                    transactionRepository.getSalesDailyReportRaw(null, null, false, List.of(branchB.getId()));
 
             assertThat(b).hasSize(1);
             assertThat(b.get(0).getNetSales()).isEqualByComparingTo(B_NET);
 
             List<SalesDailyProjection> all =
-                    transactionRepository.getSalesDailyReportRaw(null, null, null);
+                    transactionRepository.getSalesDailyReportRaw(null, null, true, List.of());
 
             assertThat(all.stream().map(SalesDailyProjection::getNetSales)
                     .reduce(BigDecimal.ZERO, BigDecimal::add))
@@ -213,19 +214,19 @@ class SalesReportWarehouseFilterTest {
         @DisplayName("by-payment-method only shows the methods used at that branch")
         void byPaymentMethodFiltersByBranch() {
             List<SalesByPaymentMethodResponse> a =
-                    transactionRepository.getSalesByPaymentMethodReport(null, null, branchA.getId());
+                    transactionRepository.getSalesByPaymentMethodReport(null, null, false, List.of(branchA.getId()));
 
             assertThat(a).hasSize(1);
             assertThat(a.get(0).paymentMethodName()).isEqualTo("Tarjeta");
 
             List<SalesByPaymentMethodResponse> b =
-                    transactionRepository.getSalesByPaymentMethodReport(null, null, branchB.getId());
+                    transactionRepository.getSalesByPaymentMethodReport(null, null, false, List.of(branchB.getId()));
 
             assertThat(b).hasSize(1);
             assertThat(b.get(0).paymentMethodName()).isEqualTo("Cash");
 
             List<SalesByPaymentMethodResponse> all =
-                    transactionRepository.getSalesByPaymentMethodReport(null, null, null);
+                    transactionRepository.getSalesByPaymentMethodReport(null, null, true, List.of());
 
             assertThat(all).hasSize(2);
         }

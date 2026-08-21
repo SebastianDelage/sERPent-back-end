@@ -6,6 +6,7 @@ import com.empresa.serpent.transactions.web.dto.request.UpdateProductPaymentAdju
 import com.empresa.serpent.transactions.web.dto.response.ProductPaymentAdjustmentResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +18,7 @@ public class ProductPaymentAdjustmentController {
 
     private final ProductPaymentAdjustmentService service;
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ProductPaymentAdjustmentResponse create(
             @Valid @RequestBody CreateProductPaymentAdjustmentRequest request
@@ -24,6 +26,7 @@ public class ProductPaymentAdjustmentController {
         return service.create(request);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ProductPaymentAdjustmentResponse update(
             @PathVariable Long id,
@@ -52,6 +55,7 @@ public class ProductPaymentAdjustmentController {
         return service.findByPaymentMethodAndProducts(paymentMethodId, productIds);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id) {
         service.delete(id);

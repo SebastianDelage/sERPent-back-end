@@ -4,6 +4,8 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import com.empresa.serpent.users.domain.enums.UserRole;
+
 import java.util.List;
 
 public record UpdateUserRequest(
@@ -24,6 +26,9 @@ public record UpdateUserRequest(
         String email,
 
         Boolean active,
+
+    /** Omit to leave the current role untouched. */
+        UserRole role,
 
         /**
          * Warehouses this user may operate in. Omit (null) to leave the current assignment

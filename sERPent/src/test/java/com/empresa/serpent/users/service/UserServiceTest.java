@@ -4,6 +4,7 @@ import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
 import com.empresa.serpent.users.domain.entity.UserEntity;
+import com.empresa.serpent.users.domain.enums.UserRole;
 import com.empresa.serpent.users.repository.UserRepository;
 import com.empresa.serpent.users.web.dto.request.CreateUserRequest;
 import com.empresa.serpent.users.web.dto.request.UpdateUserRequest;
@@ -85,11 +86,11 @@ class UserServiceTest {
     }
 
     private CreateUserRequest createRequest(String username, String password, String email, Boolean active) {
-        return new CreateUserRequest("Juan", "Pérez", username, password, email, active, List.of(WAREHOUSE_ID));
+        return new CreateUserRequest("Juan", "Pérez", username, password, email, active, null, List.of(WAREHOUSE_ID));
     }
 
     private UpdateUserRequest updateRequest(String username, String password, String email, Boolean active) {
-        return new UpdateUserRequest("Juan", "Pérez", username, password, email, active, null);
+        return new UpdateUserRequest("Juan", "Pérez", username, password, email, active, null, null);
     }
 
     // --- create ---
@@ -334,7 +335,7 @@ class UserServiceTest {
     @DisplayName("Should reject creating a user with no warehouses")
     void shouldRejectCreateWithoutWarehouses() {
         CreateUserRequest request = new CreateUserRequest(
-                "Juan", "Pérez", "jperez", "secret123", null, true, List.of());
+                "Juan", "Pérez", "jperez", "secret123", null, true, null, List.of());
 
         when(userRepository.findByUsername("jperez")).thenReturn(Optional.empty());
 
@@ -395,5 +396,67 @@ class UserServiceTest {
         assertEquals(1, captor.getValue().getWarehouses().size());
         // No warehouse lookup happened at all: the field was absent from the request.
         verify(warehouseRepository, never()).findById(any());
+    }
+
+    // --- role ---
+
+    @Test
+    @DisplayName("Should default a new user to EMPLOYEE when no role is given")
+    void shouldDefaultToEmployeeOnCreate() {
+        CreateUserRequest request = createRequest("jperez", "secret123", null, true);
+
+        when(userRepository.findByUsername("jperez")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(anyString())).thenReturn("HASHED");
+        givenWarehouseExists();
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.create(request);
+
+        ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
+        verify(userRepository).save(captor.capture());
+        // Handing out ADMIN because a field was omitted is not a mistake worth making.
+        assertEquals(UserRole.EMPLOYEE, captor.getValue().getRole());
+    }
+
+    @Test
+    @DisplayName("Should refuse to demote the protected admin")
+    void shouldRefuseToDemoteTheProtectedAdmin() {
+        UpdateUserRequest request = new UpdateUserRequest(
+                "Admin", null, "admin", null, null, true, UserRole.EMPLOYEE, null);
+
+        UserEntity admin = UserEntity.builder()
+                .id(1L).username("admin").role(UserRole.ADMIN).build();
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(admin));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+
+        ValidationException ex = assertThrows(
+                ValidationException.class,
+                () -> userService.update(1L, request)
+        );
+
+        // Without this rule the owner could quietly leave the installation with no admin.
+        assertEquals(
+                "El usuario administrador no puede dejar de ser administrador, "
+                        + "porque el sistema quedaría sin nadie que pueda administrarlo.",
+                ex.getMessage());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should leave the role untouched when the update omits it")
+    void shouldKeepRoleWhenUpdateOmitsIt() {
+        UpdateUserRequest request = updateRequest("jperez", null, null, true);
+
+        UserEntity existing = UserEntity.builder()
+                .id(5L).username("jperez").role(UserRole.ADMIN).build();
+        when(userRepository.findByUsername("jperez")).thenReturn(Optional.of(existing));
+        when(userRepository.findById(5L)).thenReturn(Optional.of(existing));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.update(5L, request);
+
+        ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
+        verify(userRepository).save(captor.capture());
+        assertEquals(UserRole.ADMIN, captor.getValue().getRole());
     }
 }

@@ -5,6 +5,7 @@ import com.empresa.serpent.inventory.web.dto.request.UpsertProductWarehouseMinim
 import com.empresa.serpent.inventory.web.dto.response.ProductWarehouseMinimumStockResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,6 +28,7 @@ public class ProductWarehouseMinimumStockController {
         return service.findByProduct(productId);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping
     public ProductWarehouseMinimumStockResponse upsert(
             @PathVariable Long productId,
@@ -36,6 +38,7 @@ public class ProductWarehouseMinimumStockController {
     }
 
     /** Removes the override: the warehouse goes back to the product's own minimum. */
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{warehouseId}")
     public void delete(@PathVariable Long productId, @PathVariable Long warehouseId) {
         service.delete(productId, warehouseId);

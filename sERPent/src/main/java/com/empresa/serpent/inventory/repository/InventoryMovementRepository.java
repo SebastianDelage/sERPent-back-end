@@ -7,6 +7,7 @@ import com.empresa.serpent.reports.repository.projection.InventoryMovementsByTyp
 import com.empresa.serpent.reports.repository.projection.InventoryMovementsByWarehouseProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import com.empresa.serpent.transactions.repository.projection.TransactionWarehouseProjection;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -20,6 +21,25 @@ public interface InventoryMovementRepository extends
     List<InventoryMovementEntity> findByProductId(Long productId);
 
     List<InventoryMovementEntity> findByWarehouseId(Long warehouseId);
+
+    List<InventoryMovementEntity> findByWarehouseIdIn(List<Long> warehouseIds);
+
+    /**
+     * The branches each of these transactions touched, in one query.
+     *
+     * <p>Feeds the history listing's branch column. DISTINCT because a transaction writes
+     * one movement per line and they nearly always share a warehouse; a transfer is the
+     * case that legitimately yields two.
+     */
+    @Query("""
+           SELECT DISTINCT m.transaction.id AS transactionId, w.name AS warehouseName
+           FROM InventoryMovementEntity m
+           JOIN m.warehouse w
+           WHERE m.transaction.id IN :transactionIds
+           ORDER BY w.name
+           """)
+    List<TransactionWarehouseProjection> findWarehouseNamesByTransactionIds(
+            @Param("transactionIds") List<Long> transactionIds);
 
     List<InventoryMovementEntity> findByTransactionId(Long transactionId);
 
@@ -35,12 +55,13 @@ public interface InventoryMovementRepository extends
            COUNT(m.id) AS movements,
            COALESCE(SUM(m.quantity), 0) AS totalQuantity
        FROM InventoryMovementEntity m
-       WHERE (:warehouseId IS NULL OR m.warehouse.id = :warehouseId)
+       WHERE (:unrestricted = TRUE OR m.warehouse.id IN :warehouseIds)
        GROUP BY m.movementType
        ORDER BY m.movementType
        """)
     List<InventoryMovementsByTypeProjection> getInventoryMovementsByTypeReportRaw(
-            @Param("warehouseId") Long warehouseId
+            @Param("unrestricted") boolean unrestricted,
+            @Param("warehouseIds") List<Long> warehouseIds
     );
 
     @Query("""
@@ -130,11 +151,12 @@ public interface InventoryMovementRepository extends
                END
            ), 0) AS netQuantity
        FROM InventoryMovementEntity m
-       WHERE (:warehouseId IS NULL OR m.warehouse.id = :warehouseId)
+       WHERE (:unrestricted = TRUE OR m.warehouse.id IN :warehouseIds)
        GROUP BY m.product.id, m.product.name
        ORDER BY m.product.name
        """)
     List<InventoryMovementsByProductProjection> getInventoryMovementsByProductReportRaw(
-            @Param("warehouseId") Long warehouseId
+            @Param("unrestricted") boolean unrestricted,
+            @Param("warehouseIds") List<Long> warehouseIds
     );
 }

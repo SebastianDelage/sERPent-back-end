@@ -6,6 +6,7 @@ import com.empresa.serpent.transactions.web.dto.request.UpdateExpenseCategoryReq
 import com.empresa.serpent.transactions.web.dto.response.ExpenseCategoryResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,11 +18,13 @@ public class ExpenseCategoryController {
 
     private final ExpenseCategoryService expenseCategoryService;
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ExpenseCategoryResponse create(@Valid @RequestBody CreateExpenseCategoryRequest request) {
         return expenseCategoryService.create(request);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ExpenseCategoryResponse update(
             @PathVariable Long id,

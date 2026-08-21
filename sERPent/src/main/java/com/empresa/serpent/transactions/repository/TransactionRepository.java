@@ -74,8 +74,8 @@ public interface TransactionRepository extends
              AND d.product IS NOT NULL
              AND (:dateFrom IS NULL OR t.date >= :dateFrom)
              AND (:dateTo IS NULL OR t.date <= :dateTo)
-             AND (:warehouseId IS NULL
-                  OR COALESCE(s.warehouse.id, os.warehouse.id) = :warehouseId)
+             AND (:unrestricted = TRUE
+                  OR COALESCE(s.warehouse.id, os.warehouse.id) IN :warehouseIds)
            GROUP BY d.product.id, d.product.name
            ORDER BY COALESCE(SUM(CASE WHEN t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.SALE
                                       THEN d.quantity ELSE 0 END), 0) DESC
@@ -83,7 +83,8 @@ public interface TransactionRepository extends
     List<SalesByProductResponse> getSalesByProductReport(
             @Param("dateFrom") LocalDateTime dateFrom,
             @Param("dateTo") LocalDateTime dateTo,
-            @Param("warehouseId") Long warehouseId
+            @Param("unrestricted") boolean unrestricted,
+            @Param("warehouseIds") List<Long> warehouseIds
     );
 
     /** A return lands on the day it was registered, not the day of the original sale. */
@@ -101,15 +102,16 @@ public interface TransactionRepository extends
            WHERE t.type IN ('SALE', 'RETURN')
              AND (:dateFrom IS NULL OR t.date >= :dateFrom)
              AND (:dateTo IS NULL OR t.date <= :dateTo)
-             AND (:warehouseId IS NULL
-                  OR COALESCE(s.warehouse_id, os.warehouse_id) = :warehouseId)
+             AND (:unrestricted = TRUE
+                  OR COALESCE(s.warehouse_id, os.warehouse_id) IN :warehouseIds)
            GROUP BY CAST(t.date AS DATE)
            ORDER BY CAST(t.date AS DATE) DESC
            """, nativeQuery = true)
     List<SalesDailyProjection> getSalesDailyReportRaw(
             @Param("dateFrom") LocalDateTime dateFrom,
             @Param("dateTo") LocalDateTime dateTo,
-            @Param("warehouseId") Long warehouseId
+            @Param("unrestricted") boolean unrestricted,
+            @Param("warehouseIds") List<Long> warehouseIds
     );
 
     /**
@@ -131,14 +133,15 @@ public interface TransactionRepository extends
            WHERE t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.SALE
              AND (:dateFrom IS NULL OR t.date >= :dateFrom)
              AND (:dateTo IS NULL OR t.date <= :dateTo)
-             AND (:warehouseId IS NULL OR s.warehouse.id = :warehouseId)
+             AND (:unrestricted = TRUE OR s.warehouse.id IN :warehouseIds)
            GROUP BY pm.id, pm.name
            ORDER BY SUM(t.total) DESC
            """)
     List<SalesByPaymentMethodResponse> getSalesByPaymentMethodReport(
             @Param("dateFrom") LocalDateTime dateFrom,
             @Param("dateTo") LocalDateTime dateTo,
-            @Param("warehouseId") Long warehouseId
+            @Param("unrestricted") boolean unrestricted,
+            @Param("warehouseIds") List<Long> warehouseIds
     );
 
     /**
@@ -185,7 +188,7 @@ public interface TransactionRepository extends
                WHERE d.transaction_type = 'SALE'
                  AND (:dateFrom IS NULL OR td.date >= :dateFrom)
                  AND (:dateTo IS NULL OR td.date <= :dateTo)
-                 AND (:warehouseId IS NULL OR sd.warehouse_id = :warehouseId)
+                 AND (:unrestricted = TRUE OR sd.warehouse_id IN :warehouseIds)
            ), 0) AS listPriceSales,
            COALESCE((
                SELECT SUM(CASE WHEN d.base_unit_price IS NOT NULL
@@ -197,7 +200,7 @@ public interface TransactionRepository extends
                WHERE d.transaction_type = 'SALE'
                  AND (:dateFrom IS NULL OR td.date >= :dateFrom)
                  AND (:dateTo IS NULL OR td.date <= :dateTo)
-                 AND (:warehouseId IS NULL OR sd.warehouse_id = :warehouseId)
+                 AND (:unrestricted = TRUE OR sd.warehouse_id IN :warehouseIds)
            ), 0) AS paymentMethodSurcharges
        FROM transactions t
        LEFT JOIN sales s ON s.transaction_id = t.transaction_id
@@ -206,12 +209,13 @@ public interface TransactionRepository extends
        WHERE t.type IN ('SALE', 'RETURN')
          AND (:dateFrom IS NULL OR t.date >= :dateFrom)
          AND (:dateTo IS NULL OR t.date <= :dateTo)
-         AND (:warehouseId IS NULL
-              OR COALESCE(s.warehouse_id, os.warehouse_id) = :warehouseId)
+         AND (:unrestricted = TRUE
+              OR COALESCE(s.warehouse_id, os.warehouse_id) IN :warehouseIds)
        """, nativeQuery = true)
     SalesSummaryProjection getSalesSummaryReportRaw(
             @Param("dateFrom") LocalDateTime dateFrom,
             @Param("dateTo") LocalDateTime dateTo,
-            @Param("warehouseId") Long warehouseId
+            @Param("unrestricted") boolean unrestricted,
+            @Param("warehouseIds") List<Long> warehouseIds
     );
 }

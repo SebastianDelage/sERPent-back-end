@@ -6,6 +6,7 @@ import com.empresa.serpent.transactions.domain.entity.ExpenseEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.transactions.domain.enums.TransactionStatus;
 import com.empresa.serpent.transactions.domain.enums.TransactionType;
+import com.empresa.serpent.shared.security.WarehouseScopeService;
 import com.empresa.serpent.transactions.service.ExpenseQueryService;
 import com.empresa.serpent.transactions.web.dto.filter.ExpenseFilter;
 import com.empresa.serpent.transactions.web.dto.response.GeneralExpensesSummaryResponse;
@@ -19,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
@@ -47,6 +49,13 @@ class ExpenseWarehouseTest {
 
     @Autowired
     private ExpenseQueryService expenseQueryService;
+
+    /**
+     * Only there to satisfy the constructor. The aggregate under test counts the
+     * expenses that belong to NO branch, so branch scoping never enters into it.
+     */
+    @MockitoBean
+    private WarehouseScopeService warehouseScopeService;
 
     private WarehouseEntity central;
     private WarehouseEntity branch;
