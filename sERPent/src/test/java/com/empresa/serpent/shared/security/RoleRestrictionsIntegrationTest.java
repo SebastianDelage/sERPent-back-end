@@ -169,14 +169,35 @@ class RoleRestrictionsIntegrationTest {
         @Test
         @DisplayName("Consolidated reports are closed to an employee")
         void consolidatedReportsClosed() throws Exception {
+            // Consolidated BY CONSTRUCTION: no branch parameter to scope them by, so what
+            // they answer is always every branch at once.
             for (String url : new String[]{
                     "/api/reports/inventory/by-warehouse",
                     "/api/reports/inventory/warehouse-summary",
-                    "/api/reports/inventory/movements/by-warehouse",
-                    "/api/reports/inventory/replenishment"}) {
+                    "/api/reports/inventory/movements/by-warehouse"}) {
                 mockMvc.perform(get(url).header("Authorization", bearer(employeeToken)))
                         .andExpect(status().isForbidden());
             }
+        }
+
+        @Test
+        @DisplayName("Replenishment is open to an employee now that it scopes by branch")
+        void replenishmentIsOpenAndScoped() throws Exception {
+            /*
+             It used to be in the list above, and its @PreAuthorize said why: ADMIN only for
+             lack of a branch filter, not because the data was sensitive. It has one now, so
+             the restriction went away — an employee needs to know what to reorder where they
+             work. What replaces it is the ordinary branch scoping: their own branches only.
+            */
+            mockMvc.perform(get("/api/reports/inventory/replenishment")
+                            .header("Authorization", bearer(employeeToken)))
+                    .andExpect(status().isOk());
+
+            // And naming somebody else's branch is still refused, filter or no filter.
+            mockMvc.perform(get("/api/reports/inventory/replenishment")
+                            .param("warehouseId", norte.getId().toString())
+                            .header("Authorization", bearer(employeeToken)))
+                    .andExpect(status().isForbidden());
         }
 
         @Test

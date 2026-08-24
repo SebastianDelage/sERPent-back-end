@@ -211,21 +211,67 @@ public interface InventoryStockSnapshotRepository extends
     void insertZeroSnapshot(@Param("productId") Long productId,
                             @Param("warehouseId") Long warehouseId);
 
+    /**
+     * What has fallen to its reorder point, per warehouse.
+     *
+     * <p>THE TRIGGER IS THE REORDER POINT, NOT THE MINIMUM, and the two are not
+     * interchangeable: the minimum is the floor you do not want to break through, the
+     * reorder point is when you order so the goods arrive before you touch it. Firing on the
+     * minimum would warn once it is already too late.
+     *
+     * <p>All three figures resolve through the SAME cascade the low-stock queries use — the
+     * warehouse's override when it has one, the product's otherwise — so the stock screen
+     * and this report finally speak about the same product at the same branch on the same
+     * terms. The explicit IS NOT NULL keeps products with no reorder point at either level
+     * out, rather than leaning on NULL comparison semantics.
+     *
+     * <p>The subquery is repeated instead of hoisted because JPQL has no LATERAL: each
+     * COALESCE needs the override for THIS row's warehouse, and the (product, warehouse)
+     * unique constraint makes every one of them return at most one row.
+     */
     @Query("""
        SELECT
            p.id AS productId,
            p.name AS productName,
+           p.sku AS productSku,
            w.id AS warehouseId,
            w.name AS warehouseName,
            s.currentStock AS currentStock,
-           p.reorderPoint AS reorderPoint,
-           p.reorderQuantity AS reorderQuantity
+           COALESCE(
+               (SELECT m.minimumStock FROM ProductWarehouseMinimumStockEntity m
+                 WHERE m.product = p AND m.warehouse = w),
+               p.minimumStock
+           ) AS minimumStock,
+           COALESCE(
+               (SELECT m.reorderPoint FROM ProductWarehouseMinimumStockEntity m
+                 WHERE m.product = p AND m.warehouse = w),
+               p.reorderPoint
+           ) AS reorderPoint,
+           COALESCE(
+               (SELECT m.reorderQuantity FROM ProductWarehouseMinimumStockEntity m
+                 WHERE m.product = p AND m.warehouse = w),
+               p.reorderQuantity
+           ) AS reorderQuantity
        FROM InventoryStockSnapshotEntity s
        JOIN s.product p
        JOIN s.warehouse w
-       WHERE p.reorderPoint IS NOT NULL
-         AND s.currentStock <= p.reorderPoint
-       ORDER BY p.name
+       WHERE (:unrestricted = TRUE OR w.id IN :warehouseIds)
+         AND (:warehouseId IS NULL OR w.id = :warehouseId)
+         AND COALESCE(
+                 (SELECT m.reorderPoint FROM ProductWarehouseMinimumStockEntity m
+                   WHERE m.product = p AND m.warehouse = w),
+                 p.reorderPoint
+             ) IS NOT NULL
+         AND s.currentStock <= COALESCE(
+                 (SELECT m.reorderPoint FROM ProductWarehouseMinimumStockEntity m
+                   WHERE m.product = p AND m.warehouse = w),
+                 p.reorderPoint
+             )
+       ORDER BY p.name, w.name
        """)
-    List<InventoryReplenishmentProjection> getReplenishmentReportRaw();
+    List<InventoryReplenishmentProjection> getReplenishmentReportRaw(
+            @Param("unrestricted") boolean unrestricted,
+            @Param("warehouseIds") List<Long> warehouseIds,
+            @Param("warehouseId") Long warehouseId
+    );
 }

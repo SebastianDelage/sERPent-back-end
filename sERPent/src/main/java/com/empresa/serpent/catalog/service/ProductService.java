@@ -22,6 +22,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
+    private final ProductReorderOverrideGuard warehouseOverrides;
 
     @Transactional
     public ProductResponse create(ProductCreateRequest request) {
@@ -59,6 +60,17 @@ public class ProductService {
 
         ProductEntity entity = productRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Product not found: " + id));
+
+        /*
+         The product's own figures are the fallback for every warehouse that does not
+         override them, so moving them can break a warehouse that is consistent right now
+         and is not being edited: raising the minimum under a warehouse that owns only its
+         reorder point, or lowering the reorder point under one that owns only its minimum.
+         Checked before the change lands, because the alternative is a report that fires
+         after the floor has already been breached — wrong in a way nobody would notice.
+        */
+        warehouseOverrides.validateOverridesAgainst(
+                id, request.minimumStock(), request.reorderPoint());
 
         productMapper.updateEntityFromRequest(request, entity);
         normalizeSku(entity);

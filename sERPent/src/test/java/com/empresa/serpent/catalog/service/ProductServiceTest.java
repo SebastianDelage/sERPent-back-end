@@ -33,13 +33,16 @@ class ProductServiceTest {
     @Mock
     private ProductRepository productRepository;
 
+    @Mock
+    private ProductReorderOverrideGuard warehouseOverrides;
+
     private ProductMapper productMapper;
     private ProductService productService;
 
     @BeforeEach
     void setUp() {
         productMapper = Mappers.getMapper(ProductMapper.class);
-        productService = new ProductService(productRepository, productMapper);
+        productService = new ProductService(productRepository, productMapper, warehouseOverrides);
     }
 
     @Test

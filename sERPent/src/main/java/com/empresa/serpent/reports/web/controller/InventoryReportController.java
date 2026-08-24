@@ -68,11 +68,15 @@ public class InventoryReportController {
         return inventoryReportService.getInventoryMovementsByProduct(warehouseId);
     }
 
-    /** ADMIN because this report has NO warehouse parameter to scope it by, not because the
-     * data is sensitive. Give it a branch filter and it can be opened to employees. */
-    @PreAuthorize("hasRole('ADMIN')")
+    /**
+     * Scoped by branch now that it takes a filter, so it is no longer ADMIN-only: an
+     * employee sees what to reorder in their own branches, which is what they need to
+     * operate. The comment this replaces said exactly that this would happen.
+     */
     @GetMapping("/replenishment")
-    public List<InventoryReplenishmentResponse> getReplenishmentReport() {
-        return inventoryReportService.getReplenishmentReport();
+    public List<InventoryReplenishmentResponse> getReplenishmentReport(
+            @RequestParam(required = false) Long warehouseId
+    ) {
+        return inventoryReportService.getReplenishmentReport(warehouseId);
     }
 }

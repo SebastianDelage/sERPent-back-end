@@ -1,5 +1,7 @@
 package com.empresa.serpent.reports.service;
 
+import com.empresa.serpent.catalog.domain.entity.ProductSupplierEntity;
+import com.empresa.serpent.catalog.repository.ProductSupplierRepository;
 import com.empresa.serpent.inventory.repository.InventoryMovementRepository;
 import com.empresa.serpent.inventory.repository.InventoryStockSnapshotRepository;
 import com.empresa.serpent.inventory.service.StockQueryService;
@@ -7,7 +9,10 @@ import com.empresa.serpent.inventory.web.dto.filter.StockFilter;
 import com.empresa.serpent.inventory.web.dto.response.LowStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.ProductStockResponse;
 import com.empresa.serpent.inventory.web.dto.response.StockResponse;
+import com.empresa.serpent.reports.repository.projection.InventoryReplenishmentProjection;
+import com.empresa.serpent.reports.repository.projection.LastPurchasePriceProjection;
 import com.empresa.serpent.reports.web.dto.response.*;
+import com.empresa.serpent.transactions.repository.TransactionDetailRepository;
 import com.empresa.serpent.shared.security.WarehouseScopeService;
 import com.empresa.serpent.shared.security.WarehouseScopeService.WarehouseScope;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +33,8 @@ public class InventoryReportService {
     private final InventoryMovementRepository inventoryMovementRepository;
     private final WarehouseScopeService warehouseScopeService;
     private final InventoryStockSnapshotRepository snapshotRepository;
+    private final ProductSupplierRepository productSupplierRepository;
+    private final TransactionDetailRepository transactionDetailRepository;
 
     public List<InventorySummaryResponse> getInventorySummary(Long warehouseId) {
         return stockQueryService.getTotalStockGroupedByProduct(false, warehouseId)
@@ -152,36 +159,98 @@ public class InventoryReportService {
         );
     }
 
-    public List<InventoryReplenishmentResponse> getReplenishmentReport() {
+    /**
+     * What to reorder, per branch, with who to buy it from and what it cost last time.
+     *
+     * <p>Scoped like every other read: an ADMIN with no filter sees every branch, an employee
+     * sees their own, and naming somebody else's is refused before any figure is computed.
+     *
+     * <p>The suppliers and the last prices are fetched in two batch queries over the products
+     * that actually came back, not per row: the report is read on a screen, and a query per
+     * line would make it quadratic in the number of shortages.
+     */
+    public List<InventoryReplenishmentResponse> getReplenishmentReport(Long warehouseId) {
+        WarehouseScope scope = warehouseScopeService.resolve(warehouseId);
 
-        return snapshotRepository.getReplenishmentReportRaw()
-                .stream()
-                .map(row -> {
+        if (scope.seesNothing()) {
+            return List.of();
+        }
 
-                    BigDecimal reorderQty =
-                            row.getReorderQuantity() == null
-                                    ? BigDecimal.ZERO
-                                    : row.getReorderQuantity();
+        List<InventoryReplenishmentProjection> rows = snapshotRepository.getReplenishmentReportRaw(
+                scope.unrestricted(), scope.warehouseIds(), warehouseId);
 
-                    BigDecimal suggested =
-                            reorderQty.subtract(row.getCurrentStock());
+        if (rows.isEmpty()) {
+            return List.of();
+        }
 
-                    if (suggested.compareTo(BigDecimal.ZERO) < 0) {
-                        suggested = reorderQty;
-                    }
-
-                    return new InventoryReplenishmentResponse(
-                            row.getProductId(),
-                            row.getProductName(),
-                            row.getWarehouseId(),
-                            row.getWarehouseName(),
-                            row.getCurrentStock(),
-                            row.getReorderPoint(),
-                            reorderQty,
-                            suggested
-                    );
-                })
+        List<Long> productIds = rows.stream()
+                .map(InventoryReplenishmentProjection::getProductId)
+                .distinct()
                 .toList();
+
+        Map<Long, ProductSupplierEntity> preferredByProduct =
+                productSupplierRepository.findPreferredForProducts(productIds).stream()
+                        .collect(Collectors.toMap(ps -> ps.getProduct().getId(), ps -> ps));
+
+        Map<Long, LastPurchasePriceProjection> lastPriceByProduct =
+                transactionDetailRepository.findLastPurchasePrices(productIds).stream()
+                        .collect(Collectors.toMap(LastPurchasePriceProjection::getProductId, p -> p));
+
+        return rows.stream()
+                .map(row -> toReplenishmentResponse(
+                        row,
+                        preferredByProduct.get(row.getProductId()),
+                        lastPriceByProduct.get(row.getProductId())))
+                .toList();
+    }
+
+    private InventoryReplenishmentResponse toReplenishmentResponse(
+            InventoryReplenishmentProjection row,
+            ProductSupplierEntity preferred,
+            LastPurchasePriceProjection lastPurchase) {
+
+        return new InventoryReplenishmentResponse(
+                row.getProductId(),
+                row.getProductName(),
+                row.getProductSku(),
+                row.getWarehouseId(),
+                row.getWarehouseName(),
+                row.getCurrentStock(),
+                row.getMinimumStock(),
+                row.getReorderPoint(),
+                row.getReorderQuantity(),
+                suggestedOrderQuantity(row),
+                preferred == null ? null : preferred.getSupplierEntity().getId(),
+                preferred == null ? null : preferred.getSupplierEntity().getName(),
+                preferred == null ? null : preferred.getSupplierProductCode(),
+                preferred == null ? null : preferred.getLeadTimeDays(),
+                lastPurchase == null ? null : lastPurchase.getUnitPrice(),
+                lastPurchase == null ? null : lastPurchase.getPurchaseDate(),
+                lastPurchase == null ? null : lastPurchase.getSupplierName()
+        );
+    }
+
+    /**
+     * How much to order: enough to bring the stock up to the reorder quantity.
+     *
+     * <p>Unchanged arithmetic from before this report grew a cascade — including the fallback
+     * to a full batch when the target already sits below the current stock, which happens
+     * when the reorder point is set higher than the reorder quantity. The reorder point fired,
+     * so something has to be ordered, and a full batch is the sensible default.
+     *
+     * <p>What DID change: a missing reorder quantity now yields null instead of zero. The line
+     * still belongs in the report — the product IS short — but nobody has said how much to
+     * buy, and "0" read as "order nothing" for something that needs ordering.
+     */
+    private BigDecimal suggestedOrderQuantity(InventoryReplenishmentProjection row) {
+        BigDecimal target = row.getReorderQuantity();
+
+        if (target == null) {
+            return null;
+        }
+
+        BigDecimal suggested = target.subtract(row.getCurrentStock());
+        return suggested.compareTo(BigDecimal.ZERO) < 0 ? target : suggested;
     }
 
     private record WarehouseKey(

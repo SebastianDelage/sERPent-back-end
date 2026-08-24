@@ -1,10 +1,22 @@
 package com.empresa.serpent.catalog.domain.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import java.math.BigDecimal;
 
+/**
+ * Which suppliers a product can be bought from, and under what code.
+ *
+ * <p>Deliberately does NOT hold a price. What we last paid is already recorded, exactly and
+ * with its date, on the purchase lines; a second copy here would be a number that answers
+ * the same question and drifts the first time someone loads a purchase without coming back
+ * to update the catalog. The replenishment report derives the last price from the purchases
+ * themselves.
+ *
+ * <p>At most ONE active supplier per product may be {@code preferred} — that is the one the
+ * replenishment report proposes. Enforced in {@code ProductSupplierService}: PostgreSQL also
+ * carries a partial unique index for it, but H2 has no partial indexes, so the service is
+ * where the guarantee actually lives and the index is a second line of defence.
+ */
 @Getter
 @Setter
 @AllArgsConstructor
@@ -13,27 +25,6 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "product_suppliers")
 public class ProductSupplierEntity {
-
-    /**
-     * Product ↔ supplier relation: which suppliers a product can be bought from,
-     * under which code and at what price.
-     *
-     * MODELLED AHEAD OF USE — there is deliberately no service or controller on top
-     * of this yet. The table and repository exist because product↔supplier is a
-     * first-class entity in every reference ERP (Odoo's product.supplierinfo, SAP
-     * Business One's preferred vendor and vendor catalog numbers, Dynamics BC's Item
-     * Vendor Catalog), so it belongs in the model of a general retail ERP even before
-     * the business layer lands.
-     *
-     * Implement it together with the replenishment report: on its own the report can
-     * only say a product is running low, whereas with this relation it can say who to
-     * buy it from and at what price — and the purchase form can autocomplete a
-     * supplier's catalog instead of having the operator type every line. A minimum
-     * viable version needs only the supplier link, the supplier's own product code
-     * (distinct from our SKU, since it's what appears on their invoice) and the last
-     * purchase price; lead time, minimum order quantity and price validity are
-     * supermarket-scale concerns that can wait.
-     */
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -48,15 +39,21 @@ public class ProductSupplierEntity {
     @JoinColumn(name = "supplier_id", nullable = false)
     private SupplierEntity supplierEntity;
 
-    @NotNull
-    @Column(name = "cost_price", nullable = false, precision = 19, scale = 4)
-    private BigDecimal costPrice;
+    /**
+     * The supplier's own code for this product: what appears on their price list and their
+     * invoice, and what you quote back at them when ordering.
+     *
+     * <p>NOT our SKU, and deliberately not unique across suppliers — two suppliers can
+     * perfectly well use the same code for different things. Optional, because plenty of
+     * small suppliers do not use one at all.
+     */
+    @Column(name = "supplier_product_code", length = 80)
+    private String supplierProductCode;
 
+    /** The supplier the replenishment report proposes. At most one active one per product. */
     @Builder.Default
     @Column(name = "preferred", nullable = false)
-    private Boolean preferred = false;  // preferred = true marca el proveedor preferido para ese producto:
-                                                        // -cuando cargás una compra, el sistema sugiere ese proveedor
-                                                        // -para costos, tiempos de entrega, cotizaciones
+    private Boolean preferred = false;
 
     @Builder.Default
     @Column(name = "active", nullable = false)
