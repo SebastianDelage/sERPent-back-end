@@ -92,9 +92,33 @@ class LowStockPerWarehouseTest {
                 .product(p).warehouse(w).currentStock(new BigDecimal(stock)).build();
     }
 
+    /**
+     * Un override que solo pisa el mínimo. Acepta null, que es lo que este helper NO podía
+     * expresar y por eso el suite no llegaba al caso que rompía: cualquiera de las tres
+     * cifras puede venir en null desde que la cascada las resuelve por separado, y un
+     * {@code new BigDecimal(null)} explotaba en el helper mismo antes de llegar al servicio.
+     */
     private ProductWarehouseMinimumStockEntity override(ProductEntity p, WarehouseEntity w, String minimum) {
+        return override(p, w, minimum, null, null);
+    }
+
+    /** Un override con las tres cifras, cualquiera de ellas null para heredarla del producto. */
+    private ProductWarehouseMinimumStockEntity override(ProductEntity p,
+                                                       WarehouseEntity w,
+                                                       String minimum,
+                                                       String reorderPoint,
+                                                       String reorderQuantity) {
         return ProductWarehouseMinimumStockEntity.builder()
-                .product(p).warehouse(w).minimumStock(new BigDecimal(minimum)).build();
+                .product(p)
+                .warehouse(w)
+                .minimumStock(decimal(minimum))
+                .reorderPoint(decimal(reorderPoint))
+                .reorderQuantity(decimal(reorderQuantity))
+                .build();
+    }
+
+    private BigDecimal decimal(String value) {
+        return value == null ? null : new BigDecimal(value);
     }
 
     @Test
@@ -239,5 +263,126 @@ class LowStockPerWarehouseTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).missingQuantity()).isEqualByComparingTo("0.000");
+    }
+
+    /**
+     * El caso que rompía: un depósito que adelanta su punto de reposición sin tocar el piso.
+     * La fila de override existe pero su minimumStock es null, y agrupar eso con
+     * Collectors.toMap tiraba NPE antes de llegar a comparar nada — se llevaba puesta la
+     * pantalla de Stock entera, que mostraba "Todavía no hay stock cargado" con stock real.
+     */
+    @Test
+    @DisplayName("An override with a null minimum inherits the product's instead of blowing up")
+    void overrideWithNullMinimumFallsBackToTheProduct() {
+        ProductEntity pollo = product(1L, "Pollo entero", "20.000");
+        WarehouseEntity central = central();
+
+        given(snapshotRepository.findAll()).willReturn(List.of(
+                snapshot(pollo, central, "8.000")
+        ));
+        given(productRepository.findAll()).willReturn(List.of(pollo));
+        // Solo pisa el punto de reposición: el mínimo y la cantidad se heredan.
+        given(minimumStockRepository.findAll()).willReturn(List.of(
+                override(pollo, central, null, "30.000", null)
+        ));
+
+        List<LowStockResponse> result = stockQueryService.getLowStock();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).minimumStock()).isEqualByComparingTo("20.000");
+        // El mínimo salió del producto aunque la fila de override exista: decir lo contrario
+        // mandaría a corregir el depósito por un valor que no está definido ahí.
+        assertThat(result.get(0).minimumFromWarehouse()).isFalse();
+        assertThat(result.get(0).missingQuantity()).isEqualByComparingTo("12.000");
+    }
+
+    @Test
+    @DisplayName("An override with all three figures null behaves as no override at all")
+    void overrideWithEverythingNullBehavesAsNoOverride() {
+        ProductEntity pollo = product(1L, "Pollo entero", "20.000");
+        WarehouseEntity central = central();
+
+        given(snapshotRepository.findAll()).willReturn(List.of(
+                snapshot(pollo, central, "5.000")
+        ));
+        given(productRepository.findAll()).willReturn(List.of(pollo));
+        given(minimumStockRepository.findAll()).willReturn(List.of(
+                override(pollo, central, null, null, null)
+        ));
+
+        List<LowStockResponse> result = stockQueryService.getLowStock();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).minimumStock()).isEqualByComparingTo("20.000");
+        assertThat(result.get(0).minimumFromWarehouse()).isFalse();
+    }
+
+    @Test
+    @DisplayName("An override that sets only the quantity still inherits the minimum")
+    void overrideWithOnlyQuantityInheritsTheMinimum() {
+        ProductEntity pollo = product(1L, "Pollo entero", "20.000");
+        WarehouseEntity central = central();
+
+        given(snapshotRepository.findAll()).willReturn(List.of(
+                snapshot(pollo, central, "3.000")
+        ));
+        given(productRepository.findAll()).willReturn(List.of(pollo));
+        given(minimumStockRepository.findAll()).willReturn(List.of(
+                override(pollo, central, null, null, "80.000")
+        ));
+
+        List<LowStockResponse> result = stockQueryService.getLowStock();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).minimumStock()).isEqualByComparingTo("20.000");
+        assertThat(result.get(0).minimumFromWarehouse()).isFalse();
+    }
+
+    /**
+     * Con el mínimo propio definido, la presencia de nulls en las otras dos cifras no cambia
+     * nada: cada una se resuelve por separado.
+     */
+    @Test
+    @DisplayName("A set minimum wins even when the other two figures are null")
+    void ownMinimumWinsRegardlessOfTheOtherNulls() {
+        ProductEntity pollo = product(1L, "Pollo entero", "20.000");
+        WarehouseEntity central = central();
+
+        given(snapshotRepository.findAll()).willReturn(List.of(
+                snapshot(pollo, central, "40.000")
+        ));
+        given(productRepository.findAll()).willReturn(List.of(pollo));
+        given(minimumStockRepository.findAll()).willReturn(List.of(
+                override(pollo, central, "50.000", null, null)
+        ));
+
+        List<LowStockResponse> result = stockQueryService.getLowStock();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).minimumStock()).isEqualByComparingTo("50.000");
+        assertThat(result.get(0).minimumFromWarehouse()).isTrue();
+    }
+
+    /**
+     * Un producto sin mínimo en ningún nivel sigue afuera aunque tenga una fila de override:
+     * la fila existe para pisar el punto de reposición, no para inventarle un piso.
+     */
+    @Test
+    @DisplayName("A null-minimum override on a product with no minimum keeps it out")
+    void nullOverrideOnProductWithoutMinimumStaysOut() {
+        ProductEntity untracked = product(9L, "Sin seguimiento", null);
+        WarehouseEntity central = central();
+
+        given(snapshotRepository.findAll()).willReturn(List.of(
+                snapshot(untracked, central, "0.000")
+        ));
+        given(productRepository.findAll()).willReturn(List.of(untracked));
+        given(minimumStockRepository.findAll()).willReturn(List.of(
+                override(untracked, central, null, "5.000", null)
+        ));
+
+        List<LowStockResponse> result = stockQueryService.getLowStock();
+
+        assertThat(result).isEmpty();
     }
 }

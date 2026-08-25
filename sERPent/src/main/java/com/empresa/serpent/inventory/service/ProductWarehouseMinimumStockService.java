@@ -3,6 +3,7 @@ package com.empresa.serpent.inventory.service;
 import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.catalog.service.ProductReorderOverrideGuard;
+import com.empresa.serpent.inventory.domain.ReorderCascade;
 import com.empresa.serpent.inventory.domain.entity.ProductWarehouseMinimumStockEntity;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.repository.ProductWarehouseMinimumStockRepository;
@@ -152,9 +153,9 @@ public class ProductWarehouseMinimumStockService implements ProductReorderOverri
         }
     }
 
-    /** The cascade, in one place: the override when it has one, the product's otherwise. */
+    /** La cascada vive en {@link ReorderCascade}; acá solo se le pone nombre corto. */
     private BigDecimal resolve(BigDecimal own, BigDecimal fromProduct) {
-        return own != null ? own : fromProduct;
+        return ReorderCascade.resolve(own, fromProduct);
     }
 
     private boolean isConsistent(BigDecimal effectiveMinimum, BigDecimal effectiveReorderPoint) {

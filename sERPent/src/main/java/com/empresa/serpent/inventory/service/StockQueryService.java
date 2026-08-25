@@ -2,6 +2,7 @@ package com.empresa.serpent.inventory.service;
 
 import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
+import com.empresa.serpent.inventory.domain.ReorderCascade;
 import com.empresa.serpent.inventory.domain.entity.InventoryStockSnapshotEntity;
 import com.empresa.serpent.inventory.domain.entity.ProductWarehouseMinimumStockEntity;
 import com.empresa.serpent.inventory.domain.enums.StockStatusFilter;
@@ -250,9 +251,22 @@ public class StockQueryService {
         Map<Long, ProductEntity> productMap = productRepository.findAll().stream()
                 .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
 
-        // (productId, warehouseId) -> override, loaded once to keep the loop free of N+1.
+        // (productId, warehouseId) -> mínimo propio, cargado de una para que el loop no haga N+1.
+        //
+        // Se filtran las filas con minimumStock null ANTES de agrupar, por dos razones que
+        // apuntan al mismo lado. La primera es que Collectors.toMap rechaza valores null por
+        // contrato del JDK — sin este filtro, un override que solo pisa el punto de reposición
+        // tiraba NPE y se llevaba puesta la pantalla de Stock entera.
+        //
+        // La segunda es semántica, y es la que hace que filtrar sea lo correcto y no un parche:
+        // un override con el mínimo en null significa "heredo el del producto", que es
+        // exactamente el mismo estado que no tener override. Dejándolo afuera del mapa, la
+        // búsqueda de más abajo no lo encuentra y cae al mínimo del producto, que es lo que
+        // corresponde — y de paso minimumFromWarehouse queda en false, correcto, porque ese
+        // mínimo salió del producto aunque la fila de override exista.
         Map<String, BigDecimal> overrides = productWarehouseMinimumStockRepository.findAll()
                 .stream()
+                .filter(row -> row.getMinimumStock() != null)
                 .collect(Collectors.toMap(
                         row -> overrideKey(row.getProduct().getId(), row.getWarehouse().getId()),
                         ProductWarehouseMinimumStockEntity::getMinimumStock));
@@ -276,7 +290,7 @@ public class StockQueryService {
         }
 
         BigDecimal override = overrides.get(overrideKey(row.productId(), row.warehouseId()));
-        BigDecimal minimum = override != null ? override : product.getMinimumStock();
+        BigDecimal minimum = ReorderCascade.resolve(override, product.getMinimumStock());
 
         // No minimum at either level: nothing to be below.
         if (minimum == null) {
