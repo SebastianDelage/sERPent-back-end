@@ -1,28 +1,8 @@
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/serpent_db
-    username: postgres
-    password: 1234
-    driver-class-name: org.postgresql.Driver
-
-  jpa:
-    hibernate:
-      ddl-auto: validate  # IMPORTANTÍSIMO: Flyway manda, Hibernate valida
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
-    validate-on-migrate: true
-
+# Config común a todos los perfiles. Deliberadamente sin datasource, JWT ni logging: cada
+# perfil (dev, prod) es dueño completo de esas tres cosas, para que activar un perfil no
+# dependa de que el archivo base "por casualidad" ya tenga lo correcto. Antes de esto, un
+# typo en -Dspring.profiles.active=prod (sin application-prod.yml) caía en silencio acá y
+# arrancaba contra Postgres con credenciales de este archivo — funcionaba por accidente.
 server:
   port: 8080
-
-serpent:
-  jwt:
-    secret: ${JWT_SECRET:claveDeDesarrolloLargaYAleatoriaDeAlMenos32Caracteres1234567890}
-    expiration-ms: 28800000
 

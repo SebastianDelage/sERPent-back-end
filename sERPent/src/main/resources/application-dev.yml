@@ -26,3 +26,11 @@ spring:
     console:
       enabled: true
       path: /h2-console
+
+serpent:
+  jwt:
+    # Fallback SOLO acá: dev no maneja datos reales, así que una clave fija y visible en el
+    # repo es aceptable. El perfil prod exige JWT_SECRET sin default (ver application-prod.yml)
+    # justamente para que este mismo valor no pueda colarse en un arranque real por descuido.
+    secret: ${JWT_SECRET:claveDeDesarrolloLargaYAleatoriaDeAlMenos32Caracteres1234567890}
+    expiration-ms: 28800000
