@@ -205,24 +205,25 @@ public class SaleApplicationService {
             }
 
             /*
-             PENDIENTE ABIERTO POR EL SOPORTE DE BALANZA — no cambiar sin decidirlo aparte.
+             REDONDEADO POR RENGLÓN, y esto CONTRADICE A PROPÓSITO un commit anterior.
 
-             Con cantidades enteras esto no tenía consecuencias: un precio de 4 decimales
-             por un entero sigue teniendo 4 decimales. Las etiquetas pesadas traen 3
-             decimales, así que este multiply puede dar HASTA 7 DECIMALES, y la columna
-             subtotal es NUMERIC(19,4): la base redondea cada renglón en silencio.
+             Hace unas tandas se sacó el redondeo por línea del frontend justamente para
+             alinearlo con este multiply, que no redondeaba. Aquello buscaba que el total
+             previsualizado coincidiera con el guardado, y para eso los dos lados tenían
+             que multiplicar igual.
 
-             El total, en cambio, se arma más abajo sumando estos lineSubtotal SIN
-             redondear y se guarda una sola vez. O sea que la suma de los subtotales
-             guardados puede no dar el total guardado. Es menos de un centavo por venta y
-             no mueve la caja, pero es visible en el detalle de una venta.
+             La venta por peso agregó un invariante que antes no se podía violar: que la
+             suma de los renglones dé el total. Con cantidades enteras era imposible
+             romperlo —un precio de 4 decimales por un entero sigue teniendo 4—, pero con
+             cantidades de 3 decimales el producto llega a 7, la columna guarda 4, y el
+             total se sumaba sin redondear mientras cada renglón se recortaba solo.
 
-             El arreglo es .setScale(AMOUNT_SCALE, HALF_UP) acá y acumular el renglón ya
-             redondeado — con el cambio gemelo en el frontend, que hoy replica esta línea
-             exactamente. Va aparte porque revierte la regla de paridad acordada, toca los
-             dos lados y el test de paridad se actualiza con ella.
+             Se redondea con la MISMA regla que TransactionDetailEntity.calculateSubtotal(),
+             que es quien fija el valor que termina en la base: si las dos se separan, el
+             total deja de ser la suma de lo guardado. El frontend replica esta línea.
             */
-            BigDecimal lineSubtotal = effectiveUnitPrice.multiply(item.quantity());
+            BigDecimal lineSubtotal = effectiveUnitPrice.multiply(item.quantity())
+                    .setScale(AMOUNT_SCALE, RoundingMode.HALF_UP);
 
             TransactionDetailEntity detail = TransactionDetailEntity.builder()
                     .transaction(transaction)

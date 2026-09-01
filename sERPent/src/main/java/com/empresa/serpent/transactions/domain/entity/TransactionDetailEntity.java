@@ -5,6 +5,7 @@ import com.empresa.serpent.transactions.domain.enums.TransactionType;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Getter
 @Setter
@@ -76,11 +77,40 @@ public class TransactionDetailEntity {
     @Column(name = "transaction_type", nullable = false, length = 30, updatable = false)
     private TransactionType transactionType;
 
+    /**
+     * Escala de la columna subtotal. El redondeo se hace ACÁ y no se delega a la base.
+     *
+     * <p>HISTORIA, PORQUE ESTO CONTRADICE UN COMMIT ANTERIOR A PROPÓSITO:
+     *
+     * <p>Hace unas tandas se sacó el redondeo por línea del FRONTEND justamente para
+     * alinearlo con este método, que no redondeaba. El objetivo entonces era que el total
+     * previsualizado coincidiera con el guardado, y para eso los dos lados tenían que
+     * multiplicar sin redondear.
+     *
+     * <p>La venta por peso cambió el problema. Antes esto era inalcanzable: un precio de 4
+     * decimales por una cantidad ENTERA sigue teniendo 4 decimales. Con cantidades de 3
+     * decimales el producto llega a 7, la columna guarda 4, y la base redondeaba cada
+     * renglón en silencio mientras el total se sumaba sin redondear. Resultado: la suma de
+     * los subtotales guardados no daba el total guardado.
+     *
+     * <p>Ahora se redondea en los dos lados con la misma regla. No es que antes estuviera
+     * mal: hacía falta un invariante más —que los renglones sumen el total— que antes no
+     * se podía violar.
+     */
+    private static final int ESCALA_DE_IMPORTE = 4;
+
     @PrePersist
     @PreUpdate
     private void calculateSubtotal() {
         if (quantity != null && unitPrice != null) {
-            this.subtotal = unitPrice.multiply(quantity);
+            /*
+             Redondeo explícito y no implícito. La columna es NUMERIC(19,4), así que la base
+             venía recortando igual; la diferencia es que ahora el valor redondeado también
+             queda en la entidad en memoria, y que la regla es visible en vez de depender de
+             cómo redondea cada motor.
+            */
+            this.subtotal = unitPrice.multiply(quantity)
+                    .setScale(ESCALA_DE_IMPORTE, RoundingMode.HALF_UP);
         }
         if (transaction != null) {
             this.transactionType = transaction.getType();

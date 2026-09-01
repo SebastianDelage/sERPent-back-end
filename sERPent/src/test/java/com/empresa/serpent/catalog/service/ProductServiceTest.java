@@ -36,13 +36,18 @@ class ProductServiceTest {
     @Mock
     private ProductReorderOverrideGuard warehouseOverrides;
 
+    /** Sin formatos de balanza configurados no reclama ningún código: es el caso por defecto. */
+    @Mock
+    private ScaleBarcodeMatcher scaleBarcodeMatcher;
+
     private ProductMapper productMapper;
     private ProductService productService;
 
     @BeforeEach
     void setUp() {
         productMapper = Mappers.getMapper(ProductMapper.class);
-        productService = new ProductService(productRepository, productMapper, warehouseOverrides);
+        productService =
+                new ProductService(productRepository, productMapper, warehouseOverrides, scaleBarcodeMatcher);
     }
 
     @Test
@@ -54,6 +59,7 @@ class ProductServiceTest {
                 new BigDecimal("2500.0000"),
                 "POLLO001",
                 null,
+                null, // scaleCode
                 true,
                 new BigDecimal("20.000"),
                 new BigDecimal("25.000"),
@@ -94,6 +100,7 @@ class ProductServiceTest {
                 new BigDecimal("1800.0000"),
                 "POLLO002",
                 null,
+                null, // scaleCode
                 null,
                 null,
                 null,
@@ -125,6 +132,7 @@ class ProductServiceTest {
                 new BigDecimal("3000.0000"),
                 "   ",
                 null,
+                null, // scaleCode
                 true,
                 null,
                 null,
@@ -158,6 +166,7 @@ class ProductServiceTest {
                 new BigDecimal("2500.0000"),
                 "POLLO001",
                 null,
+                null, // scaleCode
                 true,
                 null,
                 null,
@@ -191,6 +200,7 @@ class ProductServiceTest {
                 null,
                 "POLLO001",
                 null,
+                null, // scaleCode
                 true,
                 null,
                 null,
@@ -216,6 +226,7 @@ class ProductServiceTest {
                 new BigDecimal("-1.0000"),
                 "POLLO001",
                 null,
+                null, // scaleCode
                 true,
                 null,
                 null,
@@ -241,6 +252,7 @@ class ProductServiceTest {
                 new BigDecimal("2500.0000"),
                 "POLLO001",
                 null,
+                null, // scaleCode
                 true,
                 new BigDecimal("-1.000"),
                 null,
@@ -268,6 +280,7 @@ class ProductServiceTest {
                 new BigDecimal("2500.0000"),
                 "POLLO001",
                 null,
+                null, // scaleCode
                 true,
                 new BigDecimal("20.000"),
                 new BigDecimal("10.000"),
@@ -308,6 +321,7 @@ class ProductServiceTest {
                 new BigDecimal("3000.0000"),
                 "POLLO001",
                 null,
+                null, // scaleCode
                 false,
                 new BigDecimal("15.000"),
                 new BigDecimal("20.000"),
@@ -347,6 +361,7 @@ class ProductServiceTest {
                 new BigDecimal("2500.0000"),
                 "POLLO002",
                 null,
+                null, // scaleCode
                 true,
                 null,
                 null,
@@ -375,6 +390,7 @@ class ProductServiceTest {
                 new BigDecimal("2500.0000"),
                 "POLLO001",
                 null,
+                null, // scaleCode
                 true,
                 null,
                 null,
