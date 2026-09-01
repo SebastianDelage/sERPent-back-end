@@ -38,4 +38,7 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
 
     /** Used to enforce barcode uniqueness across active and inactive products alike. */
     Optional<ProductEntity> findByBarcode(String barcode);
+
+    /** Used to enforce scale-code uniqueness. Always called with the normalized form. */
+    Optional<ProductEntity> findByScaleCode(String scaleCode);
 }

@@ -23,12 +23,14 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
     private final ProductReorderOverrideGuard warehouseOverrides;
+    private final ScaleBarcodeMatcher scaleBarcodeMatcher;
 
     @Transactional
     public ProductResponse create(ProductCreateRequest request) {
         validatePrice(request.price());
         validateSku(request.sku(), null);
         validateBarcode(request.barcode(), null);
+        validateScaleCode(request.scaleCode(), null);
         validateInventoryConfiguration(
                 request.minimumStock(),
                 request.reorderPoint(),
@@ -42,6 +44,7 @@ public class ProductService {
         }
 
         normalizeSku(entity);
+        normalizeScaleCode(entity);
 
         ProductEntity saved = productRepository.save(entity);
         return productMapper.toResponse(saved);
@@ -52,6 +55,7 @@ public class ProductService {
         validatePrice(request.price());
         validateSku(request.sku(), id);
         validateBarcode(request.barcode(), id);
+        validateScaleCode(request.scaleCode(), id);
         validateInventoryConfiguration(
                 request.minimumStock(),
                 request.reorderPoint(),
@@ -74,6 +78,7 @@ public class ProductService {
 
         productMapper.updateEntityFromRequest(request, entity);
         normalizeSku(entity);
+        normalizeScaleCode(entity);
 
         ProductEntity saved = productRepository.save(entity);
         return productMapper.toResponse(saved);
@@ -121,6 +126,31 @@ public class ProductService {
         if (barcode == null || barcode.isBlank()) {
             return;
         }
+
+        /*
+         A scale label is not a barcode, and the two fields are one keystroke apart. Left
+         in the wrong field it would never scan: at the till a scale label is decoded and
+         looked up by scale code, so this value would sit here matching nothing forever.
+         Pointing at the right field beats a silent dead end — and it translates, because
+         copying the whole 13 digits across is the mistake this message is preventing.
+        */
+        scaleBarcodeMatcher.match(barcode.trim()).ifPresent(format -> {
+            String productCode = format.getProductCodeStart() + format.getProductCodeLength() - 1
+                    <= barcode.trim().length()
+                    ? barcode.trim().substring(
+                            format.getProductCodeStart() - 1,
+                            format.getProductCodeStart() - 1 + format.getProductCodeLength())
+                    : "";
+            String hint = productCode.isEmpty()
+                    ? ""
+                    : " Según el formato \"" + format.getName() + "\", el código de producto de esta "
+                            + "etiqueta es " + productCode + " (o sea, " + stripLeadingZeros(productCode) + ").";
+
+            throw new ValidationException(
+                    "\"" + barcode.trim() + "\" es un código de balanza, no un código de barras. "
+                            + "Va en el campo \"Código de balanza\"." + hint);
+        });
+
         productRepository.findByBarcode(barcode.trim())
                 .ifPresent(existing -> {
                     if (currentProductId == null || !existing.getId().equals(currentProductId)) {
@@ -157,6 +187,44 @@ public class ProductService {
         if (value != null && value.compareTo(BigDecimal.ZERO) < 0) {
             throw new ValidationException(message);
         }
+    }
+
+    private void validateScaleCode(String scaleCode, Long currentProductId) {
+        if (scaleCode == null || scaleCode.isBlank()) {
+            return;
+        }
+        if (!scaleCode.trim().matches("\\d+")) {
+            throw new ValidationException("El código de balanza tiene que ser un número.");
+        }
+
+        String normalized = stripLeadingZeros(scaleCode.trim());
+
+        productRepository.findByScaleCode(normalized)
+                .ifPresent(existing -> {
+                    if (currentProductId == null || !existing.getId().equals(currentProductId)) {
+                        throw new ConflictException(
+                                "El código de balanza \"" + normalized + "\" ya lo usa el producto \""
+                                        + existing.getName() + "\".");
+                    }
+                });
+    }
+
+    /**
+     * "000016" off a label and "16" off the scale listing are the same product code. Both
+     * collapse to "16" here, which is what makes the UNIQUE constraint and the lookup at
+     * the till agree on what "the same code" means.
+     */
+    private String stripLeadingZeros(String digits) {
+        String stripped = digits.replaceFirst("^0+", "");
+        return stripped.isEmpty() ? "0" : stripped;
+    }
+
+    private void normalizeScaleCode(ProductEntity entity) {
+        if (entity.getScaleCode() == null || entity.getScaleCode().isBlank()) {
+            entity.setScaleCode(null);
+            return;
+        }
+        entity.setScaleCode(stripLeadingZeros(entity.getScaleCode().trim()));
     }
 
     private void normalizeSku(ProductEntity entity) {

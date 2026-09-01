@@ -29,6 +29,12 @@ public record ProductUpdateRequest(
         )
         String barcode,
 
+        @Pattern(
+                regexp = "^(\\d{1,20})?$",
+                message = "Scale code must be digits only"
+        )
+        String scaleCode,
+
         Boolean active,
 
         @PositiveOrZero(message = "Minimum stock cannot be negative")

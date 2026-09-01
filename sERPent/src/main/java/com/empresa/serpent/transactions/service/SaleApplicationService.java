@@ -204,6 +204,24 @@ public class SaleApplicationService {
                         .divide(ONE_HUNDRED, AMOUNT_SCALE, RoundingMode.HALF_UP);
             }
 
+            /*
+             PENDIENTE ABIERTO POR EL SOPORTE DE BALANZA — no cambiar sin decidirlo aparte.
+
+             Con cantidades enteras esto no tenía consecuencias: un precio de 4 decimales
+             por un entero sigue teniendo 4 decimales. Las etiquetas pesadas traen 3
+             decimales, así que este multiply puede dar HASTA 7 DECIMALES, y la columna
+             subtotal es NUMERIC(19,4): la base redondea cada renglón en silencio.
+
+             El total, en cambio, se arma más abajo sumando estos lineSubtotal SIN
+             redondear y se guarda una sola vez. O sea que la suma de los subtotales
+             guardados puede no dar el total guardado. Es menos de un centavo por venta y
+             no mueve la caja, pero es visible en el detalle de una venta.
+
+             El arreglo es .setScale(AMOUNT_SCALE, HALF_UP) acá y acumular el renglón ya
+             redondeado — con el cambio gemelo en el frontend, que hoy replica esta línea
+             exactamente. Va aparte porque revierte la regla de paridad acordada, toca los
+             dos lados y el test de paridad se actualiza con ella.
+            */
             BigDecimal lineSubtotal = effectiveUnitPrice.multiply(item.quantity());
 
             TransactionDetailEntity detail = TransactionDetailEntity.builder()
