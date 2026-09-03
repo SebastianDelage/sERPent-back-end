@@ -1,5 +1,7 @@
 package com.empresa.serpent.inventory.web.dto.request;
 
+import com.empresa.serpent.shared.validation.QuantityLimits;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -7,10 +9,10 @@ import java.math.BigDecimal;
 
 public record CreateSaleReturnRequest(
 
-        @NotNull(message = "Sale id cannot be null")
+        @NotNull(message = "La venta es obligatoria.")
         Long saleId,
 
-        @NotNull(message = "Product id cannot be null")
+        @NotNull(message = "El producto es obligatorio.")
         Long productId,
 
         /** Ignored when {@code terminalId} is set: the terminal decides the warehouse. */
@@ -19,8 +21,19 @@ public record CreateSaleReturnRequest(
         /** Optional registered point of sale. When present it supplies the warehouse. */
         Long terminalId,
 
-        @NotNull(message = "Quantity cannot be null")
-        @Positive(message = "Quantity must be greater than zero")
+        /**
+         * Counter ceiling, same as a sale line: a return is the inverse of one. The real
+         * limit is what was sold, which the dialog enforces and the service re-checks; this
+         * one only bites on lines recorded before any ceiling existed. See
+         * {@link QuantityLimits}.
+         */
+        @NotNull(message = "La cantidad es obligatoria.")
+        @Positive(message = "La cantidad tiene que ser mayor a cero.")
+        @Digits(
+                integer = QuantityLimits.COUNTER_INTEGER_DIGITS,
+                fraction = QuantityLimits.FRACTION_DIGITS,
+                message = "La cantidad de una devolución no puede superar 999,999 y admite hasta tres decimales."
+        )
         BigDecimal quantity,
 
         /**

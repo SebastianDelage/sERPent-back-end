@@ -1,5 +1,7 @@
 package com.empresa.serpent.inventory.web.dto.request;
 
+import com.empresa.serpent.shared.validation.QuantityLimits;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 
@@ -7,7 +9,7 @@ import java.math.BigDecimal;
 
 public record CreateInventoryAdjustmentRequest(
 
-        @NotNull(message = "Product id cannot be null")
+        @NotNull(message = "El producto es obligatorio.")
         Long productId,
 
         /** Ignored when {@code terminalId} is set: the terminal decides the warehouse. */
@@ -16,8 +18,17 @@ public record CreateInventoryAdjustmentRequest(
         /** Optional registered point of sale. When present it supplies the warehouse. */
         Long terminalId,
 
-        @NotNull(message = "Counted quantity cannot be null")
-        @PositiveOrZero(message = "Counted quantity cannot be negative")
+        /**
+         * Warehouse ceiling: a physical stocktake is among the largest numbers the app
+         * handles, so it is capped well above a counter line. See {@link QuantityLimits}.
+         */
+        @NotNull(message = "La cantidad contada es obligatoria.")
+        @PositiveOrZero(message = "La cantidad contada no puede ser negativa.")
+        @Digits(
+                integer = QuantityLimits.WAREHOUSE_INTEGER_DIGITS,
+                fraction = QuantityLimits.FRACTION_DIGITS,
+                message = "La cantidad contada no puede superar 99.999,999 y admite hasta tres decimales."
+        )
         BigDecimal countedQuantity,
 
         String reason,
