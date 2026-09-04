@@ -159,13 +159,25 @@ public class SaleReturnApplicationService {
 
         saleReturnRepository.save(saleReturn);
 
+        /*
+         * NO NOTE. The movement used to carry "Devolución de la venta #12", composed here and
+         * frozen in the column — the same defect already fixed in the movement origins and in
+         * the transaction descriptions, and the last one left.
+         *
+         * <p>Nothing is lost: the movements screen composes "Devolución #12" from the
+         * transaction type and id it already receives, and the operator's reason lives on the
+         * transaction, one click away through that same cell.
+         *
+         * <p>It was worse than dead text: it OUTRANKED the operator. Someone typing "el cliente
+         * devolvió por mal olor" got "Devolución de la venta #12" on the audit screen instead.
+         */
         inventoryMovementService.registerAdjustmentMovement(
                 savedTransaction,
                 warehouse,
                 product,
                 MovementType.RETURN_IN,
                 request.quantity(),
-                "Devolución de la venta #" + request.saleId()
+                null
         );
 
         /*

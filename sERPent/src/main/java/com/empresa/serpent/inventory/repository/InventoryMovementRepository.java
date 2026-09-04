@@ -5,6 +5,10 @@ import com.empresa.serpent.inventory.domain.enums.MovementType;
 import com.empresa.serpent.reports.repository.projection.InventoryMovementsByProductProjection;
 import com.empresa.serpent.reports.repository.projection.InventoryMovementsByTypeProjection;
 import com.empresa.serpent.reports.repository.projection.InventoryMovementsByWarehouseProjection;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import com.empresa.serpent.transactions.repository.projection.TransactionWarehouseProjection;
@@ -17,6 +21,25 @@ import java.util.List;
 public interface InventoryMovementRepository extends
         JpaRepository<InventoryMovementEntity, Long>,
         JpaSpecificationExecutor<InventoryMovementEntity> {
+
+    /**
+     * The movements listing, with everything the row needs already loaded.
+     *
+     * <p>OVERRIDDEN ONLY TO ATTACH THE GRAPH. Without it this was one query plus four lazy
+     * SELECTs per row — product, warehouse, counterpart warehouse and transaction are all
+     * {@code FetchType.LAZY} and the response mapper navigates every one of them. A page of
+     * ten cost up to 41 queries; a page of fifty, up to 201.
+     *
+     * <p>Safe to join-fetch alongside pagination because all four are {@code @ManyToOne}: one
+     * row in, one row out, so the page window still means what it says. The pitfall that makes
+     * Hibernate paginate in memory is a fetched COLLECTION, and there is none here.
+     *
+     * <p>Only the listing goes through this overload; the snapshot service uses the no-arg
+     * {@code findAll()} and is untouched.
+     */
+    @Override
+    @EntityGraph(attributePaths = {"product", "warehouse", "counterpartWarehouse", "transaction"})
+    Page<InventoryMovementEntity> findAll(Specification<InventoryMovementEntity> spec, Pageable pageable);
 
     List<InventoryMovementEntity> findByProductId(Long productId);
 

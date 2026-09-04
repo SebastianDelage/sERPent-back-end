@@ -42,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -208,7 +209,10 @@ class SaleReturnApplicationServiceTest {
                 any(ProductEntity.class),
                 eq(MovementType.RETURN_IN),
                 eq(new BigDecimal("2")),
-                any(String.class)
+                // isNull y no any(String.class): el movimiento ya no lleva nota. La frase
+                // "Devolución de la venta #12" que llevaba antes era texto compuesto acá y
+                // congelado en la columna, y encima le ganaba al motivo que escribió la persona.
+                isNull()
         );
     }
 

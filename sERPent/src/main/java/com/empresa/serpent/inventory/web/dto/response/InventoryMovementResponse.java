@@ -26,7 +26,18 @@ public record InventoryMovementResponse(
         BigDecimal unitCost,
         LocalDateTime createdAt,
 
-        /** Solo el motivo que escribió el operador. Null si no escribió ninguno. */
+        /**
+         * ARCHIVO, no un campo vivo: ningún servicio escribe acá desde este cambio.
+         *
+         * <p>Guardaba el motivo del operador, y el ajuste lo duplicaba con
+         * transactions.description. El motivo es de la OPERACIÓN —una sola transferencia deja
+         * dos movimientos, una compra tantos como renglones— así que vive en la transacción, y
+         * la pantalla de movimientos llega hasta ella por el link de la columna Origen.
+         *
+         * <p>Lo que sigue habiendo son los "Conteo: ..., anterior: ..." de los ajustes
+         * anteriores a V28, que V30 deliberadamente no borró: ahí está el único rastro de esos
+         * dos números. Se lee la historia, no se escribe nada nuevo.
+         */
         String note,
 
         Long productId,

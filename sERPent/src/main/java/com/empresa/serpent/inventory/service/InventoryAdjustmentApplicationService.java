@@ -124,20 +124,31 @@ public class InventoryAdjustmentApplicationService {
           arma la pantalla con el mismo formateador que usa todo lo demás, y los movimientos
           nuevos salen bien sin migrar nada.
 
-          `note` se queda SOLO con el motivo que escribió la persona, que sí es un dato y no
-          se puede componer.
-        */
-        String movementNote = request.reason() != null && !request.reason().isBlank()
-                ? request.reason().trim()
-                : null;
+          Y EL MOTIVO YA NO SE ESCRIBE ACÁ.
 
+          Hasta este cambio, el mismo request.reason() se guardaba DOS VECES: en
+          transactions.description y en inventory_movements.note. Dos copias del mismo texto
+          que se separan en cuanto alguien edite una — y la lista de movimientos mostraba la
+          del movimiento, así que una descripción corregida en la ficha no se reflejaba.
+
+          El motivo es de la OPERACIÓN, no de la línea: un ajuste genera un movimiento, pero
+          una transferencia genera dos y una compra tantos como renglones. Guardarlo por
+          movimiento es repetir N veces algo que pasó una vez. Vive en la transacción, que la
+          pantalla de movimientos ahora enlaza desde la columna Origen.
+
+          La columna `note` NO se elimina: para los ajustes anteriores a V28 sigue guardando
+          el "Conteo: ..., anterior: ..." que V30 deliberadamente no borró, porque ahí está el
+          único rastro de esos dos números. Queda como archivo: se lee la historia, no se
+          escribe nada nuevo. Sacarla del modelo es la ronda de unificación, junto con
+          purchases.notes y product_transformations.notes.
+        */
         inventoryMovementService.registerAdjustmentMovement(
                 savedTransaction,
                 warehouse,
                 product,
                 movementType,
                 adjustmentQuantity,
-                movementNote,
+                null,
                 request.countedQuantity(),
                 previousStock
         );
