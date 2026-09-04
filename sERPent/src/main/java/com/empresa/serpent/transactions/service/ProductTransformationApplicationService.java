@@ -96,7 +96,8 @@ public class ProductTransformationApplicationService {
         ProductTransformationEntity transformation = ProductTransformationEntity.builder()
                 .transaction(savedTransaction)
                 .warehouse(warehouse)
-                .notes(normalizeOptional(request.notes()))
+                // Ver PurchaseApplicationService: la columna queda sin escritor.
+                .notes(null)
                 .inputs(new ArrayList<>())
                 .outputs(new ArrayList<>())
                 .build();

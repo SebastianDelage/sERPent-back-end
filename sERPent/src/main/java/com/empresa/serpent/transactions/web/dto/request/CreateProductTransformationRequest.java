@@ -20,9 +20,12 @@ public record CreateProductTransformationRequest(
         /** Optional registered point of sale. When present it supplies the warehouse. */
         Long terminalId,
 
+        /**
+         * Lo que escribió la persona sobre esta transformación. Va a
+         * {@code transactions.description}. Ver CreatePurchaseRequest: mismo caso, misma
+         * columna muerta ({@code product_transformations.notes}).
+         */
         String description,
-
-        String notes,
 
         @NotEmpty(message = "Inputs cannot be empty")
         List<@Valid CreateProductTransformationInputRequest> inputs,
@@ -35,9 +38,8 @@ public record CreateProductTransformationRequest(
     public CreateProductTransformationRequest(Long createdByUserId,
                                               Long warehouseId,
                                               String description,
-                                              String notes,
                                               List<CreateProductTransformationInputRequest> inputs,
                                               List<CreateProductTransformationOutputRequest> outputs) {
-        this(createdByUserId, warehouseId, null, description, notes, inputs, outputs);
+        this(createdByUserId, warehouseId, null, description, inputs, outputs);
     }
 }

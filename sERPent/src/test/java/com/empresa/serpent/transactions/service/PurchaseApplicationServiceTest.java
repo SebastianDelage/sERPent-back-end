@@ -84,7 +84,6 @@ class PurchaseApplicationServiceTest {
                 1L,
                 "PUR-002",
                 "Compra de reposición",
-                "Ingreso de mercadería para stock",
                 List.of(
                         new CreatePurchaseItemRequest(1L, "Pollo entero", new BigDecimal("3.000"), new BigDecimal("3000.0000")),
                         new CreatePurchaseItemRequest(2L, "Pata muslo", new BigDecimal("2.000"), new BigDecimal("3200.0000"))
@@ -257,7 +256,6 @@ class PurchaseApplicationServiceTest {
                 1L,
                 "PUR-005",
                 "Compra inválida",
-                null,
                 List.of(
                         new CreatePurchaseItemRequest(1L, "Pollo entero", new BigDecimal("2.000"), new BigDecimal("-100.0000"))
                 )
@@ -293,7 +291,6 @@ class PurchaseApplicationServiceTest {
                 1L,
                 null,
                 "Compra sin comprobante",
-                null,
                 List.of(
                         new CreatePurchaseItemRequest(1L, "Pollo entero", new BigDecimal("1.000"), new BigDecimal("3000.0000"))
                 )
@@ -337,7 +334,6 @@ class PurchaseApplicationServiceTest {
                 1L,
                 "PUR-002",
                 "Compra de reposición",
-                "Notas",
                 List.of(
                         new CreatePurchaseItemRequest(1L, "Pollo entero", new BigDecimal("2.000"), new BigDecimal("3000.0000"))
                 )
@@ -420,7 +416,7 @@ class PurchaseApplicationServiceTest {
             // no defined meaning. Reading that null as "on credit" would rewrite the meaning
             // of rows already in the database, which is exactly why the flag is explicit.
             CreatePurchaseRequest request = new CreatePurchaseRequest(
-                    1L, null, 1L, null, 1L, null, "PUR-CREDIT-4", "Compra sin método", null,
+                    1L, null, 1L, null, 1L, null, "PUR-CREDIT-4", "Compra sin método",
                     List.of(new CreatePurchaseItemRequest(
                             1L, "Pollo entero", new BigDecimal("2.000"), new BigDecimal("3000.0000")))
             );
@@ -451,7 +447,7 @@ class PurchaseApplicationServiceTest {
         private CreatePurchaseRequest creditRequest(Long paymentMethodId, Long supplierId) {
             return new CreatePurchaseRequest(
                     1L, paymentMethodId, supplierId, true, 1L, null,
-                    null, "Compra a plazo", null,
+                    null, "Compra a plazo",
                     List.of(new CreatePurchaseItemRequest(
                             1L, "Pollo entero", new BigDecimal("2.000"), new BigDecimal("3000.0000")))
             );

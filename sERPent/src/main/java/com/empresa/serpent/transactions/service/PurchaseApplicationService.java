@@ -157,7 +157,11 @@ public class PurchaseApplicationService {
                 .onCredit(request.isOnCredit())
                 .warehouse(warehouse)
                 .receiptNumber(normalizeOptional(request.receiptNumber()))
-                .notes(normalizeOptional(request.notes()))
+                // purchases.notes ya no se escribe: el texto del operador vive en
+                // transactions.description, que es donde toda la app lo busca. La columna
+                // queda como archivo de lo ya cargado, sin escritor, igual que
+                // inventory_movements.note.
+                .notes(null)
                 .build();
 
         PurchaseEntity savedPurchase = purchaseRepository.save(purchase);

@@ -38,9 +38,15 @@ public record CreatePurchaseRequest(
         @Size(max = 80, message = "Receipt number cannot be longer than 80 characters")
         String receiptNumber,
 
+        /**
+         * Lo que escribió la persona sobre esta compra. Va a {@code transactions.description}.
+         *
+         * <p>Antes el formulario mandaba esto en un campo {@code notes} que el servicio
+         * guardaba en {@code purchases.notes}, una columna que NINGUNA pantalla lee: quien
+         * escribía algo ahí no lo veía nunca más. El motivo es de la operación, y la
+         * operación es la transacción.
+         */
         String description,
-
-        String notes,
 
         @NotEmpty(message = "Items cannot be empty")
         List<@Valid CreatePurchaseItemRequest> items
@@ -58,9 +64,8 @@ public record CreatePurchaseRequest(
                                  Long warehouseId,
                                  String receiptNumber,
                                  String description,
-                                 String notes,
                                  List<CreatePurchaseItemRequest> items) {
         this(createdByUserId, paymentMethodId, supplierId, null, warehouseId, null,
-                receiptNumber, description, notes, items);
+                receiptNumber, description, items);
     }
 }

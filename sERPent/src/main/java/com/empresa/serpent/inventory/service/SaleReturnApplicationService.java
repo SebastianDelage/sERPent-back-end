@@ -154,7 +154,13 @@ public class SaleReturnApplicationService {
         SaleReturnEntity saleReturn = SaleReturnEntity.builder()
                 .transaction(savedTransaction)
                 .originalSale(originalSale)
-                .reason(request.reason())
+                /*
+                 * sale_returns.reason ya no se escribe. Guardaba EL MISMO request.reason() que
+                 * la línea de arriba pone en transactions.description: dos copias del mismo
+                 * texto, que se separan en cuanto alguien edite una. Y ninguna pantalla lo
+                 * mostraba: llegaba a SaleReturnResponse y ahí moría.
+                 */
+                .reason(null)
                 .build();
 
         saleReturnRepository.save(saleReturn);
@@ -220,7 +226,9 @@ public class SaleReturnApplicationService {
                                 detail.getProduct().getId(),
                                 detail.getProduct().getName(),
                                 detail.getQuantity(),
-                                saleReturn.getReason()
+                                // De la transacción y no de la columna: ahí está el motivo
+                                // vivo, y así las devoluciones ya cargadas lo siguen mostrando.
+                                saleReturn.getTransaction().getDescription()
                         )))
                 .toList();
     }

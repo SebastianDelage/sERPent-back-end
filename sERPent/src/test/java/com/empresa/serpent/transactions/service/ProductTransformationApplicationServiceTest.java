@@ -121,7 +121,6 @@ class ProductTransformationApplicationServiceTest {
                 1L,
                 1L,
                 "Despiece de pollo entero",
-                "Prueba inicial de transformation",
                 List.of(
                         new CreateProductTransformationInputRequest(
                                 1L,
@@ -184,7 +183,15 @@ class ProductTransformationApplicationServiceTest {
 
         ProductTransformationEntity savedTransformation = transformationCaptor.getValue();
         assertThat(savedTransformation.getWarehouse()).isEqualTo(warehouse);
-        assertThat(savedTransformation.getNotes()).isEqualTo("Prueba inicial de transformation");
+        /*
+         * EL TEXTO DEL OPERADOR VA A LA TRANSACCIÓN, NO A product_transformations.notes.
+         *
+         * <p>Esa columna no la leía ninguna pantalla: lo que alguien escribiera ahí no lo
+         * volvía a ver nunca. Ahora queda sin escritor —archivo de lo ya cargado— y el texto
+         * viaja a transactions.description, que es de donde la ficha de transacción lo lee.
+         */
+        assertThat(savedTransformation.getNotes()).isNull();
+        assertThat(savedTransaction.getDescription()).isEqualTo("Despiece de pollo entero");
         assertThat(savedTransformation.getInputs()).hasSize(1);
         assertThat(savedTransformation.getOutputs()).hasSize(2);
 
@@ -205,7 +212,6 @@ class ProductTransformationApplicationServiceTest {
                 99L,
                 1L,
                 "Despiece",
-                null,
                 List.of(new CreateProductTransformationInputRequest(1L, null, BigDecimal.ONE)),
                 List.of(new CreateProductTransformationOutputRequest(2L, null, BigDecimal.ONE))
         );
@@ -228,7 +234,6 @@ class ProductTransformationApplicationServiceTest {
                 1L,
                 99L,
                 "Despiece",
-                null,
                 List.of(new CreateProductTransformationInputRequest(1L, null, BigDecimal.ONE)),
                 List.of(new CreateProductTransformationOutputRequest(2L, null, BigDecimal.ONE))
         );
@@ -258,7 +263,6 @@ class ProductTransformationApplicationServiceTest {
                 1L,
                 3L,
                 "Despiece",
-                null,
                 List.of(new CreateProductTransformationInputRequest(1L, null, BigDecimal.ONE)),
                 List.of(new CreateProductTransformationOutputRequest(2L, null, BigDecimal.ONE))
         );
@@ -282,7 +286,6 @@ class ProductTransformationApplicationServiceTest {
                 1L,
                 1L,
                 "Despiece",
-                null,
                 List.of(new CreateProductTransformationInputRequest(999L, null, BigDecimal.ONE)),
                 List.of(new CreateProductTransformationOutputRequest(2L, null, BigDecimal.ONE))
         );
@@ -306,7 +309,6 @@ class ProductTransformationApplicationServiceTest {
                 1L,
                 1L,
                 "Despiece",
-                null,
                 List.of(new CreateProductTransformationInputRequest(1L, null, BigDecimal.ONE)),
                 List.of(new CreateProductTransformationOutputRequest(999L, null, BigDecimal.ONE))
         );
@@ -330,7 +332,6 @@ class ProductTransformationApplicationServiceTest {
                 1L,
                 1L,
                 "Despiece múltiple",
-                null,
                 List.of(
                         new CreateProductTransformationInputRequest(1L, null, BigDecimal.valueOf(2)),
                         new CreateProductTransformationInputRequest(2L, null, BigDecimal.valueOf(1.5))
@@ -369,7 +370,6 @@ class ProductTransformationApplicationServiceTest {
                 1L,
                 1L,
                 "Despiece",
-                "Notas",
                 List.of(
                         new CreateProductTransformationInputRequest(1L, "   ", BigDecimal.ONE)
                 ),
