@@ -92,12 +92,28 @@ public class InventoryAdjustmentApplicationService {
 
         TransactionEntity savedTransaction = transactionRepository.save(transaction);
 
-        String countDetail = "Conteo: " + request.countedQuantity()
-                + ", anterior: " + previousStock;
+        /*
+          LOS DOS NÚMEROS VAN COMO DATOS, NO DENTRO DE UNA FRASE.
 
+          Acá se armaba "Conteo: " + request.countedQuantity() + ", anterior: " +
+          previousStock, y esa concatenación llamaba a BigDecimal.toString(), que no conoce
+          el locale y siempre escribe punto decimal. En pantalla quedaba
+          "Conteo: 9999.999, anterior: 12.530" — y ese segundo número es ambiguo justamente
+          contra la regla del proyecto: en clase cantidad un punto solitario es decimal, así
+          que son 12,530, pero quien audita stock lee doce mil quinientos treinta. Un factor
+          mil, en la pantalla que existe para averiguar qué pasó con la mercadería.
+
+          Peor todavía: el texto quedaba congelado en la base, así que arreglar esto no
+          habría corregido nada de lo ya registrado. Ahora viajan los números y la frase la
+          arma la pantalla con el mismo formateador que usa todo lo demás, y los movimientos
+          nuevos salen bien sin migrar nada.
+
+          `note` se queda SOLO con el motivo que escribió la persona, que sí es un dato y no
+          se puede componer.
+        */
         String movementNote = request.reason() != null && !request.reason().isBlank()
-                ? request.reason().trim() + " — " + countDetail
-                : countDetail;
+                ? request.reason().trim()
+                : null;
 
         inventoryMovementService.registerAdjustmentMovement(
                 savedTransaction,
@@ -105,7 +121,9 @@ public class InventoryAdjustmentApplicationService {
                 product,
                 movementType,
                 adjustmentQuantity,
-                movementNote
+                movementNote,
+                request.countedQuantity(),
+                previousStock
         );
 
         return new CreateInventoryAdjustmentResponse(

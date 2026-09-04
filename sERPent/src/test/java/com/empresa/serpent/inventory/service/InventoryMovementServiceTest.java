@@ -64,7 +64,13 @@ class InventoryMovementServiceTest {
         assertThat(movement.getMovementType()).isEqualTo(MovementType.OUT);
         assertThat(movement.getQuantity()).isEqualByComparingTo("2.000");
         assertThat(movement.getUnitCost()).isNull();
-        assertThat(movement.getNote()).isEqualTo("Sale #100");
+        /*
+          Sin note, y la aserción vale la pena: acá se guardaba "Sale #100", texto de
+          operador en inglés congelado en la base. El origen lo compone ahora la pantalla a
+          partir del tipo de transacción y su id, que ya viajan en la respuesta. Que esto
+          vuelva a tener algo escrito sería la vuelta del bug.
+        */
+        assertThat(movement.getNote()).isNull();
     }
 
     @Test
@@ -88,7 +94,7 @@ class InventoryMovementServiceTest {
         assertThat(movement.getMovementType()).isEqualTo(MovementType.IN);
         assertThat(movement.getQuantity()).isEqualByComparingTo("3.000");
         assertThat(movement.getUnitCost()).isEqualByComparingTo("3200.0000");
-        assertThat(movement.getNote()).isEqualTo("Purchase #200");
+        assertThat(movement.getNote()).isNull();
     }
 
     @Test
@@ -146,15 +152,23 @@ class InventoryMovementServiceTest {
         InventoryMovementEntity transferOut = movements.get(0);
         InventoryMovementEntity transferIn = movements.get(1);
 
+        /*
+          Cada movimiento guarda el depósito del OTRO lado, que es lo que el operador
+          necesita leer y lo único que no se puede derivar de la fila sola. Antes eso vivía
+          dentro de la frase "Transfer #400 to warehouse 2": en inglés y con el id en vez del
+          nombre. Ahora la pantalla resuelve el nombre por la FK, igual que con el propio.
+        */
         assertThat(transferOut.getMovementType()).isEqualTo(MovementType.TRANSFER_OUT);
         assertThat(transferOut.getWarehouse()).isEqualTo(sourceWarehouse);
+        assertThat(transferOut.getCounterpartWarehouse()).isEqualTo(targetWarehouse);
         assertThat(transferOut.getQuantity()).isEqualByComparingTo("5.000");
-        assertThat(transferOut.getNote()).isEqualTo("Transfer #400 to warehouse 2");
+        assertThat(transferOut.getNote()).isNull();
 
         assertThat(transferIn.getMovementType()).isEqualTo(MovementType.TRANSFER_IN);
         assertThat(transferIn.getWarehouse()).isEqualTo(targetWarehouse);
+        assertThat(transferIn.getCounterpartWarehouse()).isEqualTo(sourceWarehouse);
         assertThat(transferIn.getQuantity()).isEqualByComparingTo("5.000");
-        assertThat(transferIn.getNote()).isEqualTo("Transfer #400 from warehouse 1");
+        assertThat(transferIn.getNote()).isNull();
     }
 
     @Test

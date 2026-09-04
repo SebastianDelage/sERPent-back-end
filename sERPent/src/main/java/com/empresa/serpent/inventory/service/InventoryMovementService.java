@@ -47,6 +47,12 @@ public class InventoryMovementService {
         inventoryStockSnapshotService.applyMovements(savedMovements);
     }
 
+    /**
+     * Sobrecarga sin los números del conteo, para lo que no es un ajuste de inventario.
+     *
+     * <p>La usa la devolución: reingresa mercadería y no cuenta nada, así que no tiene un
+     * "contado" ni un "anterior" que registrar.
+     */
     @Transactional
     public void registerAdjustmentMovement(
             TransactionEntity transaction,
@@ -55,6 +61,28 @@ public class InventoryMovementService {
             MovementType movementType,
             BigDecimal quantity,
             String note
+    ) {
+        registerAdjustmentMovement(
+                transaction, warehouse, product, movementType, quantity, note, null, null
+        );
+    }
+
+    /**
+     * @param note lo que escribió el operador, o null. NO se le arma texto acá: el origen
+     *             del movimiento lo compone la pantalla a partir de los datos.
+     * @param countedQuantity lo que la persona contó
+     * @param previousQuantity lo que el sistema tenía antes
+     */
+    @Transactional
+    public void registerAdjustmentMovement(
+            TransactionEntity transaction,
+            WarehouseEntity warehouse,
+            ProductEntity product,
+            MovementType movementType,
+            BigDecimal quantity,
+            String note,
+            BigDecimal countedQuantity,
+            BigDecimal previousQuantity
     ) {
         if (transaction == null) {
             throw new IllegalArgumentException("Transaction cannot be null");
@@ -108,6 +136,8 @@ public class InventoryMovementService {
                 .quantity(quantity)
                 .unitCost(null)
                 .note(note)
+                .countedQuantity(countedQuantity)
+                .previousQuantity(previousQuantity)
                 .build();
 
         InventoryMovementEntity savedMovement = inventoryMovementRepository.save(movement);
@@ -217,7 +247,9 @@ public class InventoryMovementService {
                 .movementType(MovementType.OUT)
                 .quantity(detail.getQuantity())
                 .unitCost(null)
-                .note("Sale #" + transaction.getId())
+                // Sin note: el origen lo compone la pantalla con transactionType +
+                // transactionId, que ya viajan. Antes decía "Sale #9" y quedaba en inglés
+                // para siempre en la base.
                 .build();
     }
 
@@ -233,7 +265,7 @@ public class InventoryMovementService {
                 .movementType(MovementType.IN)
                 .quantity(detail.getQuantity())
                 .unitCost(detail.getUnitPrice())
-                .note("Purchase #" + transaction.getId())
+                // Sin note, por lo mismo que la venta.
                 .build();
     }
 
@@ -252,7 +284,14 @@ public class InventoryMovementService {
                 .movementType(MovementType.TRANSFER_OUT)
                 .quantity(detail.getQuantity())
                 .unitCost(null)
-                .note("Transfer #" + transaction.getId() + " to warehouse " + targetWarehouse.getId())
+                /*
+                  El depósito del otro lado se GUARDA en vez de nombrarse dentro de una
+                  frase. Antes acá decía "Transfer #9 to warehouse 2": en inglés, y con el
+                  ID en vez del nombre pese a que el objeto Warehouse estaba a mano. Con el
+                  dato guardado la pantalla resuelve el nombre por la FK, igual que ya hace
+                  con el depósito propio.
+                */
+                .counterpartWarehouse(targetWarehouse)
                 .build();
 
         InventoryMovementEntity transferIn = InventoryMovementEntity.builder()
@@ -262,7 +301,7 @@ public class InventoryMovementService {
                 .movementType(MovementType.TRANSFER_IN)
                 .quantity(detail.getQuantity())
                 .unitCost(null)
-                .note("Transfer #" + transaction.getId() + " from warehouse " + sourceWarehouse.getId())
+                .counterpartWarehouse(sourceWarehouse)
                 .build();
 
         return Stream.of(transferOut, transferIn);
@@ -357,7 +396,18 @@ public class InventoryMovementService {
                 .movementType(MovementType.OUT)
                 .quantity(input.getQuantity())
                 .unitCost(null)
-                .note("Transformation #" + transformation.getId() + " input")
+                /*
+                  Sin note. La pantalla distingue entrada de salida por el movementType —OUT
+                  es lo que se consume, IN lo que se produce— combinado con el tipo de
+                  transacción, así que la palabra no hacía falta guardarla.
+
+                  Y el número que se muestra pasa a ser el de la TRANSACCIÓN, no el de la
+                  transformación. Es un cambio deliberado de qué significa ese número: antes
+                  "Transformación #1" era el product_transformation_id y venta y compra
+                  mostraban el de transacción, así que el mismo "#" quería decir dos cosas
+                  distintas según la fila. La relación es 1:1
+                  (ux_product_transformations_transaction), así que no se pierde trazabilidad.
+                */
                 .build();
     }
 
@@ -372,7 +422,7 @@ public class InventoryMovementService {
                 .movementType(MovementType.IN)
                 .quantity(output.getQuantity())
                 .unitCost(null)
-                .note("Transformation #" + transformation.getId() + " output")
+                // Sin note, por lo mismo que la entrada.
                 .build();
     }
 
