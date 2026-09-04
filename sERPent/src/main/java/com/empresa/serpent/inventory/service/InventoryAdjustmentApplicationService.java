@@ -65,9 +65,22 @@ public class InventoryAdjustmentApplicationService {
                 .subtract(previousStock)
                 .abs();
 
+        /*
+         * ONLY WHAT THE PERSON WROTE. No fallback sentence.
+         *
+         * <p>This used to fall back to "Inventory adjustment for product 5 in warehouse 2":
+         * English, ids instead of names, and frozen in the database the moment it was saved.
+         * The screen showed it under "Descripción", a heading that promises the operator's own
+         * words and was instead delivering a machine's.
+         *
+         * <p>Everything that sentence said is already on the detail screen, composed from the
+         * row: the heading reads "Ajuste #9" from transactions.type, the branch comes from the
+         * movements, and the product is in the items table. Composing it at display time also
+         * fixes the records already saved — see the same decision in InventoryMovementService.
+         */
         String transactionDescription = request.reason() != null && !request.reason().isBlank()
                 ? request.reason().trim()
-                : "Inventory adjustment for product " + product.getId() + " in warehouse " + warehouse.getId();
+                : null;
 
         TransactionEntity transaction = TransactionEntity.builder()
                 .type(TransactionType.ADJUSTMENT)
@@ -82,7 +95,10 @@ public class InventoryAdjustmentApplicationService {
         TransactionDetailEntity detail = TransactionDetailEntity.builder()
                 .transaction(transaction)
                 .product(product)
-                .description("Stock adjustment")
+                // The line's own description is a fallback for rows with no product, and an
+                // adjustment always has one, so this text never reached a screen. It was still a
+                // frozen English string in a column the UI reads.
+                .description(null)
                 .quantity(adjustmentQuantity)
                 .unitPrice(BigDecimal.ZERO)
                 .subtotal(BigDecimal.ZERO)

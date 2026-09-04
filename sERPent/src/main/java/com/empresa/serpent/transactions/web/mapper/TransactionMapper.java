@@ -23,6 +23,8 @@ public interface TransactionMapper {
     @Mapping(target = "createdByUserId", source = "createdByUserEntity.id")
     @Mapping(target = "createdByUsername", source = "createdByUserEntity.username")
     @Mapping(target = "saleId", source = "sale.id")
+    // Same as the list's: batch-loaded by TransactionQueryService, not reachable from here.
+    @Mapping(target = "warehouseNames", ignore = true)
     @Mapping(target = "warehouseId", source = "sale.warehouse.id")
     @Mapping(target = "warehouseName", source = "sale.warehouse.name")
     @Mapping(target = "onCredit", source = "sale.onCredit")

@@ -75,11 +75,20 @@ public class WarehouseTransferApplicationService {
                 request.quantity()
         );
 
+        /*
+         * ONLY WHAT THE PERSON WROTE. See InventoryAdjustmentApplicationService for the whole
+         * reasoning; the fallback here was "Transfer of product 5 from warehouse 1 to warehouse
+         * 3", which is the same defect with two ids instead of one.
+         *
+         * <p>The two branches were the one thing in that sentence not already on the detail
+         * screen. They are not lost and they need no new column: both ends of a transfer leave
+         * an inventory movement, and TransactionQueryService already reads branch names from
+         * those movements for the transaction list. The detail response now carries the same
+         * list, and the screen composes "Depósitos: Central, Sucursal Norte" from it.
+         */
         String description = request.reason() != null && !request.reason().isBlank()
                 ? request.reason().trim()
-                : "Transfer of product " + product.getId()
-                + " from warehouse " + sourceWarehouse.getId()
-                + " to warehouse " + targetWarehouse.getId();
+                : null;
 
         TransactionEntity transaction = TransactionEntity.builder()
                 .type(TransactionType.TRANSFER)
@@ -94,7 +103,8 @@ public class WarehouseTransferApplicationService {
         TransactionDetailEntity detail = TransactionDetailEntity.builder()
                 .transaction(transaction)
                 .product(product)
-                .description("Warehouse transfer")
+                // Same as the adjustment's: dead text behind productName, frozen in English.
+                .description(null)
                 .quantity(request.quantity())
                 .unitPrice(BigDecimal.ZERO)
                 .subtotal(BigDecimal.ZERO)

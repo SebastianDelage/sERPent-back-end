@@ -120,7 +120,38 @@ public class TransactionQueryService {
             }
         }
 
-        return transactionMapper.toDetailResponse(entity);
+        return withWarehouses(
+                transactionMapper.toDetailResponse(entity),
+                warehouseNamesFor(List.of(entity.getId())).getOrDefault(entity.getId(), List.of()));
+    }
+
+    /**
+     * The detail response with its branches filled in, since the mapper cannot reach them.
+     *
+     * <p>Reuses {@link #warehouseNamesFor(List)}, which the list already used: one transaction
+     * id instead of a page of them. A transfer comes back with both of its ends.
+     */
+    private TransactionDetailResponse withWarehouses(TransactionDetailResponse response, List<String> names) {
+        return new TransactionDetailResponse(
+                response.id(),
+                response.date(),
+                response.type(),
+                response.status(),
+                response.total(),
+                response.description(),
+                response.paymentMethodId(),
+                response.paymentMethodName(),
+                response.createdByUserId(),
+                response.createdByUsername(),
+                response.saleId(),
+                response.warehouseId(),
+                response.warehouseName(),
+                names,
+                response.onCredit(),
+                response.adjustmentType(),
+                response.adjustmentValue(),
+                response.adjustmentAmount(),
+                response.details());
     }
 
     private void validateFilter(TransactionFilter filter) {

@@ -139,7 +139,9 @@ public class SaleReturnApplicationService {
         TransactionDetailEntity detail = TransactionDetailEntity.builder()
                 .transaction(transaction)
                 .product(product)
-                .description("Devolución")
+                // En español, pero igual de congelado: es una etiqueta de tipo, y el tipo ya
+                // está en transactions.type. La pantalla la compone con TRANSACTION_TYPE_LABELS.
+                .description(null)
                 .quantity(request.quantity())
                 .unitPrice(returnUnitPrice)
                 .subtotal(returnTotal)

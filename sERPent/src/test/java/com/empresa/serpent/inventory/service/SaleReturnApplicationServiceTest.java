@@ -562,4 +562,27 @@ class SaleReturnApplicationServiceTest {
         verify(inventoryMovementService).registerAdjustmentMovement(
                 any(), any(), any(), eq(MovementType.RETURN_IN), eq(new BigDecimal("2")), any());
     }
+
+    // --- operator-facing text is composed on screen, never stored ---
+
+    @Test
+    @DisplayName("Should not freeze any operator-facing text on the return line")
+    void shouldNotStoreALineDescription() {
+        stubCommonLookups(true);
+        when(saleRepository.findById(SALE_ID)).thenReturn(Optional.of(confirmedSale()));
+        when(transactionDetailRepository.findByTransactionIdAndProductId(SALE_TX_ID, PRODUCT_ID))
+                .thenReturn(List.of(soldLine(new BigDecimal("5"))));
+        when(saleReturnRepository.findByOriginalSaleId(SALE_ID)).thenReturn(List.of());
+        when(transactionRepository.save(any(TransactionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createReturn(request(new BigDecimal("2")));
+
+        /*
+         * The line used to carry the literal "Devolución". It is a type label, and the type is
+         * already on the row, so the screen composes it with TRANSACTION_TYPE_LABELS. A stored
+         * label is a label frozen in whatever language and wording it had the day it was
+         * written — which is exactly how the movement origins ended up in English.
+         */
+        assertThat(savedReturn().getDetails().getFirst().getDescription()).isNull();
+    }
 }

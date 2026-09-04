@@ -23,6 +23,20 @@ public record TransactionDetailResponse(
         Long warehouseId,
         String warehouseName,
         /**
+         * Every branch this transaction touched, by name. Usually one; a TRANSFER has two.
+         *
+         * <p>Derived from the inventory movements it left behind, the same way and with the
+         * same query {@code TransactionListResponse} already used — no new column, and nothing
+         * stored. It replaces what the generated {@code description} sentence used to carry:
+         * for a transfer, its two ends were the only thing in that sentence that was not
+         * already on the screen.
+         *
+         * <p>{@code warehouseId}/{@code warehouseName} above stay: they are the SALE's branch
+         * specifically, which the return flow needs as an id, and they come off the sale row
+         * rather than off the movements.
+         */
+        List<String> warehouseNames,
+        /**
          * Sale-only: the sale was taken on account and nothing was collected.
          *
          * <p>Sent explicitly rather than left for the client to infer from a missing payment
