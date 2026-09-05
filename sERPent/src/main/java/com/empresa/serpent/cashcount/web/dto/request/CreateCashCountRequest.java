@@ -1,6 +1,8 @@
 package com.empresa.serpent.cashcount.web.dto.request;
 
+import com.empresa.serpent.shared.validation.MoneyLimits;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 
@@ -31,15 +33,20 @@ public record CreateCashCountRequest(
          * answer — some shifts start with an empty drawer — so it must be sent explicitly
          * rather than omitted.
          */
-        @NotNull(message = "Opening float cannot be null")
-        @PositiveOrZero(message = "Opening float cannot be negative")
+        @NotNull(message = "El fondo inicial es obligatorio.")
+        @PositiveOrZero(message = "El fondo inicial no puede ser negativo.")
+        @Digits(
+                integer = MoneyLimits.INTEGER_DIGITS,
+                fraction = MoneyLimits.FRACTION_DIGITS,
+                message = "El fondo inicial no puede superar 9.999.999,99 y admite hasta dos decimales."
+        )
         BigDecimal openingFloat,
 
         /**
          * What was actually counted, per payment method. Methods left out are taken as zero
          * counted, which is what an untouched posnet means.
          */
-        @NotNull(message = "Counted amounts cannot be null")
+        @NotNull(message = "Los importes contados son obligatorios.")
         List<@Valid CashCountLineRequest> countedAmounts,
 
         String note

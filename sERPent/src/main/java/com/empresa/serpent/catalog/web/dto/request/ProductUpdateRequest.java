@@ -1,6 +1,7 @@
 package com.empresa.serpent.catalog.web.dto.request;
 
 import com.empresa.serpent.catalog.domain.enums.UnitOfMeasure;
+import com.empresa.serpent.shared.validation.MoneyLimits;
 import com.empresa.serpent.shared.validation.QuantityLimits;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
@@ -32,6 +33,11 @@ public record ProductUpdateRequest(
 
         @NotNull(message = "El precio es obligatorio.")
         @PositiveOrZero(message = "El precio no puede ser negativo.")
+        @Digits(
+                integer = MoneyLimits.INTEGER_DIGITS,
+                fraction = MoneyLimits.FRACTION_DIGITS,
+                message = "El precio no puede superar 9.999.999,99 y admite hasta dos decimales."
+        )
         BigDecimal price,
 
         @Size(max = 80, message = "El SKU no puede tener más de 80 caracteres.")

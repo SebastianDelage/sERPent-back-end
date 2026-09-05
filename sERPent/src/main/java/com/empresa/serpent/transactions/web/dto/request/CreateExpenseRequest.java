@@ -1,6 +1,8 @@
 package com.empresa.serpent.transactions.web.dto.request;
 
 
+import com.empresa.serpent.shared.validation.MoneyLimits;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -10,7 +12,7 @@ import java.math.BigDecimal;
 
 public record CreateExpenseRequest(
 
-        @NotNull(message = "CreatedByUserId cannot be null")
+        @NotNull(message = "El usuario es obligatorio.")
         Long createdByUserId,
 
         Long paymentMethodId,
@@ -23,14 +25,19 @@ public record CreateExpenseRequest(
          */
         Long warehouseId,
 
-        @NotNull(message = "ExpenseCategoryId cannot be null")
+        @NotNull(message = "La categoría es obligatoria.")
         Long expenseCategoryId,
 
-        @NotNull(message = "Total cannot be null")
-        @PositiveOrZero(message = "Total cannot be negative")
+        @NotNull(message = "El total es obligatorio.")
+        @PositiveOrZero(message = "El total no puede ser negativo.")
+        @Digits(
+                integer = MoneyLimits.INTEGER_DIGITS,
+                fraction = MoneyLimits.FRACTION_DIGITS,
+                message = "El total del gasto no puede superar 9.999.999,99 y admite hasta dos decimales."
+        )
         BigDecimal total,
 
-        @Size(max = 80, message = "Receipt number cannot be longer than 80 characters")
+        @Size(max = 80, message = "El número de comprobante no puede tener más de 80 caracteres.")
         String receiptNumber,
 
         String description,

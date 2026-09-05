@@ -1,5 +1,6 @@
 package com.empresa.serpent.transactions.web.dto.request;
 
+import com.empresa.serpent.shared.validation.MoneyLimits;
 import com.empresa.serpent.shared.validation.QuantityLimits;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
@@ -31,6 +32,11 @@ public record CreatePurchaseItemRequest(
 
         @NotNull(message = "El precio unitario es obligatorio.")
         @PositiveOrZero(message = "El precio unitario no puede ser negativo.")
+        @Digits(
+                integer = MoneyLimits.INTEGER_DIGITS,
+                fraction = MoneyLimits.FRACTION_DIGITS,
+                message = "El precio unitario no puede superar 9.999.999,99 y admite hasta dos decimales."
+        )
         BigDecimal unitPrice
 ) {
 }

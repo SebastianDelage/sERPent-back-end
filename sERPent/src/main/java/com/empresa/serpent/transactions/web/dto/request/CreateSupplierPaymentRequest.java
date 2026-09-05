@@ -1,5 +1,7 @@
 package com.empresa.serpent.transactions.web.dto.request;
 
+import com.empresa.serpent.shared.validation.MoneyLimits;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -12,10 +14,10 @@ import java.time.LocalDate;
  */
 public record CreateSupplierPaymentRequest(
 
-        @NotNull(message = "Supplier id cannot be null")
+        @NotNull(message = "El proveedor es obligatorio.")
         Long supplierId,
 
-        @NotNull(message = "Payment method id cannot be null")
+        @NotNull(message = "El método de pago es obligatorio.")
         Long paymentMethodId,
 
         /**
@@ -29,11 +31,16 @@ public record CreateSupplierPaymentRequest(
         /** Optional registered point of sale. When present it supplies the branch. */
         Long terminalId,
 
-        @NotNull(message = "Amount cannot be null")
-        @Positive(message = "Amount must be greater than zero")
+        @NotNull(message = "El importe es obligatorio.")
+        @Positive(message = "El importe tiene que ser mayor a cero.")
+        @Digits(
+                integer = MoneyLimits.INTEGER_DIGITS,
+                fraction = MoneyLimits.FRACTION_DIGITS,
+                message = "El importe del pago no puede superar 9.999.999,99 y admite hasta dos decimales."
+        )
         BigDecimal amount,
 
-        @NotNull(message = "Payment date cannot be null")
+        @NotNull(message = "La fecha del pago es obligatoria.")
         LocalDate paymentDate,
 
         String note

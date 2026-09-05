@@ -1,5 +1,7 @@
 package com.empresa.serpent.cashcount.web.dto.request;
 
+import com.empresa.serpent.shared.validation.MoneyLimits;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
@@ -13,10 +15,15 @@ import java.math.BigDecimal;
  */
 public record CashCountLineRequest(
 
-        @NotNull(message = "Payment method id cannot be null")
+        @NotNull(message = "El método de pago es obligatorio.")
         Long paymentMethodId,
 
-        @NotNull(message = "Counted amount cannot be null")
+        @NotNull(message = "El importe contado es obligatorio.")
+        @Digits(
+                integer = MoneyLimits.INTEGER_DIGITS,
+                fraction = MoneyLimits.FRACTION_DIGITS,
+                message = "El importe contado no puede superar 9.999.999,99 y admite hasta dos decimales."
+        )
         BigDecimal countedAmount
 ) {
 }
