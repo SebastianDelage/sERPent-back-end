@@ -12,13 +12,13 @@ public record CreateSaleRequest(
 
         Long customerId,
 
-        @Size(max = 150, message = "Customer name cannot be longer than 150 characters")
+        @Size(max = 150, message = "El nombre del cliente no puede tener más de {max} caracteres.")
         String customerName,
 
-        @Size(max = 60, message = "Customer document cannot be longer than 60 characters")
+        @Size(max = 60, message = "El documento del cliente no puede tener más de {max} caracteres.")
         String customerDocument,
 
-        @Size(max = 60, message = "Invoice number cannot be longer than 60 characters")
+        @Size(max = 60, message = "El número de factura no puede tener más de {max} caracteres.")
         String invoiceNumber,
 
         /**
@@ -51,7 +51,7 @@ public record CreateSaleRequest(
 
         String description,
 
-        @NotEmpty(message = "Items cannot be empty")
+        @NotEmpty(message = "Hay que cargar al menos un producto.")
         List<@Valid CreateSaleItemRequest> items,
 
         /** Omit (or NONE) for a sale with no manual adjustment. */

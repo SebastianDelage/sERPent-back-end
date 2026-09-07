@@ -12,17 +12,17 @@ import jakarta.validation.constraints.Size;
  */
 public record UpsertProductSupplierRequest(
 
-        @NotNull(message = "Supplier id cannot be null")
+        @NotNull(message = "El proveedor es obligatorio.")
         Long supplierId,
 
         /** The supplier's own code for this product. Optional: many small suppliers have none. */
-        @Size(max = 80, message = "Supplier product code cannot be longer than 80 characters")
+        @Size(max = 80, message = "El código del proveedor no puede tener más de {max} caracteres.")
         String supplierProductCode,
 
         /** The one the replenishment report proposes. Only one active supplier per product may have it. */
         Boolean preferred,
 
-        @PositiveOrZero(message = "Lead time cannot be negative")
+        @PositiveOrZero(message = "El plazo de entrega no puede ser negativo.")
         Integer leadTimeDays,
 
         Boolean active

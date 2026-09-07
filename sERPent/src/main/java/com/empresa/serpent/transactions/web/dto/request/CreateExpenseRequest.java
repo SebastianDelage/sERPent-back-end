@@ -37,7 +37,7 @@ public record CreateExpenseRequest(
         )
         BigDecimal total,
 
-        @Size(max = 80, message = "El número de comprobante no puede tener más de 80 caracteres.")
+        @Size(max = 80, message = "El número de comprobante no puede tener más de {max} caracteres.")
         String receiptNumber,
 
         String description,

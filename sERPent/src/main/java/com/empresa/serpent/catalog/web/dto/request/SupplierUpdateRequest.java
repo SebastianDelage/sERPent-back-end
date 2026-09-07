@@ -6,23 +6,23 @@ import jakarta.validation.constraints.Size;
 
 public record SupplierUpdateRequest(
 
-        @NotBlank(message = "Name cannot be blank")
+        @NotBlank(message = "El nombre es obligatorio.")
         String name,
 
-        @Size(max = 30, message = "Document type cannot be longer than 30 characters")
+        @Size(max = 30, message = "El tipo de documento no puede tener más de {max} caracteres.")
         String documentType,
 
-        @Size(max = 40, message = "Document number cannot be longer than 40 characters")
+        @Size(max = 40, message = "El número de documento no puede tener más de {max} caracteres.")
         String documentNumber,
 
-        @Size(max = 50, message = "Tax condition cannot be longer than 50 characters")
+        @Size(max = 50, message = "La condición frente al IVA no puede tener más de {max} caracteres.")
         String taxCondition,
 
-        @Size(max = 50, message = "Phone cannot be longer than 50 characters")
+        @Size(max = 50, message = "El teléfono no puede tener más de {max} caracteres.")
         String phone,
 
-        @Email(message = "Email must be a valid email address")
-        @Size(max = 150, message = "Email cannot be longer than 150 characters")
+        @Email(message = "El email no tiene un formato válido.")
+        @Size(max = 150, message = "El email no puede tener más de {max} caracteres.")
         String email,
 
         String notes,

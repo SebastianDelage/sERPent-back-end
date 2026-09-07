@@ -10,19 +10,19 @@ import java.util.List;
 
 public record UpdateUserRequest(
 
-        @NotBlank(message = "Name cannot be blank")
+        @NotBlank(message = "El nombre es obligatorio.")
         String name,
 
-        @Size(max = 100, message = "Last name cannot be longer than 100 characters")
+        @Size(max = 100, message = "El apellido no puede tener más de {max} caracteres.")
         String lastName,
 
-        @NotBlank(message = "Username cannot be blank")
+        @NotBlank(message = "El usuario es obligatorio.")
         String username,
 
         // Optional on update: if null/blank, the current password is kept.
         String password,
 
-        @Email(message = "Email must be a valid email address")
+        @Email(message = "El email no tiene un formato válido.")
         String email,
 
         Boolean active,

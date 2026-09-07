@@ -27,10 +27,10 @@ public record CreateProductTransformationRequest(
          */
         String description,
 
-        @NotEmpty(message = "Inputs cannot be empty")
+        @NotEmpty(message = "Hay que cargar al menos un producto de entrada.")
         List<@Valid CreateProductTransformationInputRequest> inputs,
 
-        @NotEmpty(message = "Outputs cannot be empty")
+        @NotEmpty(message = "Hay que cargar al menos un producto de salida.")
         List<@Valid CreateProductTransformationOutputRequest> outputs
 ) {
 

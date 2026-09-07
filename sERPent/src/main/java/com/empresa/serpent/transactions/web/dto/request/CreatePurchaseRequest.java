@@ -35,7 +35,7 @@ public record CreatePurchaseRequest(
         /** Optional registered point of sale. When present it supplies the warehouse. */
         Long terminalId,
 
-        @Size(max = 80, message = "Receipt number cannot be longer than 80 characters")
+        @Size(max = 80, message = "El número de comprobante no puede tener más de {max} caracteres.")
         String receiptNumber,
 
         /**
@@ -48,7 +48,7 @@ public record CreatePurchaseRequest(
          */
         String description,
 
-        @NotEmpty(message = "Items cannot be empty")
+        @NotEmpty(message = "Hay que cargar al menos un producto.")
         List<@Valid CreatePurchaseItemRequest> items
 ) {
 

@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 
 public record CreateExpenseCategoryRequest(
 
-        @NotBlank(message = "Name cannot be blank")
+        @NotBlank(message = "El nombre es obligatorio.")
         String name,
 
         String description,

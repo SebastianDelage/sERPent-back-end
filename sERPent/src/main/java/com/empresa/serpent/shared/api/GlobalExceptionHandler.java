@@ -21,8 +21,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -42,9 +42,18 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "No se encontró el recurso solicitado.", req, Map.of());
     }
 
+    /**
+     * Bean validation rejected the body: one entry per field under {@code details}.
+     *
+     * <p>ORDER MATTERS AND A HashMap HAS NONE. These messages are shown to the operator, and
+     * a hash order means the same rejection can list its reasons differently on two
+     * consecutive tries — the sort of difference nobody can explain and everybody notices.
+     * TreeMap orders by field name: arbitrary as a criterion, but stable, which is the
+     * property that matters here.
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
-        Map<String, Object> details = new HashMap<>();
+        Map<String, Object> details = new TreeMap<>();
         ex.getBindingResult().getFieldErrors()
                 .forEach(err -> details.put(err.getField(), err.getDefaultMessage()));
         ex.getBindingResult().getGlobalErrors()
@@ -53,24 +62,36 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
+    /** Same as above: TreeMap so the reasons come back in a stable order. */
     public ResponseEntity<ApiError> handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest req) {
-        Map<String, Object> details = new HashMap<>();
+        Map<String, Object> details = new TreeMap<>();
         for (ConstraintViolation<?> v : ex.getConstraintViolations()) {
             details.put(v.getPropertyPath().toString(), v.getMessage());
         }
         return build(HttpStatus.BAD_REQUEST, "Revisá los datos ingresados.", req, details);
     }
 
+    /*
+     * THESE TWO PUT THE PARAMETER NAME IN THE LOG, NOT IN details.
+     *
+     * They used to answer with details = {"parameter": "warehouseId"}, and that broke the
+     * contract the front end relies on: every VALUE in details is an operator-facing sentence,
+     * so the interceptor can list them without inspecting the text. A bare field name in there
+     * put "warehouseId" on the cashier´s screen — caught by the interceptor´s own test.
+     *
+     * Nothing is lost: a malformed query parameter is not something the operator can fix, and
+     * the name is what someone debugging needs, which is what a log is for.
+     */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
-        return build(HttpStatus.BAD_REQUEST, "El valor de un parámetro no es válido.", req,
-                Map.of("parameter", ex.getName()));
+        log.warn("Type mismatch at {} on parameter {}", req.getRequestURI(), ex.getName());
+        return build(HttpStatus.BAD_REQUEST, "El valor de un parámetro no es válido.", req, Map.of());
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ApiError> handleMissingParam(MissingServletRequestParameterException ex, HttpServletRequest req) {
-        return build(HttpStatus.BAD_REQUEST, "Falta un dato requerido en la solicitud.", req,
-                Map.of("parameter", ex.getParameterName()));
+        log.warn("Missing parameter at {}: {}", req.getRequestURI(), ex.getParameterName());
+        return build(HttpStatus.BAD_REQUEST, "Falta un dato requerido en la solicitud.", req, Map.of());
     }
 
     // Safety net for any IllegalArgumentException not yet migrated to a BusinessException.

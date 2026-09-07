@@ -40,7 +40,7 @@ public record ProductCreateRequest(
         )
         BigDecimal price,
 
-        @Size(max = 80, message = "El SKU no puede tener más de 80 caracteres.")
+        @Size(max = 80, message = "El SKU no puede tener más de {max} caracteres.")
         String sku,
 
         @Pattern(

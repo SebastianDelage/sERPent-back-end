@@ -6,14 +6,14 @@ import java.math.BigDecimal;
 
 public record CreateProductPaymentAdjustmentRequest(
 
-        @NotNull(message = "Product id cannot be null")
+        @NotNull(message = "El producto es obligatorio.")
         Long productId,
 
-        @NotNull(message = "Payment method id cannot be null")
+        @NotNull(message = "El método de pago es obligatorio.")
         Long paymentMethodId,
 
         /** Signed: negative discounts, positive surcharges. Never below -100. */
-        @NotNull(message = "Adjustment percentage cannot be null")
+        @NotNull(message = "El porcentaje del ajuste es obligatorio.")
         BigDecimal adjustmentPercentage,
 
         /** Defaults to true when omitted. */

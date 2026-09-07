@@ -2,16 +2,28 @@ package com.empresa.serpent.shared.api;
 
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -53,7 +65,31 @@ class GlobalExceptionHandlerTest {
         public void business() {
             throw new ValidationException("El depósito seleccionado está inactivo.");
         }
+
+        @PostMapping("/probe/validation")
+        public void validation(@Valid @RequestBody ProbeBody body) {
+            // Never reached: every field of the body sent by the test is invalid.
+        }
     }
+
+    /**
+     * Tres campos cuyo ORDEN DE HASH NO COINCIDE CON EL ALFABÉTICO, y no es casualidad:
+     * están elegidos para que el test pueda fallar.
+     *
+     * <p>La primera versión de este record usaba zocalo/alias/medio y PASABA IGUAL con un
+     * HashMap: esos tres caen en cubetas que se recorren en orden alfabético, así que la
+     * aserción no distinguía un mapa ordenado de uno que no lo estaba. Una aserción que no
+     * puede fallar es peor que ninguna, porque se ve verde.
+     *
+     * <p>Con estos tres, el HashMap de la JDK los recorre codigo, alias, medio —cubetas 2, 9
+     * y 13— contra el alfabético alias, codigo, medio. Verificado revirtiendo el TreeMap a
+     * HashMap: el test falla.
+     */
+    record ProbeBody(
+            @NotBlank(message = "El medio es obligatorio.") String medio,
+            @NotBlank(message = "El alias es obligatorio.") String alias,
+            @NotBlank(message = "El código es obligatorio.") String codigo
+    ) {}
 
     @Test
     void notFoundException_isSanitizedToGenericSpanishMessage() throws Exception {
@@ -84,5 +120,73 @@ class GlobalExceptionHandlerTest {
         mockMvc.perform(get("/probe/business"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("El depósito seleccionado está inactivo."));
+    }
+
+    /*
+      LAS RAZONES DE UN RECHAZO VIENEN SIEMPRE EN EL MISMO ORDEN.
+
+      Los mensajes de `details` son los que va a leer el operador en cuanto el interceptor
+      del front deje de mirar solo `message`. Con un HashMap el orden sale de los hashes de
+      las claves: el mismo rechazo puede listar sus motivos distinto en dos intentos
+      seguidos, y esa es la clase de diferencia que nadie puede explicar y todos notan.
+
+      SE AFIRMA EL ORDEN DEL JSON, NO EL CONTENIDO DEL MAPA. jsonPath puede decir qué claves
+      hay pero no en qué orden vinieron, y el orden es justamente lo que se está fijando.
+      Por eso se leen las claves del cuerpo crudo, en orden de aparición, y se comparan
+      contra su propia versión ordenada.
+    */
+    @Test
+    void validationErrors_comeBackInAStableOrder() throws Exception {
+        String cuerpo = mockMvc.perform(post("/probe/validation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"medio\":\"\",\"alias\":\"\",\"codigo\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Revisá los datos ingresados."))
+                .andReturn()
+                .getResponse()
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+
+        List<String> enElJson = clavesDeDetails(cuerpo);
+
+        assertThat(enElJson).containsExactly("alias", "codigo", "medio");
+        assertThat(enElJson).isSorted();
+    }
+
+    /*
+      Y el mismo pedido dos veces da lo mismo. Un HashMap con estas tres claves podría dar un
+      orden estable dentro de una corrida y otro distinto en la siguiente JVM, así que esta
+      afirmación sola no alcanzaría — va junto con la de arriba, que fija CUÁL es el orden.
+    */
+    @Test
+    void theSameRejectionListsItsReasonsIdenticallyEveryTime() throws Exception {
+        String primera = validationBody();
+        String segunda = validationBody();
+
+        assertThat(clavesDeDetails(primera)).isEqualTo(clavesDeDetails(segunda));
+    }
+
+    private String validationBody() throws Exception {
+        return mockMvc.perform(post("/probe/validation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"medio\":\"\",\"alias\":\"\",\"codigo\":\"\"}"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /** Las claves de `details` en el orden en que aparecen en el JSON, no en el que las devuelva un Map. */
+    private static List<String> clavesDeDetails(String json) {
+        int desde = json.indexOf("\"details\"");
+        assertThat(desde).as("el cuerpo trae un campo details").isGreaterThan(-1);
+
+        String bloque = json.substring(json.indexOf('{', desde) + 1);
+        bloque = bloque.substring(0, bloque.indexOf('}'));
+
+        List<String> claves = new ArrayList<>();
+        Matcher m = Pattern.compile("\"([^\"]+)\"\\s*:").matcher(bloque);
+        while (m.find()) {
+            claves.add(m.group(1));
+        }
+        return claves;
     }
 }

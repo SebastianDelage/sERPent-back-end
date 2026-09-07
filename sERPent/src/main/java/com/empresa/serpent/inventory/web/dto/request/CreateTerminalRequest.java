@@ -6,11 +6,11 @@ import jakarta.validation.constraints.Size;
 
 public record CreateTerminalRequest(
 
-        @NotBlank(message = "Name cannot be blank")
-        @Size(max = 120, message = "Name cannot be longer than 120 characters")
+        @NotBlank(message = "El nombre es obligatorio.")
+        @Size(max = 120, message = "El nombre no puede tener más de {max} caracteres.")
         String name,
 
-        @NotNull(message = "Warehouse id cannot be null")
+        @NotNull(message = "El depósito es obligatorio.")
         Long warehouseId,
 
         Boolean active

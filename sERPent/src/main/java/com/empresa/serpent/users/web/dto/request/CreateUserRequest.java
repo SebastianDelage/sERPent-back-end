@@ -10,20 +10,20 @@ import java.util.List;
 
 public record CreateUserRequest(
 
-        @NotBlank(message = "Name cannot be blank")
+        @NotBlank(message = "El nombre es obligatorio.")
         String name,
 
-        @Size(max = 100, message = "Last name cannot be longer than 100 characters")
+        @Size(max = 100, message = "El apellido no puede tener más de {max} caracteres.")
         String lastName,
 
-        @NotBlank(message = "Username cannot be blank")
+        @NotBlank(message = "El usuario es obligatorio.")
         String username,
 
-        @NotBlank(message = "Password cannot be blank")
-        @Size(min = 6, message = "Password must be at least 6 characters")
+        @NotBlank(message = "La contraseña es obligatoria.")
+        @Size(min = 6, message = "La contraseña tiene que tener al menos {min} caracteres.")
         String password,
 
-        @Email(message = "Email must be a valid email address")
+        @Email(message = "El email no tiene un formato válido.")
         String email,
 
         Boolean active,

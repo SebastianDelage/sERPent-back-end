@@ -11,10 +11,10 @@ import java.math.BigDecimal;
  */
 public record UpdateProductPaymentAdjustmentRequest(
 
-        @NotNull(message = "Adjustment percentage cannot be null")
+        @NotNull(message = "El porcentaje del ajuste es obligatorio.")
         BigDecimal adjustmentPercentage,
 
-        @NotNull(message = "Active cannot be null")
+        @NotNull(message = "Hay que indicar si está activo.")
         Boolean active
 
 ) {}

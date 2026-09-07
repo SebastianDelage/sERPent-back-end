@@ -13,38 +13,38 @@ import jakarta.validation.constraints.*;
  */
 public record ScaleBarcodeFormatCreateRequest(
 
-        @NotBlank(message = "Name cannot be blank")
-        @Size(max = 80, message = "Name cannot be longer than 80 characters")
+        @NotBlank(message = "El nombre es obligatorio.")
+        @Size(max = 80, message = "El nombre no puede tener más de {max} caracteres.")
         String name,
 
-        @NotBlank(message = "Prefix cannot be blank")
-        @Pattern(regexp = "^\\d{1,4}$", message = "Prefix must be 1 to 4 digits")
+        @NotBlank(message = "El prefijo es obligatorio.")
+        @Pattern(regexp = "^\\d{1,4}$", message = "El prefijo tiene que ser de 1 a 4 dígitos.")
         String prefix,
 
-        @NotNull(message = "Total length cannot be null")
+        @NotNull(message = "La cantidad de dígitos de la etiqueta es obligatoria.")
         @Min(4) @Max(20)
         Integer totalLength,
 
-        @NotNull(message = "Product code start cannot be null")
+        @NotNull(message = "La posición donde empieza el código de producto es obligatoria.")
         @Min(1)
         Integer productCodeStart,
 
-        @NotNull(message = "Product code length cannot be null")
+        @NotNull(message = "La cantidad de dígitos del código de producto es obligatoria.")
         @Min(1)
         Integer productCodeLength,
 
-        @NotNull(message = "Value start cannot be null")
+        @NotNull(message = "La posición donde empieza el valor es obligatoria.")
         @Min(1)
         Integer valueStart,
 
-        @NotNull(message = "Value length cannot be null")
+        @NotNull(message = "La cantidad de dígitos del valor es obligatoria.")
         @Min(1)
         Integer valueLength,
 
-        @NotNull(message = "Value type cannot be null")
+        @NotNull(message = "Hay que indicar si el valor es peso o importe.")
         ScaleValueType valueType,
 
-        @NotNull(message = "Value decimals cannot be null")
+        @NotNull(message = "La cantidad de decimales del valor es obligatoria.")
         @Min(0) @Max(6)
         Integer valueDecimals,
 

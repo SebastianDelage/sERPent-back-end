@@ -6,15 +6,15 @@ import jakarta.validation.constraints.NotNull;
 
 public record SyncCommandRequest(
 
-        @NotBlank(message = "ClientId cannot be blank")
+        @NotBlank(message = "El identificador del cliente es obligatorio.")
         String clientId,
 
-        @NotBlank(message = "ClientOperationId cannot be blank")
+        @NotBlank(message = "El identificador de la operación es obligatorio.")
         String clientOperationId,
 
-        @NotNull(message = "CommandType cannot be null")
+        @NotNull(message = "El tipo de comando es obligatorio.")
         SyncCommandType commandType,
 
-        @NotBlank(message = "Payload cannot be blank")
+        @NotBlank(message = "El contenido del comando es obligatorio.")
         String payload
 ) {}
