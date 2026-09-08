@@ -13,6 +13,7 @@ import com.empresa.serpent.shared.security.AuthenticatedUserService;
 import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
+import com.empresa.serpent.shared.validation.PercentageLimits;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.ProductPaymentAdjustmentEntity;
 import com.empresa.serpent.transactions.domain.entity.SaleEntity;
@@ -48,6 +49,8 @@ public class SaleApplicationService {
 
     /** Matches the NUMERIC(19,4) money columns. */
     private static final int AMOUNT_SCALE = 4;
+
+    private static final BigDecimal PERCENTAGE_CAP = new BigDecimal(PercentageLimits.CAP);
 
     private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
@@ -258,6 +261,24 @@ public class SaleApplicationService {
         BigDecimal adjustmentValue = adjustmentType == AdjustmentType.NONE
                 ? BigDecimal.ZERO
                 : request.adjustmentValue();
+
+        /*
+          EL TECHO DEL AJUSTE EN MODO PORCENTAJE.
+
+          Va acá y no como anotación del DTO porque la cota depende del OTRO campo: el mismo
+          adjustmentValue es pesos en modo FIXED —donde su techo es el de los importes— y una
+          razón en modo PERCENTAGE, donde 100 ya duplica la venta. Bean validation sobre un
+          campo suelto no puede expresar eso.
+
+          El lado del descuento ya estaba cubierto, pero por rebote: un -150% deja el total en
+          negativo y lo rechaza la comprobación de más abajo. Se comprueba igual acá para que
+          el operador reciba el motivo verdadero —el porcentaje— y no una consecuencia.
+        */
+        if (adjustmentType == AdjustmentType.PERCENTAGE
+                && adjustmentValue.abs().compareTo(PERCENTAGE_CAP) > 0) {
+            throw new ValidationException(
+                    "Un ajuste porcentual no puede superar el 100% del total de la venta.");
+        }
 
         BigDecimal adjustmentAmount = switch (adjustmentType) {
             case PERCENTAGE -> subtotal.multiply(adjustmentValue)

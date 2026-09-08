@@ -609,6 +609,35 @@ class SaleApplicationServiceTest {
             return captor.getValue();
         }
 
+        /*
+          EL TECHO DEL AJUSTE PORCENTUAL.
+
+          El mismo campo lleva pesos en modo FIXED y una razón en modo PERCENTAGE, así que la
+          cota depende del otro campo y no puede ser una anotación del DTO. Hasta esta ronda no
+          existía: en modo porcentaje lo único que acotaba era el techo de los importes, o sea
+          que la pantalla aceptaba un ajuste del 9.999.999,99% sobre el total de una venta.
+        */
+        @Test
+        @DisplayName("The ceiling does not bite in FIXED mode, where the value is pesos")
+        void fixedModeKeepsTheMoneyCeiling() {
+            stubHappyPath();
+
+            // 500 pesos de recargo sobre 10000 de subtotal: muy por encima de 100, y correcto.
+            saleApplicationService.createSale(requestWith(AdjustmentType.FIXED, new BigDecimal("500")));
+
+            assertThat(savedTransaction().getTotal()).isEqualByComparingTo("10500.0000");
+        }
+
+        @Test
+        @DisplayName("Exactly 100% is accepted: it doubles the sale, which is the edge and not past it")
+        void acceptsExactlyTheCap() {
+            stubHappyPath();
+
+            saleApplicationService.createSale(requestWith(AdjustmentType.PERCENTAGE, new BigDecimal("100")));
+
+            assertThat(savedTransaction().getTotal()).isEqualByComparingTo("20000.0000");
+        }
+
         @Test
         @DisplayName("PERCENTAGE discount resolves to a negative amount and lowers the total")
         void percentageDiscount() {
@@ -706,8 +735,13 @@ class SaleApplicationServiceTest {
             verify(saleRepository, never()).save(any());
         }
 
+        /*
+          CAMBIÓ QUIÉN LO CAZA, NO SI LO CAZA. Antes lo rechazaba la comprobación del total en
+          negativo, o sea por una consecuencia; ahora lo rechaza el techo del porcentaje, que
+          es el motivo verdadero. Para el operador la diferencia es qué tiene que corregir.
+        */
         @Test
-        @DisplayName("An absurd percentage discount (over 100%) is caught by the same guard")
+        @DisplayName("An absurd percentage discount (over 100%) is caught by the percentage ceiling")
         void percentageDiscountOverOneHundredIsRejected() {
             given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
             given(paymentMethodRepository.findById(1L))
@@ -715,11 +749,10 @@ class SaleApplicationServiceTest {
             given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse(1L, "Central", true));
             given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
 
-            // -150% of 10000 is -15000, so the total would land at -5000.
             assertThatThrownBy(() -> saleApplicationService.createSale(
                     requestWith(AdjustmentType.PERCENTAGE, new BigDecimal("-150"))))
                     .isInstanceOf(ValidationException.class)
-                    .hasMessage("El descuento aplicado no puede dejar el total de la venta en negativo.");
+                    .hasMessage("Un ajuste porcentual no puede superar el 100% del total de la venta.");
 
             verify(transactionRepository, never()).save(any());
         }
@@ -734,14 +767,29 @@ class SaleApplicationServiceTest {
             assertThat(savedTransaction().getTotal()).isEqualByComparingTo("0");
         }
 
+        /*
+          ESTE TEST DECÍA LO CONTRARIO Y ESTABA EN VERDE.
+
+          Se llamaba "A surcharge has no upper bound" y comprobaba que un recargo del 500%
+          multiplicara la venta por seis. No era un test roto: describía con exactitud lo que
+          el sistema hacía. El agujero estaba escrito como comportamiento esperado, que es la
+          forma más difícil de encontrarlos.
+        */
         @Test
-        @DisplayName("A surcharge has no upper bound")
-        void surchargeHasNoCap() {
-            stubHappyPath();
+        @DisplayName("A PERCENTAGE surcharge over 100% is rejected: it would more than double the sale")
+        void percentageSurchargeOverOneHundredIsRejected() {
+            given(authenticatedUserService.requireCurrentUser()).willReturn(user(1L));
+            given(paymentMethodRepository.findById(1L))
+                    .willReturn(Optional.of(paymentMethod(1L, "Cash")));
+            given(warehouseAccessService.resolveForOperation(any(), any(), any())).willReturn(warehouse(1L, "Central", true));
+            given(productRepository.findByIdIn(List.of(10L))).willReturn(List.of(product(10L, "Pollo entero")));
 
-            saleApplicationService.createSale(requestWith(AdjustmentType.PERCENTAGE, new BigDecimal("500")));
+            assertThatThrownBy(() -> saleApplicationService.createSale(
+                    requestWith(AdjustmentType.PERCENTAGE, new BigDecimal("500"))))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Un ajuste porcentual no puede superar el 100% del total de la venta.");
 
-            assertThat(savedTransaction().getTotal()).isEqualByComparingTo("60000.0000");
+            verify(transactionRepository, never()).save(any());
         }
 
         @Test

@@ -5,6 +5,7 @@ import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.shared.exception.ConflictException;
 import com.empresa.serpent.shared.exception.NotFoundException;
 import com.empresa.serpent.shared.exception.ValidationException;
+import com.empresa.serpent.shared.validation.PercentageLimits;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.ProductPaymentAdjustmentEntity;
 import com.empresa.serpent.transactions.repository.PaymentMethodRepository;
@@ -26,7 +27,8 @@ import java.util.List;
 public class ProductPaymentAdjustmentService {
 
     /** Below this the line's unit price would go negative. */
-    private static final BigDecimal PERCENTAGE_FLOOR = new BigDecimal("-100");
+    private static final BigDecimal PERCENTAGE_FLOOR = new BigDecimal(PercentageLimits.FLOOR);
+    private static final BigDecimal PERCENTAGE_CAP = new BigDecimal(PercentageLimits.CAP);
 
     private final ProductPaymentAdjustmentRepository repository;
     private final ProductRepository productRepository;
@@ -106,9 +108,25 @@ public class ProductPaymentAdjustmentService {
         repository.deleteById(id);
     }
 
+    /**
+     * Las dos puntas del rango, con un mensaje distinto en cada una.
+     *
+     * <p>El piso ya estaba: un descuento de más del 100% dejaría el precio en negativo. El
+     * techo es nuevo, y hasta que se agregó lo único que acotaba un recargo era la precisión
+     * de la columna, o sea el 99.999,9999%. El porqué del número está en PercentageLimits.
+     *
+     * <p>Los dos mensajes son distintos a propósito aunque el número sea el mismo: del lado
+     * del descuento el 100% es donde el precio llega a cero, y del lado del recargo es donde
+     * el precio se duplica. Un texto único tendría que callarse las dos razones.
+     */
     private void validatePercentage(BigDecimal percentage) {
         if (percentage.compareTo(PERCENTAGE_FLOOR) < 0) {
-            throw new ValidationException("Un descuento no puede superar el 100% del precio del producto.");
+            throw new ValidationException(
+                    "Un descuento no puede superar el 100% del precio del producto.");
+        }
+        if (percentage.compareTo(PERCENTAGE_CAP) > 0) {
+            throw new ValidationException(
+                    "Un recargo no puede superar el 100% del precio del producto, que ya lo duplica.");
         }
     }
 }
