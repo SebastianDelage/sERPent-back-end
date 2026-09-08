@@ -4,6 +4,7 @@ import com.empresa.serpent.catalog.domain.entity.ProductEntity;
 import com.empresa.serpent.catalog.repository.ProductRepository;
 import com.empresa.serpent.inventory.domain.ReorderCascade;
 import com.empresa.serpent.inventory.domain.entity.InventoryStockSnapshotEntity;
+import com.empresa.serpent.reports.repository.projection.StockRowProjection;
 import com.empresa.serpent.inventory.domain.entity.ProductWarehouseMinimumStockEntity;
 import com.empresa.serpent.inventory.domain.enums.StockStatusFilter;
 import com.empresa.serpent.inventory.web.dto.filter.StockFilter;
@@ -55,9 +56,16 @@ public class StockQueryService {
             return List.of();
         }
 
-        List<InventoryStockSnapshotEntity> snapshots = loadSnapshots(filter, scope);
+        /*
+          UNA CONSULTA, PROYECTADA. Antes esto bajaba las filas como entidades gestionadas y
+          toStockResponse leía el nombre del producto y el del depósito, que son perezosos: diez
+          filas costaban doce sentencias en la lectura más caliente de la app, que además se
+          recarga después de cada venta confirmada. Ver StockRowProjection.
 
-        return snapshots.stream()
+          El filtro y el orden siguen acá abajo, sin tocar, para que lo único que cambie sea
+          cuántas sentencias se mandan.
+        */
+        return stockRows(filter, scope).stream()
                 .map(StockQueryService::toStockResponse)
                 .filter(response ->
                         filter.onlyPositive() == null
@@ -74,6 +82,15 @@ public class StockQueryService {
                 .toList();
     }
 
+    /**
+     * El mismo DTO, armado desde la entidad, para la vista PAGINADA.
+     *
+     * <p>searchStock filtra con Specifications sobre la entidad, así que no puede usar la
+     * consulta proyectada. Tiene el mismo N+1 —una consulta por producto de la página— pero
+     * acotado por el tamaño de página en vez de por el catálogo entero, y esa pantalla no se
+     * recarga después de cada venta. Queda anotado y sin tocar: convertirla exige reescribir
+     * las Specifications, que es otra ronda.
+     */
     private static StockResponse toStockResponse(InventoryStockSnapshotEntity snapshot) {
         return new StockResponse(
                 snapshot.getProduct().getId(),
@@ -82,6 +99,17 @@ public class StockQueryService {
                 snapshot.getWarehouse().getName(),
                 snapshot.getCurrentStock(),
                 snapshot.getWarehouse().getActive()
+        );
+    }
+
+    private static StockResponse toStockResponse(StockRowProjection row) {
+        return new StockResponse(
+                row.getProductId(),
+                row.getProductName(),
+                row.getWarehouseId(),
+                row.getWarehouseName(),
+                row.getCurrentStock(),
+                row.getWarehouseActive()
         );
     }
 
@@ -327,20 +355,15 @@ public class StockQueryService {
      * conditions come from it and not from {@code filter.warehouseId()} — reading the
      * filter here again is what would let an unscoped path slip back in.
      */
-    private List<InventoryStockSnapshotEntity> loadSnapshots(StockFilter filter, WarehouseScope scope) {
-        if (scope.unrestricted()) {
-            if (filter.productId() != null) {
-                return inventoryStockSnapshotRepository.findByProductId(filter.productId());
-            }
-            return inventoryStockSnapshotRepository.findAll();
-        }
-
-        if (filter.productId() != null) {
-            return inventoryStockSnapshotRepository
-                    .findByProductIdAndWarehouseIdIn(filter.productId(), scope.warehouseIds());
-        }
-
-        return inventoryStockSnapshotRepository.findByWarehouseIdIn(scope.warehouseIds());
+    private List<StockRowProjection> stockRows(StockFilter filter, WarehouseScope scope) {
+        /*
+          Las cuatro ramas que había acá —con producto o sin producto, por cuatro, con alcance o
+          sin alcance— son ahora dos parámetros de la misma consulta. El alcance ya viene
+          resuelto por WarehouseScope y el caso "no ve nada" lo cortó quien llama, así que la
+          lista vacía que trae el alcance sin restricción nunca llega a evaluarse.
+        */
+        return inventoryStockSnapshotRepository.findStockRows(
+                filter.productId(), scope.unrestricted(), scope.warehouseIds());
     }
 
     private record ProductKey(

@@ -3,6 +3,7 @@ package com.empresa.serpent.inventory.repository;
 import com.empresa.serpent.inventory.domain.entity.InventoryStockSnapshotEntity;
 import com.empresa.serpent.reports.repository.projection.InventoryReplenishmentProjection;
 import com.empresa.serpent.reports.repository.projection.ProductStockProjection;
+import com.empresa.serpent.reports.repository.projection.StockRowProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -135,6 +136,47 @@ public interface InventoryStockSnapshotRepository extends
             @Param("inStock") boolean inStock,
             @Param("belowMinimum") boolean belowMinimum,
             Pageable pageable
+    );
+
+    /**
+     * Las filas de stock que la pantalla necesita, en UNA consulta y sin entidades gestionadas.
+     *
+     * <p>Reemplaza a los cuatro finders de arriba en el camino de {@code getStock}: los cuatro
+     * bajaban entidades y el servicio después leía el nombre del producto y el del depósito,
+     * que son relaciones perezosas. Diez filas costaban doce sentencias; con esto son dos.
+     *
+     * <p>LOS CUATRO CASOS EN UNA SOLA CONSULTA. El servicio entraba por un finder distinto
+     * según hubiera o no producto y según el alcance por depósito. Acá los dos ejes son
+     * parámetros, con el mismo idioma que ya usa {@code searchGroupedByProduct}:
+     * {@code :unrestricted = TRUE} cortocircuita el filtro de depósito, y la lista vacía que
+     * trae WarehouseScope cuando no hay restricción nunca se evalúa.
+     *
+     * <p>NO FILTRA POR {@code onlyPositive} NI ORDENA. Las dos cosas se quedan en el servicio,
+     * donde ya estaban, y es deliberado: ordenar en SQL cambiaría el criterio de comparación
+     * —{@code compareToIgnoreCase} de Java contra la colación de la base— y eso reordena una
+     * lista que el operador mira, con eñes y acentos de por medio. Lo único que este cambio
+     * mueve es cuántas sentencias se mandan.
+     *
+     * <p>Los finders que devuelven entidades se dejan: los usan la reconstrucción de snapshots
+     * y la reconciliación, que sí necesitan la entidad.
+     */
+    @Query("""
+           SELECT p.id AS productId,
+                  p.name AS productName,
+                  w.id AS warehouseId,
+                  w.name AS warehouseName,
+                  s.currentStock AS currentStock,
+                  w.active AS warehouseActive
+           FROM InventoryStockSnapshotEntity s
+           JOIN s.product p
+           JOIN s.warehouse w
+           WHERE (:productId IS NULL OR p.id = :productId)
+             AND (:unrestricted = TRUE OR w.id IN :warehouseIds)
+           """)
+    List<StockRowProjection> findStockRows(
+            @Param("productId") Long productId,
+            @Param("unrestricted") boolean unrestricted,
+            @Param("warehouseIds") List<Long> warehouseIds
     );
 
     /**

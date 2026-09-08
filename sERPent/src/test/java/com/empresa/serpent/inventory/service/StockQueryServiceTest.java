@@ -24,6 +24,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static com.empresa.serpent.support.TestEntityFactory.stockRows;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
@@ -77,7 +79,7 @@ class StockQueryServiceTest {
                 snapshot(pollo, norte, "8.000")
         );
 
-        given(inventoryStockSnapshotRepository.findAll()).willReturn(snapshots);
+        given(inventoryStockSnapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(snapshots));
 
         List<StockResponse> result = stockQueryService.getStock(new StockFilter(null, null, null));
 
@@ -95,7 +97,9 @@ class StockQueryServiceTest {
         assertThat(result.get(1).warehouseName()).isEqualTo("Sucursal Norte");
         assertThat(result.get(1).stock()).isEqualByComparingTo("8.000");
 
-        verify(inventoryStockSnapshotRepository).findAll();
+        // Proyectado, no entidades: es lo que hace que esta lectura cueste una sentencia
+        // y no una por producto. Ver StockRowProjection.
+        verify(inventoryStockSnapshotRepository).findStockRows(any(), anyBoolean(), any());
     }
 
     @Test
@@ -111,7 +115,7 @@ class StockQueryServiceTest {
                 snapshot(pollo, norte, "3.000")
         );
 
-        given(inventoryStockSnapshotRepository.findAll()).willReturn(snapshots);
+        given(inventoryStockSnapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(snapshots));
 
         List<StockResponse> result = stockQueryService.getStock(new StockFilter(null, null, true));
 
@@ -119,7 +123,9 @@ class StockQueryServiceTest {
         assertThat(result.get(0).warehouseId()).isEqualTo(2L);
         assertThat(result.get(0).stock()).isEqualByComparingTo("3.000");
 
-        verify(inventoryStockSnapshotRepository).findAll();
+        // Proyectado, no entidades: es lo que hace que esta lectura cueste una sentencia
+        // y no una por producto. Ver StockRowProjection.
+        verify(inventoryStockSnapshotRepository).findStockRows(any(), anyBoolean(), any());
     }
 
     @Test
@@ -222,7 +228,7 @@ class StockQueryServiceTest {
                 snapshot(milanesa, norte, "5.000")
         );
 
-        given(inventoryStockSnapshotRepository.findAll()).willReturn(snapshots);
+        given(inventoryStockSnapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(snapshots));
         given(productRepository.findAll()).willReturn(List.of(pataMuslo, milanesa));
         given(productWarehouseMinimumStockRepository.findAll()).willReturn(List.of());
 
@@ -251,7 +257,7 @@ class StockQueryServiceTest {
                 snapshot(milanesa, central, "5.000")
         );
 
-        given(inventoryStockSnapshotRepository.findAll()).willReturn(snapshots);
+        given(inventoryStockSnapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(snapshots));
         given(productRepository.findAll()).willReturn(List.of(milanesa));
         given(productWarehouseMinimumStockRepository.findAll()).willReturn(List.of());
 

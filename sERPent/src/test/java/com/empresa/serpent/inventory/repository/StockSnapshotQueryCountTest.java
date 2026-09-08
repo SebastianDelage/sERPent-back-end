@@ -5,6 +5,12 @@ import com.empresa.serpent.inventory.domain.entity.InventoryMovementEntity;
 import com.empresa.serpent.inventory.domain.entity.InventoryStockSnapshotEntity;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
 import com.empresa.serpent.inventory.domain.enums.MovementType;
+import com.empresa.serpent.inventory.service.StockQueryService;
+import com.empresa.serpent.inventory.web.dto.filter.StockFilter;
+import com.empresa.serpent.inventory.web.dto.response.StockResponse;
+import com.empresa.serpent.reports.repository.projection.StockRowProjection;
+import com.empresa.serpent.shared.security.WarehouseScopeService;
+import com.empresa.serpent.shared.security.WarehouseScopeService.WarehouseScope;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -15,12 +21,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
 
 /**
  * CUÁNTAS CONSULTAS CUESTA LEER EL STOCK DE UN DEPÓSITO.
@@ -42,6 +51,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * porque un número solo no distingue "una consulta" de "una por fila" cuando hay pocas filas.
  */
 @DataJpaTest
+@Import(StockQueryService.class)
 @ActiveProfiles("test")
 @TestPropertySource(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @DisplayName("Cost of reading a warehouse's stock")
@@ -55,6 +65,18 @@ class StockSnapshotQueryCountTest {
 
     @Autowired
     private EntityManagerFactory entityManagerFactory;
+
+    @Autowired
+    private StockQueryService stockQueryService;
+
+    /*
+      Se simula solo el alcance por depósito. El resto del servicio corre de verdad: lo que este
+      test mide es cuántas sentencias manda EL CAMINO REAL, y para eso el camino tiene que ser
+      el real. Medir el repositorio suelto dejaría pasar que alguien vuelva a cablear el
+      servicio a los finders de entidades sin que ningún test se entere.
+    */
+    @MockitoBean
+    private WarehouseScopeService warehouseScopeService;
 
     private Statistics statistics;
     private WarehouseEntity warehouse;
@@ -102,8 +124,8 @@ class StockSnapshotQueryCountTest {
         entityManager.clear();
     }
 
-    /** Sentencias que la lectura del depósito manda a la base, con la caché de sesión vacía. */
-    private long statementsToLoadWarehouseStock() {
+    /** Sentencias que manda el camino de ENTIDADES, recorriendo lo que recorría producción. */
+    private long statementsLoadingManagedEntities() {
         entityManager.clear();
         statistics.clear();
 
@@ -111,10 +133,10 @@ class StockSnapshotQueryCountTest {
                 repository.findByWarehouseIdIn(List.of(warehouse.getId()));
 
         /*
-          SE RECORRE LO MISMO QUE RECORRE PRODUCCIÓN, y esto ya se hizo mal una vez: la primera
-          versión sumaba currentStock y nada más, así que medía 1 sentencia y no veía las cargas
-          perezosas que StockQueryService.toStockResponse dispara al leer producto y depósito.
-          Un medidor que no recorre lo que recorre el código mide otra cosa.
+          SE RECORRE LO MISMO QUE RECORRÍA PRODUCCIÓN, y esto ya se hizo mal una vez: la primera
+          versión de este medidor sumaba currentStock y nada más, así que daba una sentencia y no
+          veía las cargas perezosas que el armado del DTO dispara al leer producto y depósito. Un
+          medidor que no recorre lo que recorre el código mide otra cosa.
         */
         for (InventoryStockSnapshotEntity snapshot : snapshots) {
             assertThat(snapshot.getProduct().getName()).isNotNull();
@@ -125,38 +147,108 @@ class StockSnapshotQueryCountTest {
         return statistics.getPrepareStatementCount();
     }
 
+    /** Sentencias que manda el camino PROYECTADO, leyendo los seis campos que arman el DTO. */
+    private long statementsLoadingProjection() {
+        entityManager.clear();
+        statistics.clear();
+
+        List<StockRowProjection> rows =
+                repository.findStockRows(null, false, List.of(warehouse.getId()));
+
+        // Los seis, uno por uno: si alguno resolviera contra una relación en vez de contra una
+        // columna, la carga que dispare tiene que quedar contada.
+        for (StockRowProjection row : rows) {
+            assertThat(row.getProductId()).isNotNull();
+            assertThat(row.getProductName()).isNotNull();
+            assertThat(row.getWarehouseId()).isNotNull();
+            assertThat(row.getWarehouseName()).isNotNull();
+            assertThat(row.getCurrentStock()).isNotNull();
+            assertThat(row.getWarehouseActive()).isNotNull();
+        }
+
+        return statistics.getPrepareStatementCount();
+    }
+
+    /** Sentencias que manda GET /api/stock de punta a punta, entrando por el servicio. */
+    private long statementsThroughTheService() {
+        entityManager.clear();
+        statistics.clear();
+
+        List<StockResponse> rows = stockQueryService.getStock(
+                new StockFilter(null, warehouse.getId(), null));
+
+        // Se leen los seis campos del DTO: si alguno se resolviera contra una entidad perezosa,
+        // la carga quedaría contada acá y no se escaparía como pasó con el primer medidor.
+        for (StockResponse row : rows) {
+            assertThat(row.productName()).isNotNull();
+            assertThat(row.warehouseName()).isNotNull();
+            assertThat(row.stock()).isNotNull();
+            assertThat(row.warehouseActive()).isNotNull();
+        }
+
+        return statistics.getPrepareStatementCount();
+    }
+
     @Test
-    @DisplayName("Reading the whole warehouse costs one statement, and it does not grow with rows")
-    void readingStockIsOneStatement() {
+    @DisplayName("The whole GET /api/stock path costs one statement, whatever the catalogue size")
+    void theServicePathDoesNotGrowWithRows() {
+        given(warehouseScopeService.resolve(warehouse.getId()))
+                .willReturn(new WarehouseScope(false, List.of(warehouse.getId())));
+
         seedSnapshots(3);
-        long withThree = statementsToLoadWarehouseStock();
+        long withThree = statementsThroughTheService();
 
         seedSnapshots(7);
-        long withTen = statementsToLoadWarehouseStock();
+        long withTen = statementsThroughTheService();
+
+        assertThat(withThree).as("3 filas, por el servicio").isEqualTo(1);
+        assertThat(withTen).as("10 filas, por el servicio").isEqualTo(1);
+        assertThat(withTen - withThree).as("costo de las 7 filas de más").isZero();
+    }
+
+    @Test
+    @DisplayName("The projected read costs the same with 3 rows as with 10")
+    void projectedReadDoesNotGrowWithRows() {
+        seedSnapshots(3);
+        long withThree = statementsLoadingProjection();
+
+        seedSnapshots(7);
+        long withTen = statementsLoadingProjection();
+
+        assertThat(withThree).as("3 filas, proyectado").isEqualTo(1);
+        assertThat(withTen).as("10 filas, proyectado").isEqualTo(1);
 
         /*
-          LO QUE CUESTA HOY, MEDIDO Y NO SUPUESTO: una consulta por la lista, más una por
-          producto distinto, más una por depósito distinto. Los productos son distintos en cada
-          fila y el depósito es siempre el mismo, así que con N filas son N + 2.
-
-          Este número documenta un N+1 QUE YA EXISTE en la lectura más caliente de la app, y no
-          lo introduce este trabajo: toStockResponse lee el nombre del producto y el del
-          depósito, y las dos relaciones son perezosas. Arreglarlo es otra ronda —un
-          @EntityGraph sobre findByWarehouseIdIn, como el que ya tiene el repositorio de
-          movimientos—. Queda medido para que esa ronda tenga contra qué comparar.
+          LA AFIRMACIÓN QUE IMPORTA: cada fila de más cuesta CERO sentencias. Un número fijo
+          solo dice "hoy es 1"; lo que este test tiene que impedir es que el costo vuelva a
+          crecer con el catálogo, que es lo que pasaba antes y lo que volvería a pasar si
+          alguien cambia la proyección por entidades o le agrega una relación al recorrido.
         */
+        assertThat(withTen - withThree)
+                .as("sentencias que cuestan las 7 filas de más")
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("Loading managed entities instead still grows one statement per row")
+    void managedEntitiesStillGrowWithRows() {
+        /*
+          POR QUÉ ESTE CASO SIGUE ACÁ aunque getStock ya no use este camino. Primero, porque es
+          la medición contra la que se justificó el cambio y conviene que quede corriendo en vez
+          de escrita en un comentario. Y segundo, porque los finders que devuelven entidades no
+          se borraron: los usan la reconstrucción de snapshots, la reconciliación y la vista
+          paginada de Stock, que sigue pagando este costo acotado por el tamaño de página.
+        */
+        seedSnapshots(3);
+        long withThree = statementsLoadingManagedEntities();
+
+        seedSnapshots(7);
+        long withTen = statementsLoadingManagedEntities();
+
         assertThat(withThree).as("3 filas: 1 lista + 3 productos + 1 depósito").isEqualTo(5);
         assertThat(withTen).as("10 filas: 1 lista + 10 productos + 1 depósito").isEqualTo(12);
 
-        /*
-          LA AFIRMACIÓN QUE IMPORTA PARA ESTA RONDA: el costo crece con los productos y con
-          nada más. Mapear last_movement_id como @ManyToOne sin declarar LAZY sumaría otra
-          consulta por fila —medido: con product en EAGER, tres filas pasan de 1 a 4
-          sentencias— y este test lo pondría rojo.
-        */
-        long porFilaEntreLasDosCorridas = (withTen - withThree) / (10 - 3);
-        assertThat(porFilaEntreLasDosCorridas)
-                .as("sentencias que cuesta cada fila de más")
-                .isEqualTo(1);
+        long porFila = (withTen - withThree) / (10 - 3);
+        assertThat(porFila).as("sentencias por fila de más, con entidades").isEqualTo(1);
     }
 }

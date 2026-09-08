@@ -21,6 +21,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static com.empresa.serpent.support.TestEntityFactory.stockRows;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
@@ -130,7 +132,7 @@ class LowStockPerWarehouseTest {
 
         // 100 + 2 = 102 total, comfortably over a minimum of 20: the old aggregation
         // reported nothing at all. Per warehouse, the branch is clearly short.
-        given(snapshotRepository.findAll()).willReturn(List.of(
+        given(snapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(
                 snapshot(pollo, central, "100.000"),
                 snapshot(pollo, branch, "2.000")
         ));
@@ -154,7 +156,7 @@ class LowStockPerWarehouseTest {
         WarehouseEntity branch = branch();
 
         // The central warehouse moves more volume, so it carries a floor of 50.
-        given(snapshotRepository.findAll()).willReturn(List.of(
+        given(snapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(
                 snapshot(pollo, central, "40.000"),
                 snapshot(pollo, branch, "25.000")
         ));
@@ -180,7 +182,7 @@ class LowStockPerWarehouseTest {
         WarehouseEntity branch = branch();
 
         // A small branch is fine holding 5, even though the product-wide floor is 20.
-        given(snapshotRepository.findAll()).willReturn(List.of(
+        given(snapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(
                 snapshot(pollo, branch, "8.000")
         ));
         given(productRepository.findAll()).willReturn(List.of(pollo));
@@ -197,7 +199,7 @@ class LowStockPerWarehouseTest {
         ProductEntity untracked = product(9L, "Bolsas", null);
         WarehouseEntity branch = branch();
 
-        given(snapshotRepository.findAll()).willReturn(List.of(
+        given(snapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(
                 snapshot(untracked, branch, "0.000")
         ));
         given(productRepository.findAll()).willReturn(List.of(untracked));
@@ -212,7 +214,7 @@ class LowStockPerWarehouseTest {
         ProductEntity untracked = product(9L, "Bolsas", null);
         WarehouseEntity branch = branch();
 
-        given(snapshotRepository.findAll()).willReturn(List.of(
+        given(snapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(
                 snapshot(untracked, branch, "3.000")
         ));
         given(productRepository.findAll()).willReturn(List.of(untracked));
@@ -235,7 +237,13 @@ class LowStockPerWarehouseTest {
         WarehouseEntity branch = branch();
 
         // Short at both, so the filter is what makes the difference, not the data.
-        given(snapshotRepository.findByWarehouseIdIn(List.of(BRANCH_ID))).willReturn(List.of(
+        /*
+          El stub va con los argumentos EXACTOS y no con any(): lo que este test prueba es que
+          el filtro por depósito llega a la consulta. Desde que la lectura es proyectada, el
+          alcance viaja como parámetro —unrestricted en false y la lista de depósitos— en vez
+          de elegir un finder distinto, así que es acá donde tiene que verse.
+        */
+        given(snapshotRepository.findStockRows(null, false, List.of(BRANCH_ID))).willReturn(stockRows(
                 snapshot(pollo, branch, "2.000")
         ));
         given(productRepository.findAll()).willReturn(List.of(pollo));
@@ -253,7 +261,7 @@ class LowStockPerWarehouseTest {
         ProductEntity pollo = product(1L, "Pollo entero", "20.000");
         WarehouseEntity branch = branch();
 
-        given(snapshotRepository.findAll()).willReturn(List.of(
+        given(snapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(
                 snapshot(pollo, branch, "20.000")
         ));
         given(productRepository.findAll()).willReturn(List.of(pollo));
@@ -277,7 +285,7 @@ class LowStockPerWarehouseTest {
         ProductEntity pollo = product(1L, "Pollo entero", "20.000");
         WarehouseEntity central = central();
 
-        given(snapshotRepository.findAll()).willReturn(List.of(
+        given(snapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(
                 snapshot(pollo, central, "8.000")
         ));
         given(productRepository.findAll()).willReturn(List.of(pollo));
@@ -302,7 +310,7 @@ class LowStockPerWarehouseTest {
         ProductEntity pollo = product(1L, "Pollo entero", "20.000");
         WarehouseEntity central = central();
 
-        given(snapshotRepository.findAll()).willReturn(List.of(
+        given(snapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(
                 snapshot(pollo, central, "5.000")
         ));
         given(productRepository.findAll()).willReturn(List.of(pollo));
@@ -323,7 +331,7 @@ class LowStockPerWarehouseTest {
         ProductEntity pollo = product(1L, "Pollo entero", "20.000");
         WarehouseEntity central = central();
 
-        given(snapshotRepository.findAll()).willReturn(List.of(
+        given(snapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(
                 snapshot(pollo, central, "3.000")
         ));
         given(productRepository.findAll()).willReturn(List.of(pollo));
@@ -348,7 +356,7 @@ class LowStockPerWarehouseTest {
         ProductEntity pollo = product(1L, "Pollo entero", "20.000");
         WarehouseEntity central = central();
 
-        given(snapshotRepository.findAll()).willReturn(List.of(
+        given(snapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(
                 snapshot(pollo, central, "40.000")
         ));
         given(productRepository.findAll()).willReturn(List.of(pollo));
@@ -373,7 +381,7 @@ class LowStockPerWarehouseTest {
         ProductEntity untracked = product(9L, "Sin seguimiento", null);
         WarehouseEntity central = central();
 
-        given(snapshotRepository.findAll()).willReturn(List.of(
+        given(snapshotRepository.findStockRows(any(), anyBoolean(), any())).willReturn(stockRows(
                 snapshot(untracked, central, "0.000")
         ));
         given(productRepository.findAll()).willReturn(List.of(untracked));

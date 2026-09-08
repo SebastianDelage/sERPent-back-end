@@ -1,13 +1,16 @@
 package com.empresa.serpent.support;
 
 import com.empresa.serpent.catalog.domain.entity.ProductEntity;
+import com.empresa.serpent.inventory.domain.entity.InventoryStockSnapshotEntity;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
+import com.empresa.serpent.reports.repository.projection.StockRowProjection;
 import com.empresa.serpent.transactions.domain.entity.PaymentMethodEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionDetailEntity;
 import com.empresa.serpent.transactions.domain.entity.TransactionEntity;
 import com.empresa.serpent.users.domain.entity.UserEntity;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 
 public final class TestEntityFactory {
@@ -70,5 +73,56 @@ public final class TestEntityFactory {
         transaction.setId(id);
         transaction.setDetails(List.of());
         return transaction;
+    }
+
+    /**
+     * Los snapshots vistos como los ve ahora {@code StockQueryService.getStock}: proyectados.
+     *
+     * <p>Esa consulta dejó de bajar entidades gestionadas —diez filas costaban doce sentencias,
+     * porque el nombre del producto y el del depósito son relaciones perezosas— y pasó a una
+     * proyección de los seis campos que el DTO usa. Los tests que la ejercitan siguen armando
+     * snapshots, que es como se lee la intención, y esto los traduce a lo que el repositorio
+     * devuelve hoy.
+     */
+    public static List<StockRowProjection> stockRows(InventoryStockSnapshotEntity... snapshots) {
+        return stockRows(Arrays.asList(snapshots));
+    }
+
+    public static List<StockRowProjection> stockRows(List<InventoryStockSnapshotEntity> snapshots) {
+        return snapshots.stream().map(TestEntityFactory::stockRow).toList();
+    }
+
+    private static StockRowProjection stockRow(InventoryStockSnapshotEntity snapshot) {
+        return new StockRowProjection() {
+            @Override
+            public Long getProductId() {
+                return snapshot.getProduct().getId();
+            }
+
+            @Override
+            public String getProductName() {
+                return snapshot.getProduct().getName();
+            }
+
+            @Override
+            public Long getWarehouseId() {
+                return snapshot.getWarehouse().getId();
+            }
+
+            @Override
+            public String getWarehouseName() {
+                return snapshot.getWarehouse().getName();
+            }
+
+            @Override
+            public BigDecimal getCurrentStock() {
+                return snapshot.getCurrentStock();
+            }
+
+            @Override
+            public Boolean getWarehouseActive() {
+                return snapshot.getWarehouse().getActive();
+            }
+        };
     }
 }
