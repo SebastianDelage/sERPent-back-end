@@ -14,7 +14,12 @@ spring:
 
   flyway:
     enabled: true
-    locations: classpath:db/migration-h2
+    # Dos carpetas: el esquema y los datos de referencia en la primera, el negocio de mentira
+    # en la segunda. El perfil de test carga solo la primera, y ésa es toda la diferencia
+    # entre lo que ve un test y lo que ve quien levanta el proyecto para mirar pantallas.
+    # Flyway ordena por versión mezclando las dos, así que el demo (2.1) sigue entrando
+    # justo después de la referencia (2) y antes de V3, como corría antes de separarse.
+    locations: classpath:db/migration-h2,classpath:db/seed-dev
     baseline-on-migrate: true
     validate-on-migrate: true
 

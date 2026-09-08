@@ -129,7 +129,7 @@ class InventoryMovementRepositoryTest {
     void shouldFindByTransactionId() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity paymentMethod = persistPaymentMethod();
+        PaymentMethodEntity paymentMethod = paymentMethodNamed("Cash");
 
         TransactionEntity transaction = TransactionEntity.builder()
                 .type(TransactionType.SALE)
@@ -213,12 +213,25 @@ class InventoryMovementRepositoryTest {
         return entityManager.persist(user);
     }
 
-    private PaymentMethodEntity persistPaymentMethod() {
-        PaymentMethodEntity pm = PaymentMethodEntity.builder()
-                .name("Cash")
-                .active(true)
-                .build();
-
-        return entityManager.persist(pm);
+    /**
+     * El medio de pago que ya existe con ese nombre, o uno nuevo si todavía no está.
+     *
+     * <p>V2__seed_reference_data siembra "Cash" y "Transfer" como datos de referencia, y el
+     * índice único sobre el nombre rechaza un segundo con el mismo. Crear siempre uno propio
+     * funcionaba mientras la suite armaba el esquema desde las entidades y arrancaba con la
+     * tabla vacía; contra las migraciones de verdad el medio de pago ya está, que es también
+     * lo que la app se encuentra en una instalación real.
+     */
+    private PaymentMethodEntity paymentMethodNamed(String name) {
+        return entityManager.getEntityManager()
+                .createQuery("SELECT p FROM PaymentMethodEntity p WHERE p.name = :name",
+                        PaymentMethodEntity.class)
+                .setParameter("name", name)
+                .getResultStream()
+                .findFirst()
+                .orElseGet(() -> entityManager.persistAndFlush(PaymentMethodEntity.builder()
+                        .name(name)
+                        .active(true)
+                        .build()));
     }
 }

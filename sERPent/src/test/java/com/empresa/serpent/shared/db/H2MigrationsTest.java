@@ -15,14 +15,26 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Runs the H2 migration set end to end.
+ * Corre los juegos de H2 de punta a punta.
  *
- * <p>The test profile disables Flyway and lets Hibernate build the schema, so until this test
- * existed nothing executed {@code db/migration-h2} at all — a syntax error there would only
- * surface when a developer started the dev server. The dev database is the one every local
- * developer actually works against, so it deserves the same guarantee as production's.
+ * <p>Hay dos combinaciones distintas en uso y las dos se prueban acá, porque un error de
+ * sintaxis en cualquiera de las dos solo aparecería cuando alguien levanta algo:
+ *
+ * <ul>
+ *   <li>{@code db/migration-h2} solo: es lo que carga el perfil de test, o sea el esquema y
+ *       los datos de referencia, sin negocio de demostración.
+ *   <li>{@code db/migration-h2} más {@code db/seed-dev}: es lo que carga el perfil de dev,
+ *       con el negocio de mentira que hace que las pantallas se vean llenas.
+ * </ul>
+ *
+ * <p>La segunda combinación no la ejerce ningún otro test —el perfil de test no la carga—,
+ * así que sin esta clase el seed de demostración se rompería en silencio hasta que alguien
+ * arrancara el servidor de desarrollo.
  */
 class H2MigrationsTest {
+
+    private static final String SCHEMA_AND_REFERENCE = "classpath:db/migration-h2";
+    private static final String DEMO_SEED = "classpath:db/seed-dev";
 
     private DataSource freshDatabase(String name) {
         DriverManagerDataSource dataSource = new DriverManagerDataSource();
@@ -43,31 +55,70 @@ class H2MigrationsTest {
         }
     }
 
-    @Test
-    @DisplayName("The whole db/migration-h2 set applies cleanly on an empty database")
-    void appliesCleanly() {
-        DataSource dataSource = freshDatabase("migrations_apply");
-
-        MigrateResult result = Flyway.configure()
+    private MigrateResult migrate(DataSource dataSource, String... locations) {
+        return Flyway.configure()
                 .dataSource(dataSource)
-                .locations("classpath:db/migration-h2")
+                .locations(locations)
                 .load()
                 .migrate();
+    }
+
+    @Test
+    @DisplayName("El juego que carga el perfil de test se aplica limpio sobre una base vacía")
+    void schemaAndReferenceApplyCleanly() {
+        MigrateResult result = migrate(freshDatabase("migrations_apply"), SCHEMA_AND_REFERENCE);
 
         assertThat(result.success).isTrue();
         assertThat(result.migrationsExecuted).isGreaterThan(0);
     }
 
     @Test
-    @DisplayName("The user_warehouses backfill assigns every ACTIVE warehouse to every seeded user")
+    @DisplayName("El juego que carga el perfil de dev, con el seed de demostración, también")
+    void demoSeedAppliesCleanlyOnTop() {
+        MigrateResult result =
+                migrate(freshDatabase("migrations_apply_demo"), SCHEMA_AND_REFERENCE, DEMO_SEED);
+
+        assertThat(result.success).isTrue();
+        /*
+          Estrictamente mayor que el juego sin demostración. Si el seed dejara de encontrarse
+          —una carpeta mal escrita en locations, por ejemplo— Flyway no falla: aplica lo que
+          encuentra y devuelve éxito. Comparar las cuentas es lo que distingue "corrió" de
+          "no había nada que correr".
+        */
+        MigrateResult sinDemo =
+                migrate(freshDatabase("migrations_apply_baseline"), SCHEMA_AND_REFERENCE);
+        assertThat(result.migrationsExecuted).isGreaterThan(sinDemo.migrationsExecuted);
+    }
+
+    @Test
+    @DisplayName("El perfil de dev tiene las dos carpetas en sus locations")
+    void devProfileLoadsBothLocations() throws Exception {
+        /*
+          Lo de arriba prueba que las dos carpetas juntas se aplican bien, pero no que el
+          perfil de dev las pida. Y si alguien saca db/seed-dev de esa linea, Flyway no
+          protesta: aplica lo que encuentra y devuelve exito. El sintoma seria que quien
+          levanta el proyecto ve las pantallas vacias, y recien ahi se enteraria.
+        */
+        String yaml;
+        try (var in = getClass().getResourceAsStream("/application-dev.yml")) {
+            yaml = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+
+        assertThat(yaml).contains("db/migration-h2");
+        assertThat(yaml).contains("db/seed-dev");
+    }
+
+    @Test
+    @DisplayName("El backfill de user_warehouses asigna cada depósito ACTIVO a cada usuario sembrado")
     void backfillCoversActiveWarehousesOnly() throws Exception {
+        /*
+          Con las dos carpetas: lo que este test mira son los usuarios y depósitos del negocio
+          de demostración, que desde que se separó el seed no están en el juego del perfil de
+          test. Sin la segunda carpeta las tres cuentas dan cero y el test pasaría en el vacío.
+        */
         DataSource dataSource = freshDatabase("migrations_backfill");
 
-        Flyway.configure()
-                .dataSource(dataSource)
-                .locations("classpath:db/migration-h2")
-                .load()
-                .migrate();
+        migrate(dataSource, SCHEMA_AND_REFERENCE, DEMO_SEED);
 
         long users = count(dataSource, "SELECT COUNT(*) FROM users");
         long activeWarehouses = count(dataSource, "SELECT COUNT(*) FROM warehouses WHERE active = TRUE");
@@ -76,11 +127,11 @@ class H2MigrationsTest {
 
         assertThat(users).isPositive();
         assertThat(activeWarehouses).isPositive();
-        // The seed data includes at least one inactive warehouse, so this actually exercises
-        // the filter rather than passing vacuously.
+        // El seed de demostración trae al menos un depósito inactivo, así que esto ejerce el
+        // filtro de verdad en vez de pasar por vacío.
         assertThat(inactiveWarehouses).isPositive();
-        // Preserves today's behaviour for warehouses that were actually operable; an inactive
-        // warehouse was never operable in the first place, so it is not backfilled.
+        // Conserva el comportamiento de hoy para los depósitos que estaban operativos; uno
+        // inactivo nunca lo estuvo, así que no se backfillea.
         assertThat(assignments).isEqualTo(users * activeWarehouses);
     }
 }

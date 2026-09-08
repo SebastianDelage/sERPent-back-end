@@ -67,8 +67,8 @@ class SalesReportWarehouseFilterTest {
     @BeforeEach
     void setUp() {
         UserEntity user = persistUser();
-        PaymentMethodEntity cash = persistPaymentMethod("Cash");
-        PaymentMethodEntity card = persistPaymentMethod("Tarjeta");
+        PaymentMethodEntity cash = paymentMethodNamed("Cash");
+        PaymentMethodEntity card = paymentMethodNamed("Tarjeta");
 
         branchA = persistWarehouse("Sucursal A");
         branchB = persistWarehouse("Sucursal B");
@@ -239,9 +239,24 @@ class SalesReportWarehouseFilterTest {
                 .name("Admin").username("admin_wh_filter").passwordHash("hash").active(true).build());
     }
 
-    private PaymentMethodEntity persistPaymentMethod(String name) {
-        return entityManager.persistAndFlush(
-                PaymentMethodEntity.builder().name(name).active(true).build());
+    /**
+     * El medio de pago que ya existe con ese nombre, o uno nuevo si todavía no está.
+     *
+     * <p>V2__seed_reference_data siembra "Cash" y "Transfer" como datos de referencia, y el
+     * índice único sobre el nombre rechaza un segundo con el mismo. Crear siempre uno propio
+     * funcionaba mientras la suite armaba el esquema desde las entidades y arrancaba con la
+     * tabla vacía; contra las migraciones de verdad el medio de pago ya está, que es también
+     * lo que la app se encuentra en una instalación real.
+     */
+    private PaymentMethodEntity paymentMethodNamed(String name) {
+        return entityManager.getEntityManager()
+                .createQuery("SELECT p FROM PaymentMethodEntity p WHERE p.name = :name",
+                        PaymentMethodEntity.class)
+                .setParameter("name", name)
+                .getResultStream()
+                .findFirst()
+                .orElseGet(() -> entityManager.persistAndFlush(
+                        PaymentMethodEntity.builder().name(name).active(true).build()));
     }
 
     private WarehouseEntity persistWarehouse(String name) {

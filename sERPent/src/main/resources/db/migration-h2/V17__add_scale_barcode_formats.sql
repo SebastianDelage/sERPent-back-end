@@ -53,8 +53,9 @@ ALTER TABLE products
 --     | +--------------- 2..7: product code, 6 digits
 --     +----------------- 1: prefix
 --
--- The seed goes in this file and NOT in V2__seed_data.sql: that one is already applied
--- and Flyway checksums it.
+-- Va en este archivo y no junto al resto de los datos: el formato de balanza es referencia
+-- —describe el hardware del local, no un negocio de ejemplo— así que corresponde que viva
+-- entre las migraciones y llegue también al perfil de test.
 INSERT INTO scale_barcode_formats (
     scale_barcode_format_id, name, prefix, total_length,
     product_code_start, product_code_length,

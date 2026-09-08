@@ -128,10 +128,17 @@ class SyncCommandAtomicityTest {
 
     private void cleanUp() {
         clientSyncCommandRepository.deleteAll();
+        /*
+          Antes que los movimientos: inventory_stock_snapshot.last_movement_id apunta al
+          movimiento que dejó el saldo como está, y la clave foránea del esquema real no deja
+          borrar el movimiento mientras la foto lo referencie. Este orden estaba al revés y no
+          fallaba porque la suite armaba el esquema desde las entidades, donde esa FK no
+          existe: la entidad mapea la columna como un Long suelto en vez de una relación.
+        */
+        snapshotRepository.deleteAll();
         movementRepository.deleteAll();
         saleRepository.deleteAll();
         transactionRepository.deleteAll();
-        snapshotRepository.deleteAll();
         productRepository.deleteAll();
         // Before warehouses: user_warehouses rows reference them, and the cascade only runs
         // from the user side.

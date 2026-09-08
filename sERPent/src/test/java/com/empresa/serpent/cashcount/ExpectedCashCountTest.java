@@ -75,6 +75,17 @@ class ExpectedCashCountTest {
 
     @BeforeEach
     void setUp() {
+        /*
+          Esta clase manda sobre la tabla de medios de pago: afirma sobre expected.methods(),
+          que los devuelve todos, y prende y apaga la marca de efectivo, que la app admite en
+          un solo medio a la vez. Los dos de referencia que siembra V2__seed_reference_data
+          —"Cash", que V15 deja marcado como efectivo, y "Transfer"— harían que hubiera dos
+          medios marcados y que la consulta devolviera dos filas donde el contrato dice una.
+          Se vacía la tabla en vez de reutilizarlos porque lo que se prueba acá no es "un medio
+          de pago" sino el conjunto entero.
+        */
+        entityManager.getEntityManager().createQuery("DELETE FROM PaymentMethodEntity").executeUpdate();
+
         user = entityManager.persistAndFlush(UserEntity.builder()
                 .name("Cajera").username("cajera_ecc").passwordHash("hash").active(true).build());
 

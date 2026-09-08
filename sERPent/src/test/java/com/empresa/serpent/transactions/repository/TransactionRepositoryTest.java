@@ -44,7 +44,7 @@ class TransactionRepositoryTest {
     void shouldReturnSalesByProductReport() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity cash = persistPaymentMethod("Cash");
+        PaymentMethodEntity cash = paymentMethodNamed("Cash");
 
         ProductEntity pollo = persistProduct("Pollo entero", "POLLO001");
         ProductEntity pataMuslo = persistProduct("Pata muslo", "POLLO002");
@@ -82,7 +82,7 @@ class TransactionRepositoryTest {
     void shouldSubtractReturnsInSalesByProductReport() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity cash = persistPaymentMethod("Cash");
+        PaymentMethodEntity cash = paymentMethodNamed("Cash");
         ProductEntity pollo = persistProduct("Pollo entero", "POLLO001");
 
         // Sold 5 at 4500 = 22500.
@@ -114,7 +114,7 @@ class TransactionRepositoryTest {
     void shouldReturnDailySalesReportGroupedByDate() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity cash = persistPaymentMethod("Cash");
+        PaymentMethodEntity cash = paymentMethodNamed("Cash");
 
         persistSaleTransaction(
                 LocalDateTime.of(2026, 3, 12, 10, 0),
@@ -148,7 +148,7 @@ class TransactionRepositoryTest {
     void shouldCountReturnOnTheDayItWasRegistered() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity cash = persistPaymentMethod("Cash");
+        PaymentMethodEntity cash = paymentMethodNamed("Cash");
 
         persistSaleTransaction(
                 LocalDateTime.of(2026, 3, 12, 10, 0), new BigDecimal("9100.0000"), cash, user);
@@ -181,8 +181,8 @@ class TransactionRepositoryTest {
     void shouldReturnSalesByPaymentMethodReport() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity cash = persistPaymentMethod("Cash");
-        PaymentMethodEntity transfer = persistPaymentMethod("Transfer");
+        PaymentMethodEntity cash = paymentMethodNamed("Cash");
+        PaymentMethodEntity transfer = paymentMethodNamed("Transfer");
 
         persistSaleTransaction(
                 LocalDateTime.of(2026, 3, 12, 10, 0),
@@ -219,7 +219,7 @@ class TransactionRepositoryTest {
     void shouldReturnSalesSummaryReport() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity cash = persistPaymentMethod("Cash");
+        PaymentMethodEntity cash = paymentMethodNamed("Cash");
 
         ProductEntity pollo = persistProduct("Pollo entero", "POLLO001");
 
@@ -261,7 +261,7 @@ class TransactionRepositoryTest {
     void shouldSplitSummaryIntoListPriceReturnsAndNet() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity cash = persistPaymentMethod("Cash");
+        PaymentMethodEntity cash = paymentMethodNamed("Cash");
         ProductEntity pollo = persistProduct("Pollo entero", "POLLO001");
 
         TransactionEntity sale = persistSaleTransaction(
@@ -296,7 +296,7 @@ class TransactionRepositoryTest {
     void shouldMirrorTransactionTypeOnDetails() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity cash = persistPaymentMethod("Cash");
+        PaymentMethodEntity cash = paymentMethodNamed("Cash");
         ProductEntity pollo = persistProduct("Pollo entero", "POLLO001");
 
         TransactionEntity sale = persistSaleTransaction(
@@ -329,7 +329,7 @@ class TransactionRepositoryTest {
     void shouldBreakSummaryIntoPartsThatAddUpToNet() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity card = persistPaymentMethod("Tarjeta");
+        PaymentMethodEntity card = paymentMethodNamed("Tarjeta");
         ProductEntity cigarettes = persistProduct("Cigarrillos", "CIG001");
 
         TransactionEntity sale = persistSaleTransaction(
@@ -364,7 +364,7 @@ class TransactionRepositoryTest {
     void shouldReportListPriceEqualToNetWithoutAdjustments() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity cash = persistPaymentMethod("Cash");
+        PaymentMethodEntity cash = paymentMethodNamed("Cash");
         ProductEntity pollo = persistProduct("Pollo entero", "POLLO001");
 
         TransactionEntity sale = persistSaleTransaction(
@@ -389,7 +389,7 @@ class TransactionRepositoryTest {
     void shouldReportPaymentMethodSurchargeOnly() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity card = persistPaymentMethod("Tarjeta");
+        PaymentMethodEntity card = paymentMethodNamed("Tarjeta");
         ProductEntity cigarettes = persistProduct("Cigarrillos", "CIG001");
 
         // 2 x 1000 listed, +10% by card = 2200 charged.
@@ -414,7 +414,7 @@ class TransactionRepositoryTest {
     void shouldReportManualAdjustmentOnly() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity cash = persistPaymentMethod("Cash");
+        PaymentMethodEntity cash = paymentMethodNamed("Cash");
         ProductEntity pollo = persistProduct("Pollo entero", "POLLO001");
 
         // 10000 listed, 1000 knocked off manually.
@@ -439,7 +439,7 @@ class TransactionRepositoryTest {
     void shouldReportPaymentMethodDiscountAsNegative() {
 
         UserEntity user = persistUser();
-        PaymentMethodEntity cash = persistPaymentMethod("Efectivo");
+        PaymentMethodEntity cash = paymentMethodNamed("Efectivo");
         ProductEntity pollo = persistProduct("Pollo entero", "POLLO001");
 
         // 2 x 1000 listed, -5% for paying cash = 1900 charged.
@@ -471,13 +471,26 @@ class TransactionRepositoryTest {
         return entityManager.persistAndFlush(user);
     }
 
-    private PaymentMethodEntity persistPaymentMethod(String name) {
-        PaymentMethodEntity paymentMethod = PaymentMethodEntity.builder()
-                .name(name)
-                .active(true)
-                .build();
-
-        return entityManager.persistAndFlush(paymentMethod);
+    /**
+     * El medio de pago que ya existe con ese nombre, o uno nuevo si todavía no está.
+     *
+     * <p>V2__seed_reference_data siembra "Cash" y "Transfer" como datos de referencia, y el
+     * índice único sobre el nombre rechaza un segundo con el mismo. Crear siempre uno propio
+     * funcionaba mientras la suite armaba el esquema desde las entidades y arrancaba con la
+     * tabla vacía; contra las migraciones de verdad el medio de pago ya está, que es también
+     * lo que la app se encuentra en una instalación real.
+     */
+    private PaymentMethodEntity paymentMethodNamed(String name) {
+        return entityManager.getEntityManager()
+                .createQuery("SELECT p FROM PaymentMethodEntity p WHERE p.name = :name",
+                        PaymentMethodEntity.class)
+                .setParameter("name", name)
+                .getResultStream()
+                .findFirst()
+                .orElseGet(() -> entityManager.persistAndFlush(PaymentMethodEntity.builder()
+                        .name(name)
+                        .active(true)
+                        .build()));
     }
 
     private ProductEntity persistProduct(String name, String sku) {

@@ -70,6 +70,12 @@ class CashCountAccessIntegrationTest {
         north = warehouseRepository.save(
                 WarehouseEntity.builder().name("Norte CCA").active(true).build());
 
+        /*
+          Se vacía primero: V2__seed_reference_data siembra "Cash" y V15 lo deja marcado como
+          efectivo, así que sin esto habría dos medios marcados y el endpoint de importes
+          esperados falla con 500 sobre un contrato que admite uno solo.
+        */
+        paymentMethodRepository.deleteAll();
         paymentMethodRepository.save(PaymentMethodEntity.builder()
                 .name("Efectivo CCA").isCash(true).active(true).build());
 

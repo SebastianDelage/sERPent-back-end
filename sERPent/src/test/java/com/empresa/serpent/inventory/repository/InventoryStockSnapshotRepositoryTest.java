@@ -1,8 +1,10 @@
 package com.empresa.serpent.inventory.repository;
 
 import com.empresa.serpent.catalog.domain.entity.ProductEntity;
+import com.empresa.serpent.inventory.domain.entity.InventoryMovementEntity;
 import com.empresa.serpent.inventory.domain.entity.InventoryStockSnapshotEntity;
 import com.empresa.serpent.inventory.domain.entity.WarehouseEntity;
+import com.empresa.serpent.inventory.domain.enums.MovementType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,12 +36,14 @@ class InventoryStockSnapshotRepositoryTest {
         persistSnapshot(product, warehouse, "5.000");
 
         int applied = repository.decreaseStockWithFloor(
-                product.getId(), warehouse.getId(), new BigDecimal("3.000"), 999L);
+                product.getId(), warehouse.getId(), new BigDecimal("3.000"),
+                persistMovement(product, warehouse));
         assertThat(applied).isEqualTo(1);
         assertThat(currentStock(product, warehouse)).isEqualByComparingTo("2.000");
 
         int rejected = repository.decreaseStockWithFloor(
-                product.getId(), warehouse.getId(), new BigDecimal("10.000"), 1000L);
+                product.getId(), warehouse.getId(), new BigDecimal("10.000"),
+                persistMovement(product, warehouse));
         assertThat(rejected).isEqualTo(0);
         assertThat(currentStock(product, warehouse)).isEqualByComparingTo("2.000");
     }
@@ -52,7 +56,8 @@ class InventoryStockSnapshotRepositoryTest {
         persistSnapshot(product, warehouse, "2.000");
 
         int applied = repository.decreaseStockWithoutFloor(
-                product.getId(), warehouse.getId(), new BigDecimal("5.000"), 999L);
+                product.getId(), warehouse.getId(), new BigDecimal("5.000"),
+                persistMovement(product, warehouse));
 
         assertThat(applied).isEqualTo(1);
         assertThat(currentStock(product, warehouse)).isEqualByComparingTo("-3.000");
@@ -127,6 +132,26 @@ class InventoryStockSnapshotRepositoryTest {
                 .active(true)
                 .build();
         return entityManager.persistAndFlush(warehouse);
+    }
+
+    /**
+     * Un movimiento de verdad, y su id, para pasarle a las consultas que lo dejan anotado.
+     *
+     * <p>Antes estos tests pasaban 999 y 1000, ids de movimientos que no existían. Funcionaba
+     * porque la suite armaba el esquema desde las entidades, y ahí no hay ninguna clave
+     * foránea sobre esta columna: InventoryStockSnapshotEntity mapea last_movement_id como un
+     * Long suelto en vez de una relación, así que Hibernate nunca la creaba. Contra el esquema
+     * de las migraciones, que sí tiene fk_inventory_stock_snapshot_last_movement, un id
+     * inventado se rechaza — que es lo que haría producción.
+     */
+    private Long persistMovement(ProductEntity product, WarehouseEntity warehouse) {
+        InventoryMovementEntity movement = InventoryMovementEntity.builder()
+                .product(product)
+                .warehouse(warehouse)
+                .movementType(MovementType.OUT)
+                .quantity(new BigDecimal("1.000"))
+                .build();
+        return entityManager.persistAndFlush(movement).getId();
     }
 
     private void persistSnapshot(ProductEntity product, WarehouseEntity warehouse, String stock) {
