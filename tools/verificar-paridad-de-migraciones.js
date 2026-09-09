@@ -225,4 +225,91 @@ if (hallazgos.length) {
   );
 }
 
+/*
+  ===========================================================================
+  db/common: LO QUE ESTE SCRIPT VIGILA AHORA QUE HAY UNA TERCERA CARPETA
+  ===========================================================================
+
+  Los dos juegos de arriba están congelados y son el esquema histórico. Todo lo nuevo va a
+  db/common, escrito una sola vez para los dos motores — ver db/common/README.md.
+
+  Common NO SE COMPARA CONTRA NADA, porque es una sola: no hay un juego gemelo del que pueda
+  divergir, que es justamente el problema que viene a resolver. Pero trae dos riesgos propios
+  que sí se pueden revisar leyendo los nombres de archivo, y por eso siguen acá y no en otro
+  lado: esta herramienta ya es la que conoce cómo está repartido el esquema.
+
+    1. EL PISO DE VERSIÓN. Una migración de common numerada por debajo del último número de un
+       juego viejo se aplicaría en el medio de la historia, antes de la tabla que necesita.
+
+    2. LOS NÚMEROS REPETIDOS ENTRE CARPETAS. Flyway falla al arrancar si dos archivos comparten
+       versión dentro de un mismo juego de locations. Es ruidoso, pero se entera el que levanta
+       la app; acá se entera el que la escribe.
+
+  Se revisa POR COMBINACIÓN DE PERFIL y no todas las carpetas juntas, que sería incorrecto: el
+  V7 de db/seed-dev y el V7 de db/migration comparten número y no chocan nunca, porque ningún
+  perfil carga esas dos carpetas a la vez.
+  ===========================================================================
+*/
+const COMMON_VERSION_FLOOR = 40;
+
+const PROFILE_LOCATIONS = {
+  prod: ['migration', 'common'],
+  dev: ['migration-h2', 'seed-dev', 'common'],
+  test: ['migration-h2', 'common'],
+};
+
+/** Los archivos de una carpeta, con su versión, o lista vacía si la carpeta no existe. */
+function migrationsIn(dir) {
+  const d = path.join(BASE, dir);
+  if (!fs.existsSync(d)) return [];
+  return fs
+    .readdirSync(d)
+    .filter((f) => f.endsWith('.sql'))
+    .map((f) => ({ file: f, folder: dir, version: f.slice(1, f.indexOf('__')) }));
+}
+
+const commonMigrations = migrationsIn('common');
+
+console.log('\nCARPETA db/common');
+console.log('  migraciones: ' + commonMigrations.length + '   piso de versión: V' + COMMON_VERSION_FLOOR);
+if (commonMigrations.length === 0) {
+  console.log('  todavía vacía: lo nuevo va acá, no en los juegos de arriba');
+}
+
+for (const m of commonMigrations) {
+  const numero = Number(m.version.split('.')[0]);
+  if (!Number.isFinite(numero) || numero < COMMON_VERSION_FLOOR) {
+    hallazgos.push({
+      categoria: 'versión por debajo del piso de common',
+      lado: 'common',
+      nombre: m.file,
+    });
+  }
+}
+
+for (const [profile, folders] of Object.entries(PROFILE_LOCATIONS)) {
+  const seen = new Map();
+  for (const folder of folders) {
+    for (const m of migrationsIn(folder)) {
+      const previo = seen.get(m.version);
+      if (previo) {
+        hallazgos.push({
+          categoria: 'versión repetida en el perfil ' + profile,
+          lado: previo.folder + ' y ' + folder,
+          nombre: 'V' + m.version + ' (' + previo.file + ' / ' + m.file + ')',
+        });
+      } else {
+        seen.set(m.version, m);
+      }
+    }
+  }
+}
+
+if (hallazgos.length) {
+  console.log('\nPROBLEMAS DE NUMERACIÓN');
+  for (const h of hallazgos.filter((x) => x.categoria.startsWith('versión'))) {
+    console.log('  ' + h.categoria + ': ' + h.nombre + '   (' + h.lado + ')');
+  }
+}
+
 process.exitCode = hallazgos.length === 0 ? 0 : 1;
