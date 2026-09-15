@@ -22,12 +22,16 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
      * Lists users; inactive ones are excluded unless asked for. The search term matches
      * first name, last name or username.
      */
+    // Los CAST no son decoracion, y van en CADA aparicion del parametro. Sin ellos, listar SIN
+    // termino de busqueda manda el parametro a PostgreSQL como binario y la consulta revienta
+    // con "no existe la funcion lower(bytea)". En H2 anda igual, que es por lo que no se vio
+    // antes. El por que, y por que no alcanza con castear una sola: docs/OPTIONAL_FILTERS.md.
     @Query("""
            SELECT u FROM UserEntity u
-           WHERE (:name IS NULL
-                  OR LOWER(u.name) LIKE LOWER(CONCAT('%', :name, '%'))
-                  OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', :name, '%'))
-                  OR LOWER(u.username) LIKE LOWER(CONCAT('%', :name, '%')))
+           WHERE (CAST(:name AS String) IS NULL
+                  OR LOWER(u.name) LIKE LOWER(CONCAT('%', CAST(:name AS String), '%'))
+                  OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', CAST(:name AS String), '%'))
+                  OR LOWER(u.username) LIKE LOWER(CONCAT('%', CAST(:name AS String), '%')))
              AND (:includeInactive = TRUE OR u.active = TRUE)
            ORDER BY u.name
            """)

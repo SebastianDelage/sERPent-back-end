@@ -52,15 +52,19 @@ public interface InventoryStockSnapshotRepository extends
      * product that actually holds 37 — the filter would silently rewrite the number it is
      * supposed to be selecting on.
      */
+    // Los CAST no son decoracion, y van en CADA aparicion del parametro. Sin ellos, listar SIN
+    // termino de busqueda manda el parametro a PostgreSQL como binario y la consulta revienta
+    // con "no existe la funcion lower(bytea)". En H2 anda igual, que es por lo que no se vio
+    // antes. El por que, y por que no alcanza con castear una sola: docs/OPTIONAL_FILTERS.md.
     @Query(value = """
            SELECT p.id AS productId,
                   p.name AS productName,
                   COALESCE(SUM(s.currentStock), 0) AS totalStock
            FROM InventoryStockSnapshotEntity s
            JOIN s.product p
-           WHERE (:search IS NULL
-                  OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
-                  OR LOWER(p.sku) = LOWER(:search)
+           WHERE (CAST(:search AS String) IS NULL
+                  OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                  OR LOWER(p.sku) = LOWER(CAST(:search AS String))
                   OR p.barcode = :search)
              AND (:unrestricted = TRUE OR s.warehouse.id IN :warehouseIds)
              AND (:outOfStock = FALSE OR EXISTS (
@@ -96,9 +100,9 @@ public interface InventoryStockSnapshotRepository extends
            SELECT COUNT(DISTINCT p.id)
            FROM InventoryStockSnapshotEntity s
            JOIN s.product p
-           WHERE (:search IS NULL
-                  OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
-                  OR LOWER(p.sku) = LOWER(:search)
+           WHERE (CAST(:search AS String) IS NULL
+                  OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                  OR LOWER(p.sku) = LOWER(CAST(:search AS String))
                   OR p.barcode = :search)
              AND (:unrestricted = TRUE OR s.warehouse.id IN :warehouseIds)
              AND (:outOfStock = FALSE OR EXISTS (

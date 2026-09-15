@@ -24,6 +24,13 @@
         <lombok.version>1.18.44</lombok.version>
         <lombok.mapstruct.binding.version>0.2.0</lombok.mapstruct.binding.version>
         <jacoco.version>0.8.12</jacoco.version>
+
+        <!--
+            Interruptor de NullableFilterQueriesPostgresTest, el unico test que se conecta al
+            PostgreSQL de la maquina. Apagado por default para que el suite no dependa de que
+            quien lo corre tenga la base levantada. Se prende con: ./mvnw test -Dpgcheck=true
+        -->
+        <pgcheck>false</pgcheck>
     </properties>
 
     <dependencies>
@@ -173,6 +180,21 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                </configuration>
+            </plugin>
+
+            <!--
+                Surefire arranca una JVM aparte, y las propiedades -D de la linea de comandos
+                de Maven NO llegan solas a esa JVM. Sin este bloque, "-Dpgcheck=true" se queda
+                en Maven y el test sigue salteado sin decir por que.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <pgcheck>${pgcheck}</pgcheck>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
 

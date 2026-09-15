@@ -154,3 +154,14 @@ necesitar un baseline sobre una base viva y se vuelve genuinamente riesgosa.
 - **`H2MigrationsTest`** — parte del suite. Aplica las migraciones de punta a punta sobre una
   base H2 vacía, en las combinaciones que usa cada perfil, y verifica que `db/common` se aplique
   después de todo lo demás. **Solo cubre H2**; el lado de PostgreSQL es manual.
+
+- **`NullableFilterQueriesPostgresTest`** — se corre a mano, con
+  `./mvnw test -Dpgcheck=true` y PostgreSQL levantado. Ejecuta contra el motor real cada
+  consulta que recibe un filtro opcional, con ese filtro en null. **Es de otra familia que las
+  dos herramientas de arriba y por eso está acá:** aquéllas comparan DDL, y esto no era una
+  diferencia de esquema. Los dos esquemas eran idénticos y seis pantallas igual reventaban en
+  PostgreSQL, porque lo que divergía era el COMPORTAMIENTO del SQL —H2 acepta un parámetro que
+  PostgreSQL rechaza—. La historia completa está en `docs/OPTIONAL_FILTERS.md`.
+
+  Vale la pena que entre en la rutina de antes de un deploy, junto con las dos de arriba: es el
+  único chequeo del proyecto que corre SQL de la aplicación contra el motor de producción.

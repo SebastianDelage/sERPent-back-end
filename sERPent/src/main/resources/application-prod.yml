@@ -44,13 +44,17 @@ serpent:
     secret: ${JWT_SECRET}
     expiration-ms: 28800000
 
-  # Orígenes que el navegador puede usar para llamar a la API (ver CorsConfig). El shell de
-  # Electron (sERPent-desktop) todavía no existe en este repo — es un módulo documentado en
-  # ARCHITECTURE.md pero sin código — así que no puedo saber si su origen real va a ser
-  # http://localhost:PUERTO, un esquema custom, o file://, y file:// ni siquiera entra en
-  # esta lista (los navegadores mandan Origin: null para file://, que esta config no permite
-  # a propósito). Cuando exista, sumar su origen acá vía CORS_ALLOWED_ORIGINS. Por ahora
-  # el único valor conocido y en uso es el dev server de Angular.
+  # Orígenes que el navegador puede usar para llamar a la API (ver CorsConfig).
+  #
+  # EL SHELL DE ELECTRON YA EXISTE, y la respuesta a la pregunta que quedaba abierta acá es
+  # que no hay que sumar nada: su origen (serpent://app) NO va en esta lista, ni hace falta
+  # que vaya. El shell no deja que el navegador cruce a http — intercepta /api en el proceso
+  # principal de Electron y es él quien llama al backend—, así que para el navegador el
+  # pedido sale y vuelve por su propio origen y no hay petición cruzada que permitir. Lo que
+  # llega hasta acá es un cliente HTTP común, que no está sujeto a la política del navegador.
+  #
+  # El único origen que esta lista todavía necesita es el dev server de Angular, que sí es un
+  # navegador parado en http://localhost:4200 llamando al 8080.
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
 
