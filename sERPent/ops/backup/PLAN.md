@@ -186,6 +186,35 @@ día en vez de mantenerse bajo, confirma lo que el ícono ya insinúa.
 
 ---
 
+## 7. Lo que NO entra al respaldo, y por qué
+
+El archivo de configuración de la máquina —`C:\ProgramData\sERPent\serpent.properties`, el que
+escribe el instalador con la contraseña de la base y la clave de firma de sesiones— **no se
+respalda acá**. Está anotado en este plan para que nadie lo agregue más adelante creyendo que es
+un olvido.
+
+Los dos motivos:
+
+1. **Nada de lo que tiene adentro es irrecuperable.** `pg_dump -Fc` de una base no exporta los
+   roles del servidor, así que el dump no depende de esa contraseña para restaurarse: el camino
+   de recuperación es reinstalar —el instalador genera credenciales nuevas y se las asigna al
+   rol— y después restaurar. La clave de firma perdida solo cierra las sesiones abiertas, que
+   duran ocho horas de todos modos.
+
+2. **Una de las dos copias va a OneDrive.** Meter ahí la clave con la que se firman las sesiones
+   significa que quien tenga acceso a esa cuenta puede fabricar una sesión válida de cualquier
+   usuario. El dump ya viaja, pero el dump lleva hashes bcrypt, que no es lo mismo. Y la copia
+   local tampoco es buen lugar: este plan contempla que `D:` sea un pendrive.
+
+**La condición de la que depende esto, y que le toca al instalador:** la aplicación tiene que
+conectarse con un rol propio (`serpent_app`), no con el superusuario `postgres`. Este respaldo
+se autentica como `postgres` con la contraseña guardada en `pgpass.conf`; si el instalador
+generara una contraseña al azar para `postgres`, ese `pgpass.conf` quedaría viejo y **el
+respaldo nocturno empezaría a fallar** sin que la aplicación se entere de nada. Con un rol
+aparte, el instalador rota lo suyo sin tocar lo que usa este script.
+
+Ver `docs/CONFIG_FILE.md`.
+
 ## Verificación realizada — comandos exactos
 
 Todo esto se corrió en esta PC, contra Postgres 17 real, sin tocar `serpent_db`:

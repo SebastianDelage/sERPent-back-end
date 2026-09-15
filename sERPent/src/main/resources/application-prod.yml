@@ -4,15 +4,46 @@
 # base sin sufijo: si -Dspring.profiles.active=prod se tipeaba mal o este archivo no
 # existía, Spring lo ignoraba en silencio y caía en ese base, que SÍ tenía credenciales y
 # clave JWT hardcodeadas — arrancaba igual, con lo de desarrollo, sin avisar. Ahora, si falta
-# una variable requerida, el arranque falla con una excepción que nombra la variable — ver
-# el comentario de cada una abajo para cómo setearlas en esta PC.
+# un valor requerido, el arranque falla con una excepción que lo nombra.
+#
+# DE DÓNDE SALEN ESOS VALORES. De dos lugares, y en este orden: primero las variables de
+# entorno, después el archivo de configuración de la máquina. El archivo es lo que va a
+# escribir el instalador; las variables son la forma de pisarlo sin tocarlo, que es como se
+# trabaja en desarrollo.
 
 spring:
+  config:
+    # EL ARCHIVO DE CONFIGURACIÓN DE ESTA MÁQUINA.
+    #
+    # Lo escribe el instalador con credenciales generadas al azar, y por eso el backend tiene
+    # que poder leerlo: las variables de entorno son una convención de servidores, no de
+    # software de escritorio — nadie va a abrir las propiedades del sistema en el mostrador.
+    #
+    # POR QUÉ ProgramData Y NO Program Files. Program Files es para el programa, y Windows lo
+    # quiere de solo lectura después de instalar; ProgramData es la carpeta que Microsoft
+    # define para datos de aplicación por máquina, que es exactamente lo que esto es. Además
+    # deja escribirlo de nuevo sin permisos de administrador el día que haya que rotar la
+    # clave. Ver docs/CONFIG_FILE.md.
+    #
+    # "optional:" NO ES UN DESCUIDO: sin eso, el arranque fallaría cuando el archivo no
+    # existe, y no existe en ninguna de las dos situaciones en las que hoy se corre con perfil
+    # prod sin instalador — la máquina de desarrollo con las variables puestas a mano, y el
+    # modo producción sin empaquetar del shell de Electron. El que falta un valor se sigue
+    # avisando igual, porque los placeholders de abajo no tienen default.
+    #
+    # SERPENT_CONFIG_FILE existe para poder apuntarlo a otro lado en una prueba, sin tocar
+    # este archivo ni instalar nada.
+    import: optional:file:${SERPENT_CONFIG_FILE:C:/ProgramData/sERPent/serpent.properties}
+
   datasource:
     # Host y puerto fijos a propósito: Postgres corre en esta misma PC, no hay otro entorno
     # apuntando a otro host. DB_NAME tiene default porque el nombre de la base no es
-    # sensible; usuario y contraseña NO lo tienen — deben vivir en variables de entorno de
-    # esta PC, nunca en un archivo versionado.
+    # sensible; usuario y contraseña NO lo tienen — salen del entorno o del archivo de arriba,
+    # nunca de un archivo versionado.
+    #
+    # Los placeholders se llaman igual que las variables de entorno A PROPÓSITO: el archivo de
+    # configuración usa esos mismos nombres como claves, así que los dos orígenes compiten por
+    # el mismo nombre y la precedencia la resuelve Spring sola, sin una línea de código.
     url: jdbc:postgresql://localhost:5432/${DB_NAME:serpent_db}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
