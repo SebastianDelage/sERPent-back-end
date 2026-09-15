@@ -29,6 +29,9 @@ public class WarehouseService {
     public WarehouseResponse create(CreateWarehouseRequest request) {
         validateName(request.name(), null);
 
+        // Se pregunta ANTES de guardar: después del save() siempre hay al menos uno, que es éste.
+        boolean isFirstWarehouseInTheSystem = warehouseRepository.count() == 0;
+
         WarehouseEntity entity = warehouseMapper.toEntity(request);
 
         if (entity.getActive() == null) {
@@ -38,6 +41,11 @@ public class WarehouseService {
         normalizeName(entity);
 
         WarehouseEntity saved = warehouseRepository.save(entity);
+
+        if (isFirstWarehouseInTheSystem && Boolean.TRUE.equals(saved.getActive())) {
+            assignToEveryUser(saved);
+        }
+
         return warehouseMapper.toResponse(saved);
     }
 
@@ -73,6 +81,42 @@ public class WarehouseService {
         return warehouseRepository.search(term, includeInactive).stream()
                 .map(warehouseMapper::toResponse)
                 .toList();
+    }
+
+    /**
+     * Asigna el primer depósito del sistema a todos los usuarios que ya existen.
+     *
+     * <p>POR QUÉ EXISTE. Una instalación nueva arranca sin depósitos, y un usuario sin depósitos
+     * entra a la app pero no puede registrar nada — {@link WarehouseAccessService} le rechaza
+     * toda operación. El administrador recién instalado queda exactamente así, y el síntoma
+     * aparece lejos de la causa: al intentar la primera venta, no al instalar. La migración
+     * V19 no lo cubre y no podría, porque corre una sola vez sobre una base en la que todavía
+     * no hay ningún depósito que asignar.
+     *
+     * <p>POR QUÉ SOLO EL PRIMERO. Con depósitos ya cargados, asignar automáticamente sería
+     * repartir permisos que nadie pidió. Con CERO es al revés: no asignarlo no protege nada
+     * —nadie podía operar en ningún lado— y deja el sistema sin usar. El caso está acotado al
+     * arranque a propósito.
+     *
+     * <p>Y "CERO DEPÓSITOS" SOLO PASA EN UNA INSTALACIÓN NUEVA, porque los depósitos se
+     * desactivan y nunca se borran: no hay endpoint de borrado. Si algún día se agrega uno,
+     * esta condición vuelve a ser alcanzable con el sistema en uso y hay que volver a pensarla.
+     *
+     * <p>A TODOS LOS USUARIOS, incluidos los inactivos: reactivar a alguien no tiene por qué
+     * devolverlo al agujero que este método tapa.
+     *
+     * <p>Y SOLO SI EL DEPÓSITO ESTÁ ACTIVO, porque asignar uno inactivo contradice la regla de
+     * {@code UserService.resolveRequiredWarehouses}, que los rechaza justamente para no dejar a
+     * alguien "bien configurado" y sin poder operar.
+     */
+    private void assignToEveryUser(WarehouseEntity warehouse) {
+        List<UserEntity> users = userRepository.findAll();
+
+        for (UserEntity user : users) {
+            user.getWarehouses().add(warehouse);
+        }
+
+        userRepository.saveAll(users);
     }
 
     /**
