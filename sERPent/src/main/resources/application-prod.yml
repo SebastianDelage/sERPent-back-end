@@ -36,15 +36,21 @@ spring:
     import: optional:file:${SERPENT_CONFIG_FILE:C:/ProgramData/sERPent/serpent.properties}
 
   datasource:
-    # Host y puerto fijos a propósito: Postgres corre en esta misma PC, no hay otro entorno
-    # apuntando a otro host. DB_NAME tiene default porque el nombre de la base no es
-    # sensible; usuario y contraseña NO lo tienen — salen del entorno o del archivo de arriba,
-    # nunca de un archivo versionado.
+    # Host fijo a propósito: Postgres corre en esta misma PC, no hay otro entorno apuntando a
+    # otro host.
+    #
+    # EL PUERTO NO PUEDE SER FIJO. El instalador crea una instancia propia y elige el puerto:
+    # 5432 si está libre, el primero libre desde 5433 si no. Una PC que no es nueva puede
+    # tener ya un PostgreSQL ocupando el 5432, y ésa es la situación más probable de todas.
+    # El default de 5432 es el caso normal, no una suposición.
+    #
+    # DB_NAME y DB_PORT tienen default porque no son sensibles; usuario y contraseña NO lo
+    # tienen — salen del entorno o del archivo de arriba, nunca de un archivo versionado.
     #
     # Los placeholders se llaman igual que las variables de entorno A PROPÓSITO: el archivo de
     # configuración usa esos mismos nombres como claves, así que los dos orígenes compiten por
     # el mismo nombre y la precedencia la resuelve Spring sola, sin una línea de código.
-    url: jdbc:postgresql://localhost:5432/${DB_NAME:serpent_db}
+    url: jdbc:postgresql://localhost:${DB_PORT:5432}/${DB_NAME:serpent_db}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver

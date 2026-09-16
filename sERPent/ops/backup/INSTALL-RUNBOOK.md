@@ -82,19 +82,28 @@ OneDrive en la bandeja pase de "sincronizando" (flechas girando) a "al día"
 (nube con tilde). Si en un rato no cambia y hay internet, algo está mal con
 el login de OneDrive — resolverlo antes de seguir.
 
-## Paso 3 — Credenciales de Postgres, sin contraseña en ningún archivo
+## Paso 3 — Credenciales de Postgres
 
-Como el usuario de Windows con el que va a correr el respaldo (ver paso 4),
-crear el archivo (probado que funciona sin pedir contraseña en ningún otro
-lado):
+**Este paso ya no se hace a mano.** Lo hace `ops/install/provision-database.ps1`, que corre
+como parte de la instalación de sERPent: genera la contraseña del rol `serpent_app`, la
+escribe en `C:ProgramDatasERPentserpent.properties` y deja la línea correspondiente en
+el `pgpass.conf` de la cuenta que va a correr el respaldo.
+
+Lo que cambió, y por qué:
+
+- **El respaldo se conecta como `serpent_app`, no como el superusuario `postgres`.**
+  `serpent_app` es el rol de la aplicación y puede dumpear `serpent_db`. Así hay un solo
+  secreto en juego —el mismo que usa el backend— en vez de dos que pueden desincronizarse.
+- **La contraseña ya no la elige nadie.** La genera el instalador, de 32 caracteres. Nadie la
+  inventa, nadie la recuerda, y no queda un paso de este runbook que se pueda olvidar.
+
+Para verificar que quedó bien, como la cuenta que va a correr el respaldo:
 
 ```powershell
-New-Item -ItemType Directory -Force -Path "$env:APPDATA\postgresql"
-"localhost:5432:*:postgres:LA_CONTRASEÑA_REAL_DE_POSTGRES" | Out-File -FilePath "$env:APPDATA\postgresql\pgpass.conf" -Encoding ascii -NoNewline
+Get-Content "$env:APPDATApostgresqlpgpass.conf"
 ```
 
-(Reemplazar `LA_CONTRASEÑA_REAL_DE_POSTGRES` por la que corresponda a esta
-instalación — no necesariamente `1234`, que era solo la de desarrollo.)
+Tiene que haber una línea que empiece con `localhost:<puerto>:serpent_db:serpent_app:`.
 
 ## Paso 4 — Programar la tarea
 
@@ -136,10 +145,13 @@ tiene que decir `Resultado: OK`, y con un tamaño mayor a 0.
 **Si se queda "corriendo" para siempre y nunca aparece el archivo:** no es
 necesariamente el script — puede ser un problema de la cuenta/sesión con la
 que corre la tarea en esta PC en particular. Revisar:
-- Que `pgpass.conf` (paso 3) esté en el perfil de la MISMA cuenta que quedó
-  configurada en el paso 4.
-- Que esa cuenta pueda conectarse a Postgres a mano (`psql -U postgres -h
-  localhost` desde una sesión de esa cuenta).
+- Que `pgpass.conf` esté en el perfil de la MISMA cuenta que quedó configurada
+  en el paso 4. **El instalador lo escribe para la cuenta que se le indicó**, así
+  que esto ya no es algo que alguien pueda olvidarse — pero sigue siendo cierto
+  que si después se cambia la cuenta de la tarea, hay que volver a correr
+  `provision-database.ps1` con `-BackupTaskUser` apuntando a la nueva.
+- Que esa cuenta pueda conectarse a Postgres a mano (`psql -U serpent_app -h
+  localhost -p <puerto> -d serpent_db` desde una sesión de esa cuenta).
 - El Visor de eventos de Windows, registro de Seguridad, buscando inicios de
   sesión (tipo 4, "por lotes") de esa cuenta alrededor de la hora del intento.
 

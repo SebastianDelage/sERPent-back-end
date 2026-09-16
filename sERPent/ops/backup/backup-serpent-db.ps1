@@ -9,9 +9,14 @@
       restauración selectiva de tablas si algún día hace falta. El formato plano
       (-Fp, SQL de texto) es más lento de restaurar y no admite eso; para "restaurar
       rápido" el custom format es la elección correcta.
-    - Las credenciales de Postgres NO están en este archivo. Vienen de
-      %APPDATA%\postgresql\pgpass.conf (mecanismo estándar de libpq en Windows),
-      que hay que crear una sola vez fuera de este script. Ver el runbook.
+    - Las credenciales de Postgres NO están en este archivo. La contraseña viene de
+      pgpass.conf (mecanismo estándar de libpq en Windows), que ahora escribe el instalador
+      en el perfil de la cuenta que corre la tarea programada. El resto —dónde está
+      PostgreSQL, en qué puerto, con qué usuario y contra qué base— sale del mismo
+      serpent.properties que lee el backend.
+    - Se conecta como serpent_app, el rol de la aplicación, NO como el superusuario postgres.
+      serpent_app puede dumpear serpent_db, así que hay un solo secreto en juego en vez de dos
+      que pueden desincronizarse.
     - Las dos carpetas de destino tienen rotación DISTINTA a propósito (ver abajo):
       la local es agresiva porque el disco es limitado y "restaurar rápido" no
       necesita historia larga; la de la nube es floja porque no hay forma de saber
@@ -26,13 +31,11 @@
 #>
 
 # ============================== CONFIGURACIÓN ==============================
-# Todo lo que puede cambiar según la PC vive acá arriba.
+# Lo que puede cambiar según la PC vive acá arriba, y lo que depende de CÓMO quedó instalado
+# PostgreSQL se lee del archivo que escribió el instalador.
 
-$PgBin          = "C:\Program Files\PostgreSQL\17\bin"
-$PgHost         = "localhost"
-$PgPort         = 5432
-$PgUser         = "postgres"
-$PgDatabase     = "serpent_db"
+# El archivo de configuración de la máquina, el mismo que lee el backend.
+$ConfigFile = "C:\ProgramData\sERPent\serpent.properties"
 
 # Disco DISTINTO al de los datos de Postgres (que en esta PC vive en C:).
 # AJUSTAR a la letra de unidad real del disco/pendrive del local.
@@ -65,6 +68,53 @@ $MinExpectedBytes = 10KB
 # =============================== EJECUCIÓN ==================================
 
 $ErrorActionPreference = "Stop"
+
+<#
+    Lee el .properties que escribió el instalador.
+
+    NADA DE ESTO SE PUEDE HARDCODEAR, y ya se pagó por hacerlo: este script decía
+    "C:\Program Files\PostgreSQL\17\bin", y la máquina de desarrollo tiene la 18 — o sea que
+    el respaldo NO corría ahí y nadie se había enterado, porque un script programado que
+    falla no le avisa a nadie más que a su propio archivo de estado.
+
+    El puerto tampoco: el instalador crea una instancia propia y elige 5432 si está libre, o
+    el primero libre desde 5433 si no. En una PC que no es nueva, el 5432 puede estar tomado.
+#>
+function Read-InstallSettings {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) {
+        throw "No se encontro el archivo de configuracion '$Path'. Lo escribe el instalador de sERPent; sin el, este script no sabe donde esta PostgreSQL ni con que usuario entrar."
+    }
+
+    $values = @{}
+    foreach ($line in Get-Content -Path $Path) {
+        $trimmed = $line.Trim()
+        if ($trimmed -eq '' -or $trimmed.StartsWith('#') -or $trimmed.StartsWith('!')) { continue }
+        $separator = $trimmed.IndexOf('=')
+        if ($separator -lt 1) { continue }
+        $values[$trimmed.Substring(0, $separator).Trim()] = $trimmed.Substring($separator + 1).Trim()
+    }
+
+    foreach ($key in @('PG_BIN', 'DB_PORT', 'DB_NAME', 'DB_USERNAME')) {
+        if (-not $values.ContainsKey($key)) {
+            throw "Al archivo '$Path' le falta '$key'. Volve a correr provision-database.ps1, que lo completa."
+        }
+    }
+    return $values
+}
+
+$settings = Read-InstallSettings -Path $ConfigFile
+
+$PgBin      = $settings['PG_BIN']
+$PgHost     = "localhost"
+$PgPort     = [int]$settings['DB_PORT']
+$PgDatabase = $settings['DB_NAME']
+
+# EL ROL DE LA APLICACIÓN, NO EL SUPERUSUARIO. serpent_app puede dumpear serpent_db, así que
+# el respaldo no necesita la contraseña de postgres: queda un solo secreto, el mismo que usa
+# la aplicación, y ya no hay dos credenciales que puedan desincronizarse.
+$PgUser     = $settings['DB_USERNAME']
 $start = Get-Date
 $timestamp = $start.ToString("yyyy-MM-dd_HHmmss")
 $fileName = "serpent_db_$timestamp.dump"
