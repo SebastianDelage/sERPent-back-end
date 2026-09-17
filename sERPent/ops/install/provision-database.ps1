@@ -99,13 +99,31 @@ function New-AlphanumericSecret {
     Y el ErrorActionPreference local, por lo mismo: con 'Stop' heredado, ese stderr convertido
     aborta el script aunque psql haya devuelto 0. El codigo de salida es la senal que importa,
     y se revisa abajo.
+
+    LA CODIFICACION, medida en un Windows en espanol, porque la solucion obvia no sirve. psql
+    escribe DOS codificaciones distintas: los errores que arma el propio cliente —"fallo la
+    conexion al servidor", el caso mas comun en una instalacion— salen en la pagina de codigos
+    ANSI de Windows (WIN1252), y los que manda el servidor salen en UTF-8. Leidos como los lee
+    PowerShell por defecto, los dos quedaban ilegibles, cada uno a su manera: "fall¾ la
+    conexi¾n" y "relaci├│n".
+
+    PGCLIENTENCODING=UTF8 NO lo arregla: solo gobierna lo que manda el servidor, y el error de
+    conexion ocurre antes de que haya servidor. Lo que si funciona es lo contrario: pedirle al
+    servidor la misma pagina ANSI que ya usa el cliente, y decodificar todo con esa. Probado con
+    los dos tipos de error: "fallo la conexion al servidor en «localhost»" y "no existe la
+    relacion «...»", con sus tildes y sus comillas.
 #>
 function Invoke-Sql {
     param([string]$Sql, [string]$OnDatabase = 'postgres')
 
     $previous = $ErrorActionPreference
+    $previousEncoding = [Console]::OutputEncoding
+    $ansiCodePage = [System.Globalization.CultureInfo]::CurrentCulture.TextInfo.ANSICodePage
+
     $ErrorActionPreference = 'Continue'
     $env:PGOPTIONS = '-c client_min_messages=warning'
+    $env:PGCLIENTENCODING = "WIN$ansiCodePage"
+    [Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding($ansiCodePage)
     try {
         $output = $Sql | & $psql -h localhost -p $Port -U $SuperUser -d $OnDatabase -v ON_ERROR_STOP=1 -t -A 2>&1
         if ($LASTEXITCODE -ne 0) {
@@ -115,6 +133,7 @@ function Invoke-Sql {
     }
     finally {
         $ErrorActionPreference = $previous
+        [Console]::OutputEncoding = $previousEncoding
     }
 }
 

@@ -86,7 +86,7 @@ el login de OneDrive — resolverlo antes de seguir.
 
 **Este paso ya no se hace a mano.** Lo hace `ops/install/provision-database.ps1`, que corre
 como parte de la instalación de sERPent: genera la contraseña del rol `serpent_app`, la
-escribe en `C:ProgramDatasERPentserpent.properties` y deja la línea correspondiente en
+escribe en `C:\ProgramData\sERPent\serpent.properties` y deja la línea correspondiente en
 el `pgpass.conf` de la cuenta que va a correr el respaldo.
 
 Lo que cambió, y por qué:
@@ -100,7 +100,7 @@ Lo que cambió, y por qué:
 Para verificar que quedó bien, como la cuenta que va a correr el respaldo:
 
 ```powershell
-Get-Content "$env:APPDATApostgresqlpgpass.conf"
+Get-Content "$env:APPDATA\postgresql\pgpass.conf"
 ```
 
 Tiene que haber una línea que empiece con `localhost:<puerto>:serpent_db:serpent_app:`.
