@@ -9,10 +9,17 @@
     saber qué va a generar, y eso es el punto: nadie inventa credenciales, nadie las recuerda,
     no pueden ser débiles, y no queda un paso del runbook que se pueda olvidar.
 
-    La única credencial que NO genera es la del superusuario de PostgreSQL, que necesita para
-    crear el rol. Esa viene en PGPASSWORD, en el entorno de este proceso. NO como parámetro:
-    el argv de cualquier proceso lo lee cualquiera por WMI, y el entorno solo su dueño y los
-    administradores.
+    EL SUPERUSUARIO NO TIENE CONTRASEÑA. Este script entra como postgres por SSPI: la cuenta de
+    Windows que lo corre, mapeada a postgres en pg_ident.conf, y solo desde esta máquina (lo
+    configura el instalador; ver sERPent-desktop\installer\code\database.iss). No existe un
+    secreto de superusuario que guardar, perder o filtrar (handoff\fase5-decisiones.md, punto 2).
+
+    Si SSPI no lo deja entrar, sale con el CÓDIGO 20 y un mensaje que dice por qué: el instalador
+    distingue ese caso de cualquier otra falla.
+
+    Si alguien lo corre a mano contra un PostgreSQL que sí pide contraseña, libpq usa PGPASSWORD
+    del entorno como siempre. Nunca como parámetro: el argv de cualquier proceso lo lee
+    cualquiera por WMI.
 
     EL SQL VA POR STDIN DE psql, no por -c, por lo mismo.
 
@@ -47,9 +54,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-if (-not $env:PGPASSWORD) {
-    throw "Falta PGPASSWORD en el entorno: es la contrasena del superusuario de PostgreSQL, y este script la necesita para crear el rol. No se pasa como parametro a proposito."
-}
+# Código de salida cuando SSPI no deja entrar. Lo lee database.iss para mostrar el cartel correcto.
+$SspiDeniedExitCode = 20
 
 $psql = Join-Path $PgBin 'psql.exe'
 if (-not (Test-Path $psql)) {
@@ -112,29 +118,98 @@ function New-AlphanumericSecret {
     servidor la misma pagina ANSI que ya usa el cliente, y decodificar todo con esa. Probado con
     los dos tipos de error: "fallo la conexion al servidor en «localhost»" y "no existe la
     relacion «...»", con sus tildes y sus comillas.
+
+    Y POR ESO NO SE USA LA TUBERIA DE POWERSHELL. Medido: con la consola en la pagina 65001,
+    PowerShell 5.1 le antepone el BOM de UTF-8 a lo que manda por la entrada estandar de un
+    programa nativo, y psql lo toma como parte de la consulta:
+
+        ERROR: error de sintaxis en o cerca de «ï»¿SELECT»
+
+    No depende de $OutputEncoding (medido: con UTF-8 sin BOM el BOM aparece igual) ni de
+    [Console]::OutputEncoding (que este script ya fijaba). Depende de la pagina de codigos de la
+    consola, que decide quien nos invoca: el instalador la pone en 65001 para que los acentos de
+    los programas lleguen bien al log, y a mano puede ser 850 o 1252.
+
+    QUIEN ESCRIBE EL BOM, medido: no es la tuberia. El StreamWriter que .NET arma para la entrada
+    estandar de un proceso usa [Console]::InputEncoding, y cuando esa codificacion tiene preambulo
+    —la 65001 lo tiene— el preambulo se escribe solo, al primer contacto con el flujo. Pasa igual
+    escribiendo los bytes a mano en BaseStream, porque el getter de BaseStream hace un flush.
+
+    Por eso el arreglo tiene dos partes, y las dos hacen falta:
+      1. se deja [Console]::InputEncoding SIN preambulo mientras dura la llamada (misma pagina de
+         codigos, otra instancia), y se restaura como estaba;
+      2. se lanza psql con System.Diagnostics.Process y SE ESCRIBEN LOS BYTES del SQL a mano, en la
+         misma codificacion que se le declara al servidor. Las salidas se decodifican con
+         StandardOutputEncoding y StandardErrorEncoding, en vez de tocar [Console]::OutputEncoding.
+
+    Medido con la consola en 65001, 850, 1252 y 437: con esto no hay BOM en ninguna.
+
+    El SQL sigue yendo por la entrada estandar, y no por un archivo temporal: lleva la contrasena
+    del rol, y un archivo con la contrasena en el disco es justo lo que este script evita.
 #>
 function Invoke-Sql {
     param([string]$Sql, [string]$OnDatabase = 'postgres')
 
-    $previous = $ErrorActionPreference
-    $previousEncoding = [Console]::OutputEncoding
     $ansiCodePage = [System.Globalization.CultureInfo]::CurrentCulture.TextInfo.ANSICodePage
+    $clientEncoding = [System.Text.Encoding]::GetEncoding($ansiCodePage)
 
-    $ErrorActionPreference = 'Continue'
-    $env:PGOPTIONS = '-c client_min_messages=warning'
-    $env:PGCLIENTENCODING = "WIN$ansiCodePage"
-    [Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding($ansiCodePage)
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $psql
+    # -w: NUNCA preguntar una contraseña. Sin eso, si la autenticación la pide, psql se queda
+    # esperando una respuesta en una ventana que el instalador tiene escondida, para siempre.
+    $startInfo.Arguments = "-w -h localhost -p $Port -U `"$SuperUser`" -d `"$OnDatabase`" -v ON_ERROR_STOP=1 -t -A"
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardInput = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.StandardOutputEncoding = $clientEncoding
+    $startInfo.StandardErrorEncoding = $clientEncoding
+    $startInfo.EnvironmentVariables['PGOPTIONS'] = '-c client_min_messages=warning'
+    $startInfo.EnvironmentVariables['PGCLIENTENCODING'] = "WIN$ansiCodePage"
+
+    # Sin preámbulo mientras dura la llamada, para que no aparezca un BOM delante del SQL. Si no
+    # hay consola (el setter falla), tampoco hay preámbulo: no hay nada que arreglar.
+    $previousInput = $null
+    $inputChanged = $false
     try {
-        $output = $Sql | & $psql -h localhost -p $Port -U $SuperUser -d $OnDatabase -v ON_ERROR_STOP=1 -t -A 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            throw "psql fallo: $output"
+        $previousInput = [Console]::InputEncoding
+        if ($previousInput.GetPreamble().Count -gt 0) {
+            [Console]::InputEncoding = New-Object System.Text.UTF8Encoding $false
+            $inputChanged = $true
         }
-        return ($output | Out-String).Trim()
+    }
+    catch {
+        $inputChanged = $false
+    }
+
+    try {
+        $process = [System.Diagnostics.Process]::Start($startInfo)
+        # Las dos salidas se leen mientras psql corre: si se esperara a que termine, un mensaje
+        # largo llenaría el búfer de una tubería y psql quedaría esperando a que alguien la vacíe.
+        $outputTask = $process.StandardOutput.ReadToEndAsync()
+        $errorTask = $process.StandardError.ReadToEndAsync()
+
+        # LOS BYTES, a mano: ninguna capa decide por nosotros cómo se codifica la consulta.
+        $bytes = $clientEncoding.GetBytes($Sql + "`n")
+        $process.StandardInput.BaseStream.Write($bytes, 0, $bytes.Length)
+        $process.StandardInput.BaseStream.Flush()
+        $process.StandardInput.Close()
+
+        $process.WaitForExit()
+        $output = $outputTask.Result
+        $errors = $errorTask.Result
     }
     finally {
-        $ErrorActionPreference = $previous
-        [Console]::OutputEncoding = $previousEncoding
+        if ($inputChanged) {
+            try { [Console]::InputEncoding = $previousInput } catch { }
+        }
     }
+
+    if ($process.ExitCode -ne 0) {
+        throw "psql fallo: $(($errors + "`n" + $output).Trim())"
+    }
+    return $output.Trim()
 }
 
 <# Lee un .properties simple. Solo lo que escribe este script: una clave por linea. #>
@@ -206,6 +281,27 @@ function Write-SecretFile {
 
 # ============================== EJECUCION ==============================
 
+# --- 0) Entrar como superusuario, o decir por qué no ----------------------------------------
+#
+# Antes de tocar nada. Si falla la autenticación, el mensaje dice qué cuenta intentó entrar y qué
+# hacer; cualquier otra falla (el servidor no responde, por ejemplo) sale como error común.
+try {
+    Invoke-Sql "SELECT 1;" | Out-Null
+}
+catch {
+    $detail = $_.Exception.Message
+    if ($detail -match 'SSPI|autentific|authentication|password|contrase') {
+        $account = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+        Write-Host "No se pudo entrar a PostgreSQL como '$SuperUser' con la cuenta de Windows '$account' (SSPI)."
+        Write-Host "Esa cuenta no esta en pg_ident.conf del cluster, o este PostgreSQL no permite SSPI para '$SuperUser'."
+        Write-Host "Si el cluster es el de sERPent, volver a correr el instalador como administrador: agrega la cuenta que lo corre."
+        Write-Host "Detalle de psql: $detail"
+        exit $SspiDeniedExitCode
+    }
+    throw
+}
+Write-Host "Conectado como '$SuperUser' (SSPI) en el puerto $Port."
+
 # --- 1) Las credenciales: se generan UNA sola vez, en la primera corrida -------------------
 #
 # LA IDEMPOTENCIA EMPIEZA ACA. Si el archivo ya existe, sus valores mandan: regenerar la
@@ -272,6 +368,16 @@ else {
     Invoke-Sql "GRANT CREATE ON SCHEMA public TO $AppRole;" -OnDatabase $Database | Out-Null
     Write-Host "  Se le dieron a '$AppRole' permisos de lectura, escritura y creacion."
 }
+
+# La codificación de la base, siempre (nueva o ya existente). La app guarda texto con tildes y eñes
+# y el driver JDBC habla UTF-8: una base en otra codificación rompe en silencio. El locale lo fija
+# el clúster (initdb en el instalador, fase5-decisiones.md) y acá solo se anota.
+$dbEncoding = Invoke-Sql "SELECT pg_encoding_to_char(encoding) || '|' || datcollate || '|' || datctype FROM pg_database WHERE datname = '$Database';"
+$encodingParts = $dbEncoding.Split('|')
+if ($encodingParts[0] -ne 'UTF8') {
+    throw "La base '$Database' esta en codificacion '$($encodingParts[0])' y tiene que ser UTF8. No se sigue: la app romperia tildes y enes sin avisar."
+}
+Write-Host "Base '$Database': codificacion $($encodingParts[0]), LC_COLLATE $($encodingParts[1]), LC_CTYPE $($encodingParts[2])."
 
 # --- 4) El archivo de configuracion --------------------------------------------------------
 #
