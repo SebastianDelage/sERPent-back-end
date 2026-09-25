@@ -31,7 +31,7 @@ public interface CashCountRepository extends JpaRepository<CashCountEntity, Long
     @Query("""
            SELECT c FROM CashCountEntity c
            WHERE (:unrestricted = TRUE OR c.warehouse.id IN :warehouseIds)
-             AND (:warehouseId IS NULL OR c.warehouse.id = :warehouseId)
+             AND (CAST(:warehouseId AS Long) IS NULL OR c.warehouse.id = :warehouseId)
            ORDER BY c.closedAt DESC, c.id DESC
            """)
     Page<CashCountEntity> search(

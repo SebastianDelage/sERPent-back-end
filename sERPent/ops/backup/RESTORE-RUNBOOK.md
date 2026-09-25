@@ -4,32 +4,47 @@ Este procedimiento fue **probado de verdad** el 2026-08-26, sobre bases de prueb
 en esta misma PC (Postgres 17 real, no una simulación). Detalle de esa prueba al
 final de este documento.
 
+## DOS COSAS QUE CAMBIARON CON LA FASE 6, Y HAY QUE SABERLAS ANTES
+
+1. **Los respaldos están comprimidos con zstd**, que ocupa la mitad que el formato anterior. Un
+   PostgreSQL compilado sin zstd **no puede leerlos**. Hay que restaurar con **los binarios que
+   instala sERPent**: `C:\Program Files\sERPent-postgresql\18\bin`. Si esa carpeta no existe
+   (disco muerto, PC nueva), primero se corre el instalador de sERPent, que los deja ahí.
+2. **Los respaldos viven en `C:\ProgramData\sERPent\respaldos`**, en el mismo disco que la base.
+   La copia de afuera es el pendrive, en su carpeta `sERPent-respaldos`. No hay nube.
+
 ## Escenario A — el disco murió, Postgres se reinstaló de cero
 
 Este es el caso que realmente importa ("si ese disco se rompe se pierde el
 negocio entero"), y es exactamente el que se probó.
 
-1. Instalar PostgreSQL 17 en la PC nueva/reparada.
+1. **Correr el instalador de sERPent** en la PC nueva o reparada. Deja PostgreSQL 18, la base vacía
+   y sus binarios, que son los que saben leer el respaldo.
 
-2. Conseguir el archivo de respaldo más reciente. Va a estar en uno de estos
-   dos lugares (usar el que esté disponible):
-   - `D:\Backups\sERPent\Diario\serpent_db_AAAA-MM-DD_HHMMSS.dump` (si el disco D
-     sobrevivió)
-   - La carpeta de OneDrive/Drive sincronizada en otra PC o en la web del
-     servicio, carpeta `sERPent-Backups`
+2. Conseguir el archivo de respaldo más reciente:
+   - del **pendrive**, carpeta `sERPent-respaldos` (es la copia que sobrevive al disco);
+   - o de `C:\ProgramData\sERPent\respaldos`, si el disco sobrevivió.
 
-3. Crear la base vacía:
+   El pendrive trae además un `sERPent-respaldos.json` que dice qué archivos tiene y su SHA-256.
+
+3. La base ya la creó el instalador. Si hiciera falta crearla a mano:
    ```
-   "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -c "CREATE DATABASE serpent_db;"
+   "C:\Program Files\sERPent-postgresql\18\bin\psql.exe" -U postgres -h localhost -p 5432 -c "CREATE DATABASE serpent_db;"
    ```
+   (el puerto puede no ser 5432: mirar `DB_PORT` en `C:\ProgramData\sERPent\serpent.properties`)
 
 4. Restaurar:
    ```
-   "C:\Program Files\PostgreSQL\17\bin\pg_restore.exe" -U postgres -h localhost -d serpent_db --no-owner --no-privileges -v "RUTA\AL\serpent_db_....dump"
+   "C:\Program Files\sERPent-postgresql\18\bin\pg_restore.exe" -U postgres -h localhost -p 5432 -d serpent_db --no-owner --no-privileges -v "RUTA\AL\serpent_db_....dump"
    ```
    `--no-owner --no-privileges`: el dump puede traer el rol `postgres` de la PC
    vieja; con estas opciones todo se crea con el rol que uno usa para restaurar,
    sin pelearse con roles que no existen en la instalación nueva.
+
+   **Antes de restaurar sobre una base que tiene datos, respaldar lo que hay**, aunque esté mal:
+   ```
+   powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\sERPent\ops\backup\backup-serpent-db.ps1" -Origen manual
+   ```
 
 5. Confirmar que los datos están (ver la sección "Cómo confirmar" abajo).
 

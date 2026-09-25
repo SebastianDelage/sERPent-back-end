@@ -13,8 +13,15 @@ import org.springframework.test.context.ActiveProfiles;
  *   ./mvnw test -Dpgcheck=true
  * </pre>
  *
- * <p>Con PostgreSQL levantado y las credenciales en el entorno (las mismas variables que usa
- * el perfil prod: DB_USERNAME y DB_PASSWORD; ver application-pgcheck.properties).
+ * <p>Con PostgreSQL levantado y las credenciales en el entorno, en las variables
+ * <b>PGCHECK_DB_USERNAME</b> y <b>PGCHECK_DB_PASSWORD</b> (ver application-pgcheck.properties,
+ * que las prefiere sobre DB_USERNAME / DB_PASSWORD).
+ *
+ * <p>Y TIENEN QUE SER ÉSAS, no las de prod, aunque el perfil acepte las dos. Medido: con
+ * DB_USERNAME puesta en el entorno, {@code ExternalConfigFileTest} falla dos casos en la misma
+ * corrida — no por un bug, sino porque esa variable le gana al archivo de configuración que ese
+ * test justamente verifica. El resultado era un suite en rojo por cómo se lo invocó, que es la
+ * peor clase de rojo: el que enseña a ignorar los rojos.
  *
  * <h2>Por qué es a pedido y no parte del suite</h2>
  *

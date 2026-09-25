@@ -1,257 +1,159 @@
-# Instalación del respaldo en la PC del local
+# El respaldo de sERPent: qué hace solo y qué hay que hacer a mano
 
-Para Joaquin. Seguir en orden. Cada paso dice cómo confirmar que salió bien
-antes de pasar al siguiente.
+**Desde la fase 6, el respaldo lo arma el instalador.** Este documento dice qué quedó instalado,
+qué tiene que hacer la persona que atiende la tienda, y qué tiene que hacer quien la visita.
+
+Reemplaza al runbook anterior, que hablaba de `D:\Backups\sERPent`, de OneDrive y de programar la
+tarea a mano. **Nada de eso aplica**: la PC de la tienda tiene una sola unidad y no tiene internet.
 
 ---
 
-## Antes de empezar: qué NO puede quedar en C:
+## Lo que quedó instalado, sin que nadie haga nada
 
-Esta PC tiene poco espacio libre en `C:` (13,6 GB al momento de escribir
-esto). Nada de lo que sigue puede terminar ahí:
-
-| Cosa | Dónde tiene que quedar |
+| Qué | Dónde |
 |---|---|
-| Respaldos locales diarios | `D:\Backups\sERPent\Diario` |
-| Carpeta que sube a la nube | `D:\OneDrive\...` (OneDrive movido a D:, paso 2) |
-| Log y estado del respaldo | `D:\Backups\sERPent\` |
-| Logs de la aplicación sERPent | `D:` — fijar la variable `SERPENT_LOG_DIR` |
-| Base de datos de Postgres | Ya vive en `C:\Program Files\PostgreSQL\17\data` de fábrica. **No se mueve como parte de esto** — moverla es una operación aparte, más delicada, fuera de este trabajo. Si `C:` se queda sin espacio en el futuro, es la primera candidata a revisar. |
+| Los respaldos | `C:\ProgramData\sERPent\respaldos` |
+| El registro de lo que pasó | `estado.json` y `historial.jsonl`, en esa misma carpeta |
+| El script que respalda | `C:\Program Files\sERPent\ops\backup\backup-serpent-db.ps1` |
+| La tarea de red | "sERPent - Respaldo diario", **como SYSTEM**, todos los días a las 14:00 |
 
-**Cuánto espacio hace falta en D: para un año**, con una estimación
-conservadora (la base hoy pesa 10 MB recién armada; esto asume que crece a
-lo largo del año — si crece menos, todo lo de abajo es un techo, no un
-piso):
+**Cuándo se respalda:**
+1. **Al cerrar caja**, que es lo que marca el fin del día. Lo dispara el propio sERPent, en segundo
+   plano: el cierre de caja no espera.
+2. **Cuando alguien aprieta "respaldar ahora"** en la app.
+3. **A las 14:00, solo si ese día todavía no hubo respaldo.** Es la red para el día que no cierran
+   caja. Si la PC estaba apagada a esa hora, la tarea se dispara sola pocos minutos después de
+   prenderla (medido: 3,4 minutos).
 
-- Asumiendo que la base llega a ~500 MB hacia fin de año (estimación, no un
-  dato medido — conviene revisar esto a los 2-3 meses de uso real y ajustar
-  si hace falta) y que el dump comprimido pesa ~60% de eso en el peor caso:
-  **~300 MB el archivo más pesado del año**.
-- Local (14 diarios + 12 anclas mensuales = 26 archivos, la mayoría mucho
-  más chicos que el peor caso): **techo de ~8 GB**.
-- Nube en espera (90 días parejos): **techo de ~27 GB**.
-- Logs de la aplicación: acotados por diseño a 500 MB (rotación configurada
-  en `application-prod.yml`).
-- **Total: bajo 40 GB en el peor caso**, para un disco que en la PC de
-  desarrollo tiene 80 GB libres. Confirmar el espacio libre real en `D:` de
-  la PC del local antes de instalar (`Get-Volume`), y si es sensiblemente
-  menor a 40 GB, avisar antes de seguir.
+**El primer respaldo de una instalación nueva no sale, y está bien.** El instalador registra la
+tarea y la corre una vez para probar que ejecuta de verdad, pero en ese momento la base está creada
+y **vacía**: las tablas las crea sERPent la primera vez que arranca. La tarea contesta 12 ("no había
+nada que respaldar") y lo deja anotado. El primer respaldo con datos sale solo, al primer cierre de
+caja, o a las 14:00 del día siguiente.
 
----
+**Cuánto se guarda:** todos los respaldos de los últimos 90 días; después, uno por semana hasta el
+año; después, uno por mes, para siempre. Lo viejo se borra **solo después** de que el respaldo nuevo
+salió bien y pasó su verificación.
 
-## Paso 1 — Carpetas y el script
-
-Como administrador, en PowerShell:
-
-```powershell
-New-Item -ItemType Directory -Force -Path "D:\Backups\sERPent\Diario"
-New-Item -ItemType Directory -Force -Path "D:\Backups\sERPent\Scripts"
-```
-
-Copiar `backup-serpent-db.ps1` y `setup-scheduled-task.ps1` (están en
-`ops/backup/` del repositorio) a `D:\Backups\sERPent\Scripts\`.
-
-Abrir `backup-serpent-db.ps1` con el Bloc de notas y revisar, cerca del
-principio, que estas líneas tengan el valor correcto para esta PC:
-
-```powershell
-$LocalBackupDir = "D:\Backups\sERPent\Diario"
-$CloudStagingDir = "D:\OneDrive\sERPent-Backups"   # se ajusta en el paso 2
-```
-
-## Paso 2 — OneDrive, con la cuenta de Joaquin
-
-**Importante: la cuenta que se loguea acá tiene que ser de Joaquin, personal,
-no una cuenta del negocio.** Es la que va a tener acceso a los respaldos
-desde cualquier otro lado si hace falta.
-
-1. Instalar OneDrive si no está (`https://www.microsoft.com/microsoft-365/onedrive/download`).
-2. Al configurarlo, loguear con la cuenta de Joaquin.
-3. **Mover la carpeta de OneDrive a D:**, porque por defecto se instala
-   dentro de `C:\Users\...`, y ya vimos que ahí sobra poco lugar:
-   - Clic derecho en el ícono de OneDrive (bandeja del sistema, abajo a la
-     derecha) → Configuración → Cuenta → **Cambiar ubicación de la carpeta**.
-   - Elegir `D:\OneDrive`.
-4. Dentro de esa carpeta, crear `D:\OneDrive\sERPent-Backups`.
-5. Confirmar que `$CloudStagingDir` en `backup-serpent-db.ps1` apunta
-   exactamente ahí (ya debería, del paso 1).
-
-**Cómo confirmar que OneDrive sincroniza de verdad:** poner cualquier
-archivo de prueba en `D:\OneDrive\sERPent-Backups`, y ver que el ícono de
-OneDrive en la bandeja pase de "sincronizando" (flechas girando) a "al día"
-(nube con tilde). Si en un rato no cambia y hay internet, algo está mal con
-el login de OneDrive — resolverlo antes de seguir.
-
-## Paso 3 — Credenciales de Postgres
-
-**Este paso ya no se hace a mano.** Lo hace `ops/install/provision-database.ps1`, que corre
-como parte de la instalación de sERPent: genera la contraseña del rol `serpent_app`, la
-escribe en `C:\ProgramData\sERPent\serpent.properties` y deja la línea correspondiente en
-el `pgpass.conf` de la cuenta que va a correr el respaldo.
-
-Lo que cambió, y por qué:
-
-- **El respaldo se conecta como `serpent_app`, no como el superusuario `postgres`.**
-  `serpent_app` es el rol de la aplicación y puede dumpear `serpent_db`. Así hay un solo
-  secreto en juego —el mismo que usa el backend— en vez de dos que pueden desincronizarse.
-- **La contraseña ya no la elige nadie.** La genera el instalador, de 32 caracteres. Nadie la
-  inventa, nadie la recuerda, y no queda un paso de este runbook que se pueda olvidar.
-
-Para verificar que quedó bien, como la cuenta que va a correr el respaldo:
-
-```powershell
-Get-Content "$env:APPDATA\postgresql\pgpass.conf"
-```
-
-Tiene que haber una línea que empiece con `localhost:<puerto>:serpent_db:serpent_app:`.
-
-## Paso 4 — Programar la tarea
-
-Como **administrador**, en PowerShell:
-
-```powershell
-cd "D:\Backups\sERPent\Scripts"
-.\setup-scheduled-task.ps1
-```
-
-Va a pedir la contraseña de Windows de la cuenta que corre el respaldo (la
-de Joaquin, la que queda en esta PC). Esa contraseña la guarda Windows,
-cifrada — no queda en ningún archivo de este proyecto.
-
-**Verificación obligatoria del propio script**, apenas termina:
-
-```powershell
-Get-ScheduledTaskInfo -TaskName "sERPent - Respaldo diario"
-```
-
-`LastTaskResult` tiene que ser `0` y `LastRunTime` NO puede ser
-`30/11/1999` (ese valor significa "nunca corrió"). Si se queda así, es el
-problema documentado adentro de `setup-scheduled-task.ps1`
-("Iniciar sesión como tarea por lotes" — la solución está ahí mismo).
-
-## Paso 5 — Probarlo YA, sin esperar a la noche
-
-```powershell
-Start-ScheduledTask -TaskName "sERPent - Respaldo diario"
-Start-Sleep -Seconds 15
-Get-ScheduledTaskInfo -TaskName "sERPent - Respaldo diario"
-Get-Content "D:\Backups\sERPent\ESTADO-ULTIMO-RESPALDO.txt"
-Get-ChildItem "D:\Backups\sERPent\Diario"
-```
-
-Tiene que aparecer un archivo `serpent_db_....dump`, `ESTADO-ULTIMO-RESPALDO.txt`
-tiene que decir `Resultado: OK`, y con un tamaño mayor a 0.
-
-**Si se queda "corriendo" para siempre y nunca aparece el archivo:** no es
-necesariamente el script — puede ser un problema de la cuenta/sesión con la
-que corre la tarea en esta PC en particular. Revisar:
-- Que `pgpass.conf` esté en el perfil de la MISMA cuenta que quedó configurada
-  en el paso 4. **El instalador lo escribe para la cuenta que se le indicó**, así
-  que esto ya no es algo que alguien pueda olvidarse — pero sigue siendo cierto
-  que si después se cambia la cuenta de la tarea, hay que volver a correr
-  `provision-database.ps1` con `-BackupTaskUser` apuntando a la nueva.
-- Que esa cuenta pueda conectarse a Postgres a mano (`psql -U serpent_app -h
-  localhost -p <puerto> -d serpent_db` desde una sesión de esa cuenta).
-- El Visor de eventos de Windows, registro de Seguridad, buscando inicios de
-  sesión (tipo 4, "por lotes") de esa cuenta alrededor de la hora del intento.
-
-## Paso 6 — Confirmar al otro día (y todos los días después)
-
-Sin abrir nada técnico: abrir `D:\Backups\sERPent\ESTADO-ULTIMO-RESPALDO.txt`
-con el Bloc de notas. Tiene que decir la fecha de anoche y `Resultado: OK`.
-
-Para la nube: mirar el ícono de OneDrive en la bandeja del sistema. Nube con
-tilde = al día. Si el número de "Respaldos esperando subir a la nube" en ese
-mismo archivo crece día tras día, confirma que hace rato no hay internet o
-que OneDrive dejó de sincronizar.
+**Cuánto ocupa:** un respaldo pesa unos 4,5 MB con un año de operación y crece ~4,2 MB por año. Todo
+el esquema de retención ocupa 1,7 GB a los cinco años.
 
 ---
 
-## RESTAURACIÓN — leer esto con calma aunque el negocio esté parado
+## LA COPIA AL PENDRIVE. Es un paso obligatorio, no un recordatorio
 
-Dos escenarios. Elegir el que corresponda.
+> **Por qué:** hasta que exista la pantalla de exportación, **un disco muerto se lleva la base y los
+> respaldos juntos**. Los respaldos viven en el mismo disco que la base: sirven para volver atrás de
+> un error, no para sobrevivir a un disco roto. El pendrive es la única copia que está afuera.
 
-### A) El disco de la PC murió, hay que levantar todo de cero
+**Cuándo:** en cada visita a la tienda, y **como mínimo cada 15 días**.
 
-Postgres nuevo, instalado de cero, base vacía.
+**Cómo:**
 
-**Paso 1.** Conseguir el respaldo más reciente que exista. Buscar primero en
-`D:\Backups\sERPent\Diario\` (si ese disco sobrevivió). Si no, entrar a
-OneDrive desde OTRA computadora o desde el celular, carpeta
-`sERPent-Backups`, y bajar el archivo `.dump` más nuevo.
+1. Conectar un pendrive.
+2. Copiar **la carpeta de respaldos entera** con el Explorador de Windows:
+   de `C:\ProgramData\sERPent\respaldos` a una carpeta `sERPent-respaldos` en el pendrive.
+3. **Verificar que llegaron los archivos** y anotar la fecha. Eso lo hace este comando, que además
+   compara uno por uno por SHA-256 y **no anota nada si algo no coincide**:
 
-**Paso 2.** Abrir PowerShell como administrador. Crear la base:
+   ```
+   powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\sERPent\ops\backup\marcar-exportacion.ps1" -Unidad F
+   ```
 
-```powershell
-& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -c "CREATE DATABASE serpent_db;"
-```
+   (cambiar `F` por la letra que le tocó al pendrive)
 
-Va a pedir la contraseña de Postgres. Escribirla y Enter.
+4. **Expulsar el pendrive desde Windows** antes de sacarlo. Windows escribe en caché: sacarlo de un
+   tirón puede dejar archivos a medias aunque la copia "haya terminado". Medido: sacándolo a mitad
+   de una copia quedaron 11 archivos completos y el que estaba en curso se perdió sin aviso.
 
-**Paso 3.** Restaurar (reemplazar la ruta del archivo por la real):
+**Qué contesta el comando:**
 
-```powershell
-& "C:\Program Files\PostgreSQL\17\bin\pg_restore.exe" -U postgres -h localhost -d serpent_db --no-owner --no-privileges -v "RUTA\AL\serpent_db_2026-08-27_220000.dump"
-```
+| Sale con | Qué pasó |
+|---|---|
+| 0 | Todo lo que hay en la PC está en el pendrive, verificado, y quedó anotada la exportación |
+| 30 | La unidad no existe o no está lista. ¿Está conectado el pendrive? |
+| 31 | Esa unidad no es extraíble. Si es un disco externo, agregar `-AceptarUnidadNoExtraible` |
+| 32 | **Faltan archivos o alguno no coincide.** No anotó nada: copiar de nuevo y repetir |
+| 33 | Los archivos están bien, pero no pudo anotar la exportación |
 
-Esto tarda. Va a mostrar muchas líneas "creando..." — es normal, no hay que
-interrumpirlo.
-
-**Paso 4.** Confirmar que funcionó (copiar y pegar tal cual, una por una):
-
-```powershell
-& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -d serpent_db -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public';"
-```
-Tiene que dar un número parecido a 29 (puede haber crecido con el tiempo,
-pero no puede dar 0 ni un número chico).
-
-```powershell
-& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -d serpent_db -c "SELECT COUNT(*) FROM products;"
-```
-Tiene que dar más de 0 si había productos cargados.
-
-Si los dos números tienen sentido, la restauración salió bien. Seguir con la
-instalación normal de la aplicación (backend + frontend), que ahora va a
-encontrar la base con los datos.
-
-### B) La base actual tiene datos rotos o mal cargados, hay que volver a un respaldo bueno
-
-Acá la base YA EXISTE y hay que reemplazar su contenido, no crearla.
-
-**Paso 1.** Cerrar la aplicación sERPent (que nadie esté usándola).
-
-**Paso 2.** Restaurar con `--clean`, que borra cada cosa antes de recrearla:
-
-```powershell
-& "C:\Program Files\PostgreSQL\17\bin\pg_restore.exe" -U postgres -h localhost -d serpent_db --clean --if-exists --no-owner --no-privileges -v "RUTA\AL\serpent_db_....dump"
-```
-
-**Paso 3.** Confirmar con las mismas dos consultas del Escenario A, Paso 4.
-
-**Paso 4.** Volver a abrir la aplicación.
+**Si el pendrive está en FAT32**, no acepta archivos de más de 4 GB. Hoy un respaldo pesa 4,5 MB, así
+que no molesta; el día que moleste, el comando lo dice antes de empezar y hay que formatearlo en NTFS
+o exFAT.
 
 ---
 
-## Este procedimiento fue probado de verdad
+## Qué mira el que atiende la tienda
 
-El mecanismo (`pg_dump` → `pg_restore`) se probó de punta a punta el
-2026-08-26, contra Postgres real, sobre bases descartables (nunca contra
-`serpent_db`): se armó una base de prueba con el esquema completo, se le
-insertó una fila marcadora, se la respaldó, se restauró en una base vacía
-nueva, y se confirmó que la fila marcadora y las 29 tablas estaban intactas.
-El detalle línea por línea está en `RESTORE-RUNBOOK.md`, en esta misma
-carpeta.
+La app avisa sola:
+- **a los 15 días sin exportar**, y después todos los días, hasta que alguien exporte;
+- **cuando el disco se está llenando**;
+- **si un día no hubo respaldo**.
 
-**Lo que no se pudo probar en el entorno de desarrollo**: la ejecución en
-vivo de la tarea programada de Windows, tanto en la modalidad "sin sesión
-iniciada" como, más en general, cualquier ejecución disparada por el propio
-servicio de Task Scheduler. En el entorno donde se desarrolló esto, un
-proceso lanzado por Task Scheduler queda colgado antes incluso de intentar
-conectarse a Postgres — se confirmó que no es un problema del script (la
-misma línea de comando, lanzada por fuera de Task Scheduler, funciona
-perfecto) ni de `pg_dump` en sí. Todo indica que es una restricción del
-entorno de desarrollo (una sandbox), no algo que vaya a pasar en una PC de
-Windows normal — pero como no se pudo confirmar eso último de forma
-concluyente, **el Paso 5 de este documento (probar la tarea apenas se
-instala) no es opcional**: es la verificación que faltó hacer acá, y tiene
-que hacerse en la PC real antes de dar esto por andando.
+Nada de eso reemplaza mirar el estado de vez en cuando.
+
+---
+
+## Cómo saber si está todo bien, en 30 segundos
+
+```
+powershell -NoProfile -Command "Get-Content 'C:\ProgramData\sERPent\respaldos\estado.json' -Encoding UTF8"
+```
+
+Qué mirar:
+
+| Campo | Qué quiere decir |
+|---|---|
+| `ultimoRespaldoOk` | Cuándo salió bien el último respaldo. Si es de hace más de un día, algo pasa |
+| `ultimoIntentoResultado` | `ok`, `fallo` o `nada-que-respaldar`. Si dice `fallo`, `ultimoIntentoDetalle` dice por qué |
+| `ultimaExportacion` | La última copia al pendrive **verificada**. Si está vacío, nunca se exportó |
+| `ultimaPruebaDeRestauracionOk` | La prueba profunda mensual: lee y descomprime el respaldo entero |
+| `espacioLibreBytes` | Lo que queda en el disco |
+| `ultimoRespaldoPoda` | `ok`, o `con problemas` si no pudo borrar respaldos viejos (no es grave, pero conviene mirar) |
+| `ultimoIntentoObjetosEnBase` | Cuántas tablas y demás objetos tenía la base en el último intento. `0` recién instalado; `no se pudo preguntar` si la base no contestó |
+
+**Cómo leer los nombres**, que no son decorativos: todo lo que empieza con `ultimoIntento` es de la
+**última corrida**, salga como salga, y se reescribe entera cada vez. Lo que empieza con
+`ultimoRespaldo`, `ultimaPrueba` o `ultimaExportacion` es de **la última vez que salió bien** y
+sobrevive a propósito a los intentos que fallan, que es justo cuando más se lo mira.
+
+Y el detalle de cada intento, uno por línea:
+
+```
+powershell -NoProfile -Command "Get-Content 'C:\ProgramData\sERPent\respaldos\historial.jsonl' -Encoding UTF8 -Tail 5"
+```
+
+---
+
+## Si algo falla
+
+**El respaldo falla todos los días.** Correrlo a mano y leer lo que dice:
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\sERPent\ops\backup\backup-serpent-db.ps1" -Origen manual
+```
+
+| Sale con | Qué pasó |
+|---|---|
+| 0 | Respaldo hecho y verificado |
+| 11 | No hacía falta: ya había uno de hoy (solo con `-SoloSiFaltaHoy`) |
+| 12 | No había nada que respaldar: la base todavía no tiene ninguna tabla. Es lo normal recién instalado, antes de que sERPent arranque por primera vez |
+| 20 | Ya hay otro respaldo corriendo |
+| 21 | No se pudo leer `serpent.properties` |
+| 22 | Falló `pg_dump`. El motivo va en el historial |
+| 23 | El respaldo salió pero **no pasó la verificación**. No se borró nada |
+| 24 | El respaldo salió pero no se pudo escribir el registro |
+
+**La tarea de red no corre.** Ver cuándo corrió por última vez y con qué resultado:
+
+```
+powershell -NoProfile -Command "Get-ScheduledTaskInfo -TaskName 'sERPent - Respaldo diario' | Format-List LastRunTime, LastTaskResult, NextRunTime"
+```
+
+`LastTaskResult` 0 es "respaldó", 11 es "no hacía falta" y 12 es "la base todavía no tiene tablas".
+La tarea corre **como SYSTEM**: no depende
+de que nadie inicie sesión ni de permisos de una cuenta.
+
+**Hay que restaurar.** Está en `RESTORE-RUNBOOK.md`. Dos cosas que no se pueden olvidar:
+- los respaldos están comprimidos con **zstd**, así que se restauran **con los binarios de sERPent**
+  (`C:\Program Files\sERPent-postgresql\18\bin`), no con cualquier PostgreSQL;
+- antes de restaurar sobre la base viva, **hacer un respaldo a mano** de lo que hay.

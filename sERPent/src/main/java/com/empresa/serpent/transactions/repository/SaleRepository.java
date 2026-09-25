@@ -53,8 +53,8 @@ public interface SaleRepository extends JpaRepository<SaleEntity, Long> {
            SELECT COALESCE(SUM(s.transaction.total), 0)
            FROM SaleEntity s
            WHERE s.onCredit = TRUE
-             AND (:dateFrom IS NULL OR s.transaction.date >= :dateFrom)
-             AND (:dateTo IS NULL OR s.transaction.date <= :dateTo)
+             AND (CAST(:dateFrom AS LocalDateTime) IS NULL OR s.transaction.date >= :dateFrom)
+             AND (CAST(:dateTo AS LocalDateTime) IS NULL OR s.transaction.date <= :dateTo)
              AND (:unrestricted = TRUE OR s.warehouse.id IN :warehouseIds)
            """)
     BigDecimal sumCreditSales(

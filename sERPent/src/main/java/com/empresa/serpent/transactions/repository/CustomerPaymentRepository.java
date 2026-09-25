@@ -29,9 +29,9 @@ public interface CustomerPaymentRepository extends JpaRepository<CustomerPayment
      */
     @Query("""
            SELECT p FROM CustomerPaymentEntity p
-           WHERE (:dateFrom IS NULL OR p.paymentDate >= :dateFrom)
-             AND (:dateTo IS NULL OR p.paymentDate <= :dateTo)
-             AND (:paymentMethodId IS NULL OR p.paymentMethod.id = :paymentMethodId)
+           WHERE (CAST(:dateFrom AS LocalDate) IS NULL OR p.paymentDate >= :dateFrom)
+             AND (CAST(:dateTo AS LocalDate) IS NULL OR p.paymentDate <= :dateTo)
+             AND (CAST(:paymentMethodId AS Long) IS NULL OR p.paymentMethod.id = :paymentMethodId)
            ORDER BY p.paymentDate DESC, p.id DESC
            """)
     List<CustomerPaymentEntity> search(

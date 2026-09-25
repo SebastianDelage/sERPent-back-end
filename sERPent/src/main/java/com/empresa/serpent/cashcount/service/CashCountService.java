@@ -1,5 +1,6 @@
 package com.empresa.serpent.cashcount.service;
 
+import com.empresa.serpent.backup.service.BackupService;
 import com.empresa.serpent.cashcount.domain.entity.CashCountEntity;
 import com.empresa.serpent.cashcount.domain.entity.CashCountLineEntity;
 import com.empresa.serpent.cashcount.repository.CashCountRepository;
@@ -49,6 +50,7 @@ public class CashCountService {
     private final WarehouseAccessService warehouseAccessService;
     private final WarehouseScopeService warehouseScopeService;
     private final AuthenticatedUserService authenticatedUserService;
+    private final BackupService backupService;
 
     /**
      * Closes the till for a branch.
@@ -124,7 +126,18 @@ public class CashCountService {
                     .build());
         }
 
-        return toResponse(cashCountRepository.save(cashCount));
+        CashCountResponse response = toResponse(cashCountRepository.save(cashCount));
+
+        // EL RESPALDO DEL DIA SE DISPARA ACA, porque cerrar caja es lo que marca el fin del dia,
+        // no cerrar la app ni una hora fija con la maquina apagada (handoff\fase6-decisiones.md).
+        //
+        // Se pide y se sigue: NO se espera. Medido: el respaldo tarda ~1 s con un anio de datos y
+        // no traba las ventas (una venta registrada mientras corria tardo 115 ms contra 193 ms sin
+        // respaldo), pero el cierre de caja no puede quedar esperando con gente en el mostrador.
+        // Si falla, quien avisa es el estado que mira la pantalla, no esta llamada.
+        backupService.requestBackup("cierre-de-caja");
+
+        return response;
     }
 
     /** The history, newest first, restricted to the branches the caller may see. */

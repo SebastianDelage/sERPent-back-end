@@ -51,7 +51,7 @@ public interface CashCountSourceRepository extends JpaRepository<TransactionEnti
            JOIN t.sale s
            WHERE t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.SALE
              AND s.warehouse.id = :warehouseId
-             AND (:periodFrom IS NULL OR t.date > :periodFrom)
+             AND (CAST(:periodFrom AS LocalDateTime) IS NULL OR t.date > :periodFrom)
              AND t.date <= :periodTo
            GROUP BY pm.id
            """)
@@ -81,7 +81,7 @@ public interface CashCountSourceRepository extends JpaRepository<TransactionEnti
            JOIN sr.originalSale os
            WHERE os.warehouse.id = :warehouseId
              AND os.onCredit = FALSE
-             AND (:periodFrom IS NULL OR t.date > :periodFrom)
+             AND (CAST(:periodFrom AS LocalDateTime) IS NULL OR t.date > :periodFrom)
              AND t.date <= :periodTo
            GROUP BY pm.id
            """)
@@ -105,7 +105,7 @@ public interface CashCountSourceRepository extends JpaRepository<TransactionEnti
            FROM CustomerPaymentEntity p
            JOIN p.paymentMethod pm
            WHERE p.warehouse.id = :warehouseId
-             AND (:periodFrom IS NULL OR p.createdAt > :periodFrom)
+             AND (CAST(:periodFrom AS LocalDateTime) IS NULL OR p.createdAt > :periodFrom)
              AND p.createdAt <= :periodTo
            GROUP BY pm.id
            """)
@@ -127,7 +127,7 @@ public interface CashCountSourceRepository extends JpaRepository<TransactionEnti
            FROM SupplierPaymentEntity p
            JOIN p.paymentMethod pm
            WHERE p.warehouse.id = :warehouseId
-             AND (:periodFrom IS NULL OR p.createdAt > :periodFrom)
+             AND (CAST(:periodFrom AS LocalDateTime) IS NULL OR p.createdAt > :periodFrom)
              AND p.createdAt <= :periodTo
            GROUP BY pm.id
            """)
@@ -151,7 +151,7 @@ public interface CashCountSourceRepository extends JpaRepository<TransactionEnti
            JOIN e.transaction t
            JOIN t.paymentMethod pm
            WHERE e.warehouse.id = :warehouseId
-             AND (:periodFrom IS NULL OR t.date > :periodFrom)
+             AND (CAST(:periodFrom AS LocalDateTime) IS NULL OR t.date > :periodFrom)
              AND t.date <= :periodTo
            GROUP BY pm.id
            """)
@@ -175,7 +175,7 @@ public interface CashCountSourceRepository extends JpaRepository<TransactionEnti
            JOIN t.paymentMethod pm
            WHERE p.warehouse.id = :warehouseId
              AND p.onCredit = FALSE
-             AND (:periodFrom IS NULL OR t.date > :periodFrom)
+             AND (CAST(:periodFrom AS LocalDateTime) IS NULL OR t.date > :periodFrom)
              AND t.date <= :periodTo
            GROUP BY pm.id
            """)
@@ -204,7 +204,7 @@ public interface CashCountSourceRepository extends JpaRepository<TransactionEnti
            WHERE os.warehouse.id = :warehouseId
              AND os.onCredit = FALSE
              AND t.paymentMethod IS NULL
-             AND (:periodFrom IS NULL OR t.date > :periodFrom)
+             AND (CAST(:periodFrom AS LocalDateTime) IS NULL OR t.date > :periodFrom)
              AND t.date <= :periodTo
            """)
     BigDecimal sumUnattributedReturns(
@@ -221,7 +221,7 @@ public interface CashCountSourceRepository extends JpaRepository<TransactionEnti
            WHERE os.warehouse.id = :warehouseId
              AND os.onCredit = FALSE
              AND t.paymentMethod IS NULL
-             AND (:periodFrom IS NULL OR t.date > :periodFrom)
+             AND (CAST(:periodFrom AS LocalDateTime) IS NULL OR t.date > :periodFrom)
              AND t.date <= :periodTo
            """)
     long countUnattributedReturns(
@@ -237,7 +237,7 @@ public interface CashCountSourceRepository extends JpaRepository<TransactionEnti
            JOIN e.transaction t
            WHERE e.warehouse.id = :warehouseId
              AND t.paymentMethod IS NULL
-             AND (:periodFrom IS NULL OR t.date > :periodFrom)
+             AND (CAST(:periodFrom AS LocalDateTime) IS NULL OR t.date > :periodFrom)
              AND t.date <= :periodTo
            """)
     BigDecimal sumUnattributedExpenses(
@@ -252,7 +252,7 @@ public interface CashCountSourceRepository extends JpaRepository<TransactionEnti
            JOIN e.transaction t
            WHERE e.warehouse.id = :warehouseId
              AND t.paymentMethod IS NULL
-             AND (:periodFrom IS NULL OR t.date > :periodFrom)
+             AND (CAST(:periodFrom AS LocalDateTime) IS NULL OR t.date > :periodFrom)
              AND t.date <= :periodTo
            """)
     long countUnattributedExpenses(

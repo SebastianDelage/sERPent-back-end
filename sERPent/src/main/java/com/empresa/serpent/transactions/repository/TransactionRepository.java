@@ -72,8 +72,8 @@ public interface TransactionRepository extends
                      com.empresa.serpent.transactions.domain.enums.TransactionType.RETURN
                  )
              AND d.product IS NOT NULL
-             AND (:dateFrom IS NULL OR t.date >= :dateFrom)
-             AND (:dateTo IS NULL OR t.date <= :dateTo)
+             AND (CAST(:dateFrom AS LocalDateTime) IS NULL OR t.date >= :dateFrom)
+             AND (CAST(:dateTo AS LocalDateTime) IS NULL OR t.date <= :dateTo)
              AND (:unrestricted = TRUE
                   OR COALESCE(s.warehouse.id, os.warehouse.id) IN :warehouseIds)
            GROUP BY d.product.id, d.product.name
@@ -100,8 +100,8 @@ public interface TransactionRepository extends
            LEFT JOIN sale_returns sr ON sr.transaction_id = t.transaction_id
            LEFT JOIN sales os ON os.sale_id = sr.original_sale_id
            WHERE t.type IN ('SALE', 'RETURN')
-             AND (:dateFrom IS NULL OR t.date >= :dateFrom)
-             AND (:dateTo IS NULL OR t.date <= :dateTo)
+             AND (CAST(:dateFrom AS TIMESTAMP) IS NULL OR t.date >= :dateFrom)
+             AND (CAST(:dateTo AS TIMESTAMP) IS NULL OR t.date <= :dateTo)
              AND (:unrestricted = TRUE
                   OR COALESCE(s.warehouse_id, os.warehouse_id) IN :warehouseIds)
            GROUP BY CAST(t.date AS DATE)
@@ -131,8 +131,8 @@ public interface TransactionRepository extends
            JOIN t.paymentMethod pm
            LEFT JOIN t.sale s
            WHERE t.type = com.empresa.serpent.transactions.domain.enums.TransactionType.SALE
-             AND (:dateFrom IS NULL OR t.date >= :dateFrom)
-             AND (:dateTo IS NULL OR t.date <= :dateTo)
+             AND (CAST(:dateFrom AS LocalDateTime) IS NULL OR t.date >= :dateFrom)
+             AND (CAST(:dateTo AS LocalDateTime) IS NULL OR t.date <= :dateTo)
              AND (:unrestricted = TRUE OR s.warehouse.id IN :warehouseIds)
            GROUP BY pm.id, pm.name
            ORDER BY SUM(t.total) DESC
@@ -186,8 +186,8 @@ public interface TransactionRepository extends
                JOIN transactions td ON td.transaction_id = d.transaction_id
                LEFT JOIN sales sd ON sd.transaction_id = td.transaction_id
                WHERE d.transaction_type = 'SALE'
-                 AND (:dateFrom IS NULL OR td.date >= :dateFrom)
-                 AND (:dateTo IS NULL OR td.date <= :dateTo)
+                 AND (CAST(:dateFrom AS TIMESTAMP) IS NULL OR td.date >= :dateFrom)
+                 AND (CAST(:dateTo AS TIMESTAMP) IS NULL OR td.date <= :dateTo)
                  AND (:unrestricted = TRUE OR sd.warehouse_id IN :warehouseIds)
            ), 0) AS listPriceSales,
            COALESCE((
@@ -198,8 +198,8 @@ public interface TransactionRepository extends
                JOIN transactions td ON td.transaction_id = d.transaction_id
                LEFT JOIN sales sd ON sd.transaction_id = td.transaction_id
                WHERE d.transaction_type = 'SALE'
-                 AND (:dateFrom IS NULL OR td.date >= :dateFrom)
-                 AND (:dateTo IS NULL OR td.date <= :dateTo)
+                 AND (CAST(:dateFrom AS TIMESTAMP) IS NULL OR td.date >= :dateFrom)
+                 AND (CAST(:dateTo AS TIMESTAMP) IS NULL OR td.date <= :dateTo)
                  AND (:unrestricted = TRUE OR sd.warehouse_id IN :warehouseIds)
            ), 0) AS paymentMethodSurcharges
        FROM transactions t
@@ -207,8 +207,8 @@ public interface TransactionRepository extends
        LEFT JOIN sale_returns sr ON sr.transaction_id = t.transaction_id
        LEFT JOIN sales os ON os.sale_id = sr.original_sale_id
        WHERE t.type IN ('SALE', 'RETURN')
-         AND (:dateFrom IS NULL OR t.date >= :dateFrom)
-         AND (:dateTo IS NULL OR t.date <= :dateTo)
+         AND (CAST(:dateFrom AS TIMESTAMP) IS NULL OR t.date >= :dateFrom)
+         AND (CAST(:dateTo AS TIMESTAMP) IS NULL OR t.date <= :dateTo)
          AND (:unrestricted = TRUE
               OR COALESCE(s.warehouse_id, os.warehouse_id) IN :warehouseIds)
        """, nativeQuery = true)

@@ -174,7 +174,7 @@ public interface InventoryStockSnapshotRepository extends
            FROM InventoryStockSnapshotEntity s
            JOIN s.product p
            JOIN s.warehouse w
-           WHERE (:productId IS NULL OR p.id = :productId)
+           WHERE (CAST(:productId AS Long) IS NULL OR p.id = :productId)
              AND (:unrestricted = TRUE OR w.id IN :warehouseIds)
            """)
     List<StockRowProjection> findStockRows(
@@ -302,7 +302,7 @@ public interface InventoryStockSnapshotRepository extends
        JOIN s.product p
        JOIN s.warehouse w
        WHERE (:unrestricted = TRUE OR w.id IN :warehouseIds)
-         AND (:warehouseId IS NULL OR w.id = :warehouseId)
+         AND (CAST(:warehouseId AS Long) IS NULL OR w.id = :warehouseId)
          AND COALESCE(
                  (SELECT m.reorderPoint FROM ProductWarehouseMinimumStockEntity m
                    WHERE m.product = p AND m.warehouse = w),

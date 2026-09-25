@@ -430,21 +430,21 @@ else {
 
 # --- 6) pgpass.conf para el respaldo --------------------------------------------------------
 #
-# El respaldo corre pg_dump como serpent_app, y libpq lee la contrasena de este archivo, que
-# vive en el perfil de UNA cuenta. Por eso lo escribe el instalador: la version anterior de
-# este paso era una linea del runbook que habia que acordarse de hacer en la cuenta correcta,
-# y si no coincidia con la cuenta de la tarea programada el respaldo fallaba sin que nadie se
-# enterara.
+# El respaldo corre pg_dump como serpent_app, y libpq lee la contrasena de este archivo.
 #
-# Se reemplaza solo la linea de esta base: cualquier otra que el usuario tenga —por ejemplo la
-# del superusuario, para administrar a mano— se conserva.
+# VA AL LADO DE serpent.properties, NO EN EL PERFIL DE UNA CUENTA (fase 6). El respaldo lo
+# dispara el back-end al cerrar caja (cuenta del mostrador), lo repite una tarea de red que corre
+# COMO SYSTEM, y a veces lo corre un tecnico a mano: un archivo en el perfil de una cuenta solo
+# sirve para una de las tres. El script del respaldo apunta ahi con PGPASSFILE.
+#
+# Medido (handoff\fase6-decisiones.md): PGPASSFILE funciona apuntando a cualquier ruta, incluso
+# con el ACL apretado (SYSTEM, Administradores y la cuenta del respaldo). Lo que viaja al proceso
+# hijo es LA RUTA, nunca la contrasena.
+#
+# Se reemplaza solo la linea de esta base: cualquier otra que el archivo tenga se conserva.
 
-$pgpassDir = Join-Path (Split-Path $env:APPDATA -Parent) 'Roaming\postgresql'
-if ($BackupTaskUser -eq $env:USERNAME) {
-    $pgpassDir = Join-Path $env:APPDATA 'postgresql'
-}
-$pgpassPath = Join-Path $pgpassDir 'pgpass.conf'
-New-Item -ItemType Directory -Force -Path $pgpassDir | Out-Null
+$pgpassPath = Join-Path (Split-Path $ConfigFile -Parent) 'pgpass.conf'
+New-Item -ItemType Directory -Force -Path (Split-Path $pgpassPath -Parent) | Out-Null
 
 $entry = "localhost:${Port}:${Database}:${AppRole}:${dbPassword}"
 $prefix = "localhost:${Port}:${Database}:${AppRole}:"
@@ -462,7 +462,7 @@ $pgpassChanged = Write-SecretFile -Path $pgpassPath -Lines ($kept + $entry) -Rea
     -Encoding ([System.Text.ASCIIEncoding]::new())
 
 if ($pgpassChanged) {
-    Write-Host "pgpass.conf: linea de '$AppRole' escrita en el perfil de '$BackupTaskUser'."
+    Write-Host "pgpass.conf: linea de '$AppRole' escrita en '$pgpassPath'."
 }
 else {
     Write-Host "pgpass.conf: ya estaba como corresponde."
