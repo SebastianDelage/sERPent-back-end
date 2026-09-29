@@ -18,6 +18,23 @@ public record ProductResponse(
         BigDecimal reorderPoint,
         BigDecimal reorderQuantity,
         LocalDateTime createdAt,
-        UnitOfMeasure unitOfMeasure
+        UnitOfMeasure unitOfMeasure,
+
+        /**
+         * Lo que se configuro para este producto, o null si nunca se configuro.
+         *
+         * <p>Va crudo porque la pantalla de edicion tiene que poder distinguir "usa el valor por
+         * omision" de "alguien puso justo ese numero".
+         */
+        BigDecimal priceAlertPercent,
+
+        /**
+         * El que de verdad se aplica. Nunca null.
+         *
+         * <p>VIAJAN LOS DOS Y NO UNO, para que la regla viva en un solo lado. Si la pantalla
+         * tuviera que resolver el valor por omision, el numero quedaria escrito tambien en el
+         * frontend y habria que acordarse de cambiarlo en dos lugares.
+         */
+        BigDecimal effectivePriceAlertPercent
 ) {
 }

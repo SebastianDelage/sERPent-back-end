@@ -35,11 +35,25 @@ negocio entero"), y es exactamente el que se probó.
 
 4. Restaurar:
    ```
-   "C:\Program Files\sERPent-postgresql\18\bin\pg_restore.exe" -U postgres -h localhost -p 5432 -d serpent_db --no-owner --no-privileges -v "RUTA\AL\serpent_db_....dump"
+   "C:\Program Files\sERPent-postgresql\18\bin\pg_restore.exe" -U postgres -h localhost -p 5432 -d serpent_db -v "RUTA\AL\serpent_db_....dump"
    ```
-   `--no-owner --no-privileges`: el dump puede traer el rol `postgres` de la PC
-   vieja; con estas opciones todo se crea con el rol que uno usa para restaurar,
-   sin pelearse con roles que no existen en la instalación nueva.
+
+   > **SIN `--no-owner --no-privileges`, Y ESO CAMBIÓ.** Este runbook las traía, y dejan la base
+   > inutilizable. Medido, ensayando la vuelta atrás y después en el banco
+   > `scratchpad\fase7\banco-restauracion.ps1`: con esas dos banderas, **60 objetos de `public`
+   > quedan perteneciendo a `postgres` en vez de a `serpent_app`**, y a partir de ahí
+   >
+   > ```
+   > pg_dump: error: la consulta falló: ERROR: permission denied for table cash_count_lines
+   > ```
+   >
+   > O sea que el respaldo deja de funcionar, y con el respaldo roto **el instalador tampoco deja
+   > actualizar**, porque el respaldo previo falla y sale con 7. Se queda sin app y sin poder
+   > instalar, que es el peor lugar donde estar parado en una tienda.
+   >
+   > El motivo por el que estaban —"el dump puede traer un rol que no existe acá"— no aplica: el
+   > rol se llama siempre `serpent_app` y **lo crea el instalador antes de que uno restaure**. Sin
+   > las banderas, `pg_restore` devuelve cada objeto a su dueño y la base queda como estaba.
 
    **Antes de restaurar sobre una base que tiene datos, respaldar lo que hay**, aunque esté mal:
    ```
@@ -61,14 +75,32 @@ reemplazar, no crear desde cero.
 2. Restaurar con `--clean --if-exists`, que borra cada objeto antes de
    recrearlo:
    ```
-   "C:\Program Files\PostgreSQL\17\bin\pg_restore.exe" -U postgres -h localhost -d serpent_db --clean --if-exists --no-owner --no-privileges -v "RUTA\AL\serpent_db_....dump"
+   "C:\Program Files\sERPent-postgresql\18\bin\pg_restore.exe" -U postgres -h localhost -p 5432 -d serpent_db --clean --if-exists -v "RUTA\AL\serpent_db_....dump"
    ```
+
+   Sin `--no-owner --no-privileges`, por lo que dice el recuadro del escenario A.
 
 3. Confirmar (sección de abajo) y volver a levantar el backend.
 
 ## Cómo confirmar que la restauración salió bien
 
-No alcanza con que `pg_restore` no tire error. Correr esto contra la base
+**Lo primero, y es una sola línea: correr el respaldo.** Si sale con 0, la base está sana de
+verdad — se pudo entrar como `serpent_app`, leer todas las tablas y escribir el registro. Es la
+misma prueba que hace el instalador antes de actualizar, así que si esto anda, la actualización
+también va a arrancar:
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\sERPent\ops\backup\backup-serpent-db.ps1" -Origen manual
+```
+
+> **SI DIO 22 CON "permission denied"**, la base se restauró con `--no-owner` y las tablas
+> quedaron de otro dueño. No hay que salir a repartir permisos a mano: volver a correr el
+> instalador lo arregla. `provision-database.ps1` detecta los objetos que no son de `serpent_app`
+> y se los pasa. (Repartir permisos a mano tampoco es inofensivo: cada permiso explícito agrega
+> una entrada al dump. Medido: el respaldo pasó de 327 a 388 entradas, +61, una por cada objeto
+> ajeno. No rompe nada, pero el número deja de ser comparable con el de antes.)
+
+Después, no alcanza con que `pg_restore` no tire error. Correr esto contra la base
 restaurada:
 
 ```sql

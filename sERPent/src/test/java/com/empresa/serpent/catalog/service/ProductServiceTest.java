@@ -64,7 +64,8 @@ class ProductServiceTest {
                 new BigDecimal("20.000"),
                 new BigDecimal("25.000"),
                 new BigDecimal("50.000"),
-                UnitOfMeasure.UNIT
+                UnitOfMeasure.UNIT,
+                null   // priceAlertPercent: sin configurar, usa el valor por omision
         );
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.empty());
@@ -105,7 +106,8 @@ class ProductServiceTest {
                 null,
                 null,
                 null,
-                UnitOfMeasure.KG
+                UnitOfMeasure.KG,
+                null   // priceAlertPercent: sin configurar, usa el valor por omision
         );
 
         when(productRepository.findBySku("POLLO002")).thenReturn(Optional.empty());
@@ -137,7 +139,8 @@ class ProductServiceTest {
                 null,
                 null,
                 null,
-                UnitOfMeasure.KG
+                UnitOfMeasure.KG,
+                null   // priceAlertPercent: sin configurar, usa el valor por omision
         );
 
         when(productRepository.save(any(ProductEntity.class))).thenAnswer(invocation -> {
@@ -171,7 +174,8 @@ class ProductServiceTest {
                 null,
                 null,
                 null,
-                UnitOfMeasure.UNIT
+                UnitOfMeasure.UNIT,
+                null   // priceAlertPercent: sin configurar, usa el valor por omision
         );
 
         ProductEntity existing = ProductEntity.builder()
@@ -205,7 +209,8 @@ class ProductServiceTest {
                 null,
                 null,
                 null,
-                UnitOfMeasure.UNIT
+                UnitOfMeasure.UNIT,
+                null   // priceAlertPercent: sin configurar, usa el valor por omision
         );
 
         ValidationException ex = assertThrows(
@@ -231,7 +236,8 @@ class ProductServiceTest {
                 null,
                 null,
                 null,
-                UnitOfMeasure.UNIT
+                UnitOfMeasure.UNIT,
+                null   // priceAlertPercent: sin configurar, usa el valor por omision
         );
 
         ValidationException ex = assertThrows(
@@ -257,7 +263,8 @@ class ProductServiceTest {
                 new BigDecimal("-1.000"),
                 null,
                 null,
-                UnitOfMeasure.UNIT
+                UnitOfMeasure.UNIT,
+                null   // priceAlertPercent: sin configurar, usa el valor por omision
         );
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.empty());
@@ -285,7 +292,8 @@ class ProductServiceTest {
                 new BigDecimal("20.000"),
                 new BigDecimal("10.000"),
                 new BigDecimal("50.000"),
-                UnitOfMeasure.UNIT
+                UnitOfMeasure.UNIT,
+                null   // priceAlertPercent: sin configurar, usa el valor por omision
         );
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.empty());
@@ -326,7 +334,8 @@ class ProductServiceTest {
                 new BigDecimal("15.000"),
                 new BigDecimal("20.000"),
                 new BigDecimal("40.000"),
-                UnitOfMeasure.UNIT
+                UnitOfMeasure.UNIT,
+                null   // priceAlertPercent: sin configurar, usa el valor por omision
         );
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.of(existing));
@@ -366,7 +375,8 @@ class ProductServiceTest {
                 null,
                 null,
                 null,
-                UnitOfMeasure.UNIT
+                UnitOfMeasure.UNIT,
+                null   // priceAlertPercent: sin configurar, usa el valor por omision
         );
 
         when(productRepository.findBySku("POLLO002")).thenReturn(Optional.of(other));
@@ -395,7 +405,8 @@ class ProductServiceTest {
                 null,
                 null,
                 null,
-                UnitOfMeasure.UNIT
+                UnitOfMeasure.UNIT,
+                null   // priceAlertPercent: sin configurar, usa el valor por omision
         );
 
         when(productRepository.findBySku("POLLO001")).thenReturn(Optional.empty());

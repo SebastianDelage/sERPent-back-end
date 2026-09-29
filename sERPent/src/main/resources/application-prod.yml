@@ -69,7 +69,23 @@ spring:
     # ordena por numero de version, asi que el piso de V40 de common la deja siempre despues.
     # Ver db/common/README.md.
     locations: classpath:db/migration,classpath:db/common
-    baseline-on-migrate: true
+    # EN false, Y ESTA MEDIDO (fase 7, scratchpad\fase7\medir-baseline.ps1).
+    #
+    # Con true, si Flyway encuentra un esquema NO VACIO y SIN tabla de historial, se inventa un
+    # punto de partida: anota la V1 como aplicada SIN CORRERLA y sigue desde la V2. Medido contra
+    # el jar de verdad: en una base con un solo objeto suelto y sin historial escribe
+    # "Successfully baselined schema with version: 1" y despues revienta en la V2, porque la V2
+    # necesita lo que crea la V1. La app no arranca igual, pero el mensaje no dice lo que pasa.
+    #
+    # Con false, el mismo caso frena con la verdad:
+    #   "Found non-empty schema(s) "public" but no schema history table."
+    # y no toca nada.
+    #
+    # EN UNA INSTALACION NUEVA NO CAMBIA NADA: la base la crea provision-database.ps1 vacia, y
+    # contra una base vacia Flyway aplica todo igual (medido: 33 migraciones, 0,32 s). El unico
+    # caso donde la diferencia se nota es una base en un estado inesperado — un restore parcial,
+    # un historial borrado —, que es exactamente cuando hace falta que avise en vez de adivinar.
+    baseline-on-migrate: false
     validate-on-migrate: true
 
 serpent:

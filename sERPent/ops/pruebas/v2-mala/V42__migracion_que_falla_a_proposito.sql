@@ -1,0 +1,23 @@
+-- V42__migracion_que_falla_a_proposito.sql
+--
+-- ESTA MIGRACIÓN ESTÁ ROTA A PROPÓSITO Y NO VA EN NINGUNA VERSIÓN QUE SE INSTALE.
+--
+-- PARA QUÉ EXISTE. La fase 7 agregó un paso al instalador que migra la base y verifica el
+-- resultado antes de decir que la actualización salió bien. Un camino de falla que nunca se
+-- ejecuta es un camino de falla que no está probado: sin este archivo, la única forma de saber
+-- si el instalador detecta una migración rota sería que se rompa una de verdad, en la tienda.
+--
+-- DÓNDE VIVE, Y POR QUÉ ACÁ. Fuera de db/common, fuera de db/migration, fuera de cualquier
+-- carpeta que algún perfil tenga en sus "locations". Flyway no la puede encontrar sola: hay que
+-- copiarla a mano, y eso lo hace un solo script —scripts\build-v2-mala.ps1 del proyecto de
+-- escritorio— que la borra en su "finally".
+--
+-- Y SI EL SCRIPT SE MUERE A MITAD DE CAMINO, que es lo que de verdad podría pasar: los dos
+-- scripts de compilación normales (build-app.ps1 y build-installer.ps1) CORTAN si encuentran un
+-- archivo con "a_proposito" en el nombre dentro de db/common. O sea que una copia olvidada no
+-- puede salir en un instalador bueno: rompe la compilación con un mensaje que lo dice.
+--
+-- QUÉ HACE. Falla. Toca una tabla que no existe y no puede existir, así que el error es
+-- inequívoco y no depende del estado de la base.
+
+ALTER TABLE tabla_que_no_existe_a_proposito ADD COLUMN x INTEGER;

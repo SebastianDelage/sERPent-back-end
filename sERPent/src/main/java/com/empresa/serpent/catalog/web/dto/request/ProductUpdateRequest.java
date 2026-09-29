@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
@@ -85,5 +86,14 @@ public record ProductUpdateRequest(
         BigDecimal reorderQuantity,
 
         @NotNull(message = "La unidad de medida es obligatoria.")
-        UnitOfMeasure unitOfMeasure
+        UnitOfMeasure unitOfMeasure,
+
+        /** Cuánto puede moverse el precio antes de avisar. Vacío = el valor por omisión. */
+        @Positive(message = "La tolerancia de precio tiene que ser mayor que cero.")
+        @Digits(
+                integer = 3,
+                fraction = 2,
+                message = "La tolerancia de precio no puede superar 999,99 y admite hasta dos decimales."
+        )
+        BigDecimal priceAlertPercent
 ) {}

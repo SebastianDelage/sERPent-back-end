@@ -66,6 +66,16 @@ public class ProductEntity {
     @Column(name = "reorder_quantity", precision = 12, scale = 3)
     private BigDecimal reorderQuantity;
 
+    /**
+     * Cuanto puede moverse el precio de este producto antes de que valga la pena preguntar.
+     *
+     * <p>NULL quiere decir "usa el valor por omision", que vive en PriceAlertPolicy y no aca: es
+     * un numero que se va a mover con la experiencia, y moverlo tiene que ser un despliegue y no
+     * una migracion. Los productos que ya existian quedaron en NULL y andan sin configurar nada.
+     */
+    @Column(name = "price_alert_percent", precision = 5, scale = 2)
+    private BigDecimal priceAlertPercent;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

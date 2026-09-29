@@ -369,6 +369,77 @@ else {
     Write-Host "  Se le dieron a '$AppRole' permisos de lectura, escritura y creacion."
 }
 
+# --- 3b) LOS DUENOS DE LAS TABLAS, DESPUES DE UNA RESTAURACION -----------------------------
+#
+# QUE PROBLEMA RESUELVE, Y NO ES HIPOTETICO. Restaurar un respaldo con
+# "pg_restore --no-owner" deja TODAS las tablas perteneciendo al superusuario, no a serpent_app.
+# La base sigue siendo de serpent_app —el objeto base no se recrea—, asi que el bloque de arriba
+# la ve bien y no hace nada, pero adentro la aplicacion ya no puede leer nada:
+#
+#   pg_dump: error: la consulta fallo: ERROR: permission denied for table cash_count_lines
+#
+# Y con el respaldo roto el instalador tampoco deja actualizar, porque el respaldo previo falla.
+# Paso de verdad, ensayando la vuelta atras: la salida fue a mano, con GRANT sobre cada tabla.
+#
+# El procedimiento de restauracion ya NO usa --no-owner (ver RESTORE-RUNBOOK.md), asi que esto no
+# deberia hacer falta nunca. Esta igual porque el instinto de cualquiera parado frente a una
+# instalacion rota es volver a correr el instalador, y hasta ahora eso no arreglaba nada.
+#
+# SOLO SI LA BASE ES NUESTRA. Si la base es de otro dueno no se toca ni un objeto: eso ya lo
+# decidio el bloque de arriba y este no lo contradice.
+if ($dbOwner -eq $AppRole) {
+    # LAS SECUENCIAS ENLAZADAS A UNA COLUMNA QUEDAN AFUERA, y no es un detalle: PostgreSQL no deja
+    # cambiarles el dueno por separado ("la secuencia esta enlazada a la tabla"), porque siguen al
+    # de su tabla. Intentarlo cortaba la reparacion entera en la primera de las 29 que tiene este
+    # esquema. Se las saca de la cuenta Y del bucle, que tienen que mirar exactamente lo mismo:
+    # si una quedara en la cuenta y no en el bucle, la verificacion del final fallaria sola.
+    $sinEnlazar = "AND NOT (c.relkind = 'S' AND EXISTS (SELECT 1 FROM pg_depend d " +
+                  "WHERE d.objid = c.oid AND d.classid = 'pg_class'::regclass " +
+                  "AND d.refobjsubid > 0 AND d.deptype IN ('a','i')))"
+    $consultaAjenos = "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace " +
+                      "WHERE n.nspname = 'public' AND c.relkind IN ('r','p','v','m','S') " +
+                      "AND pg_get_userbyid(c.relowner) <> '$AppRole' $sinEnlazar"
+    $ajenos = [int](Invoke-Sql $consultaAjenos -OnDatabase $Database)
+    if ($ajenos -gt 0) {
+        # El bloque va entre comillas SIMPLES y con etiqueta propia ($reparar$): con comillas
+        # dobles, PowerShell se come el "$$" de PostgreSQL, que es una variable automatica suya.
+        $reparacion = @'
+DO $reparar$
+DECLARE r record;
+BEGIN
+    FOR r IN SELECT c.relkind AS kind, n.nspname AS esquema, c.relname AS nombre
+             FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'public' AND c.relkind IN ('r','p','v','m','S')
+               AND pg_get_userbyid(c.relowner) <> 'APP_ROLE'
+               AND NOT (c.relkind = 'S' AND EXISTS (SELECT 1 FROM pg_depend d
+                        WHERE d.objid = c.oid AND d.classid = 'pg_class'::regclass
+                          AND d.refobjsubid > 0 AND d.deptype IN ('a','i')))
+    LOOP
+        IF r.kind IN ('r','p') THEN
+            EXECUTE format('ALTER TABLE %I.%I OWNER TO %I', r.esquema, r.nombre, 'APP_ROLE');
+        ELSIF r.kind = 'S' THEN
+            EXECUTE format('ALTER SEQUENCE %I.%I OWNER TO %I', r.esquema, r.nombre, 'APP_ROLE');
+        ELSIF r.kind = 'v' THEN
+            EXECUTE format('ALTER VIEW %I.%I OWNER TO %I', r.esquema, r.nombre, 'APP_ROLE');
+        ELSIF r.kind = 'm' THEN
+            EXECUTE format('ALTER MATERIALIZED VIEW %I.%I OWNER TO %I', r.esquema, r.nombre, 'APP_ROLE');
+        END IF;
+    END LOOP;
+END
+$reparar$;
+'@
+        Invoke-Sql ($reparacion.Replace('APP_ROLE', $AppRole)) -OnDatabase $Database | Out-Null
+        $quedan = [int](Invoke-Sql $consultaAjenos -OnDatabase $Database)
+        if ($quedan -gt 0) {
+            throw "Quedaron $quedan objetos de 'public' que no son de '$AppRole' y no se pudieron pasar. La aplicacion no va a poder leerlos."
+        }
+        Write-Host "Base '$Database': $ajenos objetos no eran de '$AppRole' (tipico de una restauracion con --no-owner) y se le pasaron."
+    }
+    else {
+        Write-Host "Base '$Database': todos sus objetos son de '$AppRole'."
+    }
+}
+
 # La codificación de la base, siempre (nueva o ya existente). La app guarda texto con tildes y eñes
 # y el driver JDBC habla UTF-8: una base en otra codificación rompe en silencio. El locale lo fija
 # el clúster (initdb en el instalador, fase5-decisiones.md) y acá solo se anota.
